@@ -1,0 +1,24 @@
+[
+  {
+    "id": "jobs-faq-001",
+    "title": "Finding work",
+    "category": "Jobs FAQ",
+    "language": "English",
+    "keywords": ["job", "jobs", "work", "looking for work", "find job", "worker", "עבודה", "מחפש עבודה", "משרה", "תעסוקה"],
+    "question": "How can I find a job in Israel?",
+    "answer": "Start with trusted contacts, community groups, licensed agencies, and employers you can verify. Be careful with anyone asking for money before giving you clear job details.",
+    "relatedTopics": ["Workers Rights", "Documents"],
+    "lastUpdated": "2026-06-30"
+  },
+  {
+    "id": "jobs-faq-002",
+    "title": "Documents for work",
+    "category": "Jobs FAQ",
+    "language": "English",
+    "keywords": ["job documents", "work permit", "visa", "passport", "contract", "מסמכי עבודה", "אישור עבודה", "ויזה", "דרכון", "חוזה"],
+    "question": "What documents may I need for work?",
+    "answer": "You may need your passport, valid visa or permit, contract, bank details, and sometimes health insurance details. Requirements depend on the job and your legal status.",
+    "relatedTopics": ["Documents", "Workers Rights"],
+    "lastUpdated": "2026-06-30"
+  }
+]

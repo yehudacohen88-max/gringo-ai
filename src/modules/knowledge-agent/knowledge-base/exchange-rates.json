@@ -1,0 +1,24 @@
+[
+  {
+    "id": "exchange-rates-001",
+    "title": "Where to check exchange rates",
+    "category": "Exchange Rates",
+    "language": "English",
+    "keywords": ["exchange", "rate", "rates", "currency", "shekel", "nis", "dollar", "usd"],
+    "question": "Where can I check the exchange rate in Israel?",
+    "answer": "You can check exchange rates through your bank, licensed money changers, or reliable financial websites. Always compare the rate and the fee before exchanging money.",
+    "relatedTopics": ["Money Transfer Companies"],
+    "lastUpdated": "2026-06-30"
+  },
+  {
+    "id": "exchange-rates-002",
+    "title": "Exchange rate and transfer fee",
+    "category": "Exchange Rates",
+    "language": "English",
+    "keywords": ["exchange", "rate", "fee", "transfer", "commission", "send money"],
+    "question": "Why is the exchange rate different when I send money?",
+    "answer": "The final amount can change because companies use different exchange rates and also charge transfer fees. Check both the exchange rate and the fee before sending.",
+    "relatedTopics": ["Money Transfer Companies"],
+    "lastUpdated": "2026-06-30"
+  }
+]

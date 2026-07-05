@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Workers | Gringo Community</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Gringo Platform</p>
+        <h1>Workers</h1>
+      </div>
+      <nav class="nav-actions" aria-label="Workers navigation">
+        <a class="button" href="/add-worker.html">Add worker</a>
+        <a class="button button-secondary" href="/contacts.html">Contacts</a>
+      </nav>
+    </header>
+
+    <main class="page-shell">
+      <section class="list-panel">
+        <div class="section-heading split">
+          <div>
+            <h2>Worker roster</h2>
+            <p id="workerCount">Loading workers...</p>
+          </div>
+          <button id="refreshWorkersButton" class="button button-secondary" type="button">Refresh</button>
+        </div>
+
+        <div id="workersAlert" class="alert" role="status" hidden></div>
+
+        <form id="workerFiltersForm" class="filters-form" aria-label="Worker filters">
+          <label>
+            <span>Search</span>
+            <input name="search" placeholder="Name, phone, skill, passport">
+          </label>
+          <label>
+            <span>Status</span>
+            <select name="status">
+              <option value="">Active statuses</option>
+              <option value="new">New</option>
+              <option value="screening">Screening</option>
+              <option value="ready">Ready</option>
+              <option value="working">Working</option>
+              <option value="inactive">Inactive</option>
+              <option value="not_eligible">Not eligible</option>
+              <option value="archived">Archived</option>
+            </select>
+          </label>
+          <label>
+            <span>Availability</span>
+            <select name="availability">
+              <option value="">Any</option>
+              <option value="unknown">Unknown</option>
+              <option value="immediate">Immediate</option>
+              <option value="this_week">This week</option>
+              <option value="this_month">This month</option>
+              <option value="unavailable">Unavailable</option>
+            </select>
+          </label>
+          <label>
+            <span>Nationality</span>
+            <input name="nationality" placeholder="Nationality">
+          </label>
+          <label>
+            <span>Profession</span>
+            <input name="profession" placeholder="Profession">
+          </label>
+          <label>
+            <span>City</span>
+            <input name="current_city" placeholder="City">
+          </label>
+          <div class="filter-actions">
+            <button class="button" type="submit">Apply</button>
+            <button id="clearWorkerFiltersButton" class="button button-secondary" type="button">Clear</button>
+          </div>
+        </form>
+
+        <div id="workersLoadingState" class="loading-state">Loading workers...</div>
+        <div id="workersEmptyState" class="empty-state" hidden>No workers found.</div>
+
+        <div class="table-wrap">
+          <table id="workersTable" hidden>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Nationality</th>
+                <th>Phone</th>
+                <th>Profession</th>
+                <th>City</th>
+                <th>Availability</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="workersTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="/workers-list.js"></script>
+  </body>
+</html>

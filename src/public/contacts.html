@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Contact List | Gringo Community</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Contacts</p>
+        <h1>Contact list</h1>
+      </div>
+      <nav class="nav-actions" aria-label="Contacts navigation">
+        <a class="button" href="/add-contact.html">Add contact</a>
+      </nav>
+    </header>
+
+    <main class="page-shell">
+      <section class="list-panel" aria-labelledby="contact-list-title">
+        <div class="section-heading split">
+          <div>
+            <h2 id="contact-list-title">Saved contacts</h2>
+            <p id="contactCount">Loading contacts...</p>
+          </div>
+          <button id="refreshButton" class="button button-secondary" type="button">Refresh</button>
+        </div>
+
+        <div id="listAlert" class="alert" role="status" hidden></div>
+        <form id="filtersForm" class="filters-form" aria-label="Contact filters">
+          <label>
+            <span>Search</span>
+            <input id="searchInput" name="search" placeholder="Name, phone, or email">
+          </label>
+
+          <label>
+            <span>Status</span>
+            <select id="statusFilter" name="status">
+              <option value="">All active statuses</option>
+              <option value="new">New</option>
+              <option value="reviewed">Reviewed</option>
+              <option value="contacted">Contacted</option>
+              <option value="engaged">Engaged</option>
+              <option value="follow_up">Follow up</option>
+              <option value="active_member">Active member</option>
+              <option value="inactive">Inactive</option>
+              <option value="not_relevant">Not relevant</option>
+              <option value="archived">Archived</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Source</span>
+            <select id="sourceFilter" name="source">
+              <option value="">All sources</option>
+              <option value="manual">Manual</option>
+              <option value="website">Website</option>
+              <option value="referral">Referral</option>
+              <option value="event">Event</option>
+              <option value="facebook">Facebook</option>
+              <option value="instagram">Instagram</option>
+              <option value="google">Google</option>
+              <option value="partner">Partner</option>
+              <option value="import">Import</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Country</span>
+            <input id="countryFilter" name="country" placeholder="Country">
+          </label>
+
+          <div class="filter-actions">
+            <button class="button" type="submit">Apply</button>
+            <button id="clearFiltersButton" class="button button-secondary" type="button">Clear</button>
+          </div>
+        </form>
+
+        <div id="loadingState" class="loading-state">Loading contacts...</div>
+        <div id="emptyState" class="empty-state" hidden>No contacts yet.</div>
+
+        <div class="table-wrap">
+          <table id="contactsTable" hidden>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Status</th>
+                <th>Source</th>
+                <th>Country</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="contactsTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <div id="editModal" class="modal-backdrop" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="editContactTitle">
+        <div class="section-heading split">
+          <div>
+            <h2 id="editContactTitle">Edit contact</h2>
+            <p>Update the contact details and save changes.</p>
+          </div>
+          <button id="closeEditButton" class="button button-secondary" type="button">Close</button>
+        </div>
+
+        <form id="editContactForm" class="contact-form">
+          <input type="hidden" name="contact_id">
+          <div class="form-grid">
+            <label>
+              <span>First name</span>
+              <input name="first_name" required>
+            </label>
+
+            <label>
+              <span>Last name</span>
+              <input name="last_name">
+            </label>
+
+            <label>
+              <span>Email</span>
+              <input name="email" type="email">
+            </label>
+
+            <label>
+              <span>Phone</span>
+              <input name="phone">
+            </label>
+
+            <label>
+              <span>Country</span>
+              <input name="country">
+            </label>
+
+            <label>
+              <span>City</span>
+              <input name="city">
+            </label>
+
+            <label>
+              <span>Status</span>
+              <select name="status">
+                <option value="new">New</option>
+                <option value="reviewed">Reviewed</option>
+                <option value="contacted">Contacted</option>
+                <option value="engaged">Engaged</option>
+                <option value="follow_up">Follow up</option>
+                <option value="active_member">Active member</option>
+                <option value="inactive">Inactive</option>
+                <option value="not_relevant">Not relevant</option>
+                <option value="archived">Archived</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Source</span>
+              <select name="source">
+                <option value="manual">Manual</option>
+                <option value="website">Website</option>
+                <option value="referral">Referral</option>
+                <option value="event">Event</option>
+                <option value="facebook">Facebook</option>
+                <option value="instagram">Instagram</option>
+                <option value="google">Google</option>
+                <option value="partner">Partner</option>
+                <option value="import">Import</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Interest</span>
+              <select name="interest">
+                <option value="unknown">Unknown</option>
+                <option value="community">Community</option>
+                <option value="events">Events</option>
+                <option value="housing">Housing</option>
+                <option value="jobs">Jobs</option>
+                <option value="business">Business</option>
+                <option value="language">Language</option>
+                <option value="support">Support</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Priority</span>
+              <select name="priority">
+                <option value="normal">Normal</option>
+                <option value="low">Low</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </label>
+
+            <label class="wide">
+              <span>Tags</span>
+              <input name="tags">
+            </label>
+
+            <label class="wide">
+              <span>Source detail</span>
+              <input name="source_detail">
+            </label>
+          </div>
+
+          <div class="form-actions">
+            <button id="saveEditButton" class="button" type="submit">Save changes</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <script src="/contacts-list.js"></script>
+  </body>
+</html>

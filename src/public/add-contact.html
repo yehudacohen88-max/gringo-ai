@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Add Contact | Gringo Community</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Contacts</p>
+        <h1>Add contact</h1>
+      </div>
+      <nav class="nav-actions" aria-label="Contacts navigation">
+        <a class="button button-secondary" href="/contacts.html">View contacts</a>
+      </nav>
+    </header>
+
+    <main class="page-shell">
+      <section class="form-panel" aria-labelledby="add-contact-title">
+        <div class="section-heading">
+          <h2 id="add-contact-title">New contact</h2>
+          <p>First name and one contact method are required.</p>
+        </div>
+
+        <div id="formAlert" class="alert" role="status" hidden></div>
+
+        <form id="contactForm" class="contact-form">
+          <div class="form-grid">
+            <label>
+              <span>First name</span>
+              <input name="first_name" autocomplete="given-name" required>
+            </label>
+
+            <label>
+              <span>Last name</span>
+              <input name="last_name" autocomplete="family-name">
+            </label>
+
+            <label>
+              <span>Email</span>
+              <input name="email" type="email" autocomplete="email">
+            </label>
+
+            <label>
+              <span>Phone</span>
+              <input name="phone" autocomplete="tel">
+            </label>
+
+            <label>
+              <span>Country</span>
+              <input name="country" autocomplete="country-name">
+            </label>
+
+            <label>
+              <span>City</span>
+              <input name="city" autocomplete="address-level2">
+            </label>
+
+            <label>
+              <span>Preferred channel</span>
+              <select name="preferred_channel">
+                <option value="unknown">Unknown</option>
+                <option value="phone">Phone</option>
+                <option value="email">Email</option>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="telegram">Telegram</option>
+                <option value="line">Line</option>
+                <option value="in_person">In person</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Source</span>
+              <select name="source">
+                <option value="manual">Manual</option>
+                <option value="website">Website</option>
+                <option value="referral">Referral</option>
+                <option value="event">Event</option>
+                <option value="facebook">Facebook</option>
+                <option value="instagram">Instagram</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Interest</span>
+              <select name="interest">
+                <option value="unknown">Unknown</option>
+                <option value="community">Community</option>
+                <option value="events">Events</option>
+                <option value="housing">Housing</option>
+                <option value="jobs">Jobs</option>
+                <option value="business">Business</option>
+                <option value="language">Language</option>
+                <option value="support">Support</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Priority</span>
+              <select name="priority">
+                <option value="normal">Normal</option>
+                <option value="low">Low</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </label>
+
+            <label class="wide">
+              <span>Tags</span>
+              <input name="tags" placeholder="new-member, events">
+            </label>
+
+            <label class="wide">
+              <span>Source detail</span>
+              <input name="source_detail" placeholder="Event name, group name, or referral detail">
+            </label>
+          </div>
+
+          <div class="form-actions">
+            <button id="submitButton" class="button" type="submit">Save contact</button>
+            <a class="button button-secondary" href="/contacts.html">Cancel</a>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <script src="/contact-form.js"></script>
+  </body>
+</html>

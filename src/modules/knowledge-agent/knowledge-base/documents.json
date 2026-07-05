@@ -1,0 +1,24 @@
+[
+  {
+    "id": "documents-001",
+    "title": "Important documents to keep",
+    "category": "Documents",
+    "language": "English",
+    "keywords": ["documents", "passport", "visa", "permit", "contract", "payslip"],
+    "question": "Which documents should I keep safe?",
+    "answer": "Keep your passport, visa or permit, work contract, payslips, health insurance details, and important employer messages. Keep photos or scans as backup.",
+    "relatedTopics": ["Workers Rights", "Jobs FAQ"],
+    "lastUpdated": "2026-06-30"
+  },
+  {
+    "id": "documents-002",
+    "title": "Passport held by someone else",
+    "category": "Documents",
+    "language": "English",
+    "keywords": ["passport", "employer took passport", "documents held", "visa"],
+    "question": "Can my employer keep my passport?",
+    "answer": "Your passport is your personal document. If someone is holding it and you cannot get it back, ask for help from a trusted organization or legal support.",
+    "relatedTopics": ["Workers Rights", "Emergency Numbers"],
+    "lastUpdated": "2026-06-30"
+  }
+]

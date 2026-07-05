@@ -1,0 +1,24 @@
+[
+  {
+    "id": "money-transfer-001",
+    "title": "Sending money from Israel",
+    "category": "Money Transfer Companies",
+    "language": "English",
+    "keywords": ["money", "transfer", "send", "remittance", "family", "abroad"],
+    "question": "How can I send money from Israel to my family?",
+    "answer": "You can send money through licensed transfer companies, banks, or digital transfer services. Compare the fee, exchange rate, delivery time, and whether the receiver needs cash pickup or bank deposit.",
+    "relatedTopics": ["Exchange Rates"],
+    "lastUpdated": "2026-06-30"
+  },
+  {
+    "id": "money-transfer-002",
+    "title": "Before choosing a transfer company",
+    "category": "Money Transfer Companies",
+    "language": "English",
+    "keywords": ["company", "transfer company", "fee", "rate", "receipt", "safe"],
+    "question": "How do I choose a money transfer company?",
+    "answer": "Use a licensed company, ask for the total fee, check the exchange rate, and keep the receipt. Do not send money through someone you do not trust.",
+    "relatedTopics": ["Exchange Rates"],
+    "lastUpdated": "2026-06-30"
+  }
+]

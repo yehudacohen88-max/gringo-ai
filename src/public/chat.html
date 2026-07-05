@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chat with Gringo</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="page-shell">
+      <section class="form-panel">
+        <div class="section-heading">
+          <h1>Chat with Gringo</h1>
+          <p>Ask a question and Gringo will try to help.</p>
+        </div>
+
+        <div id="chatAlert" class="alert alert-error" hidden></div>
+        <div id="chatHistory" class="chat-history" aria-live="polite"></div>
+
+        <form id="chatForm" class="chat-form">
+          <input id="chatInput" name="message" placeholder="Type your message..." autocomplete="off" required>
+          <button id="chatSendButton" class="button" type="submit">Send</button>
+        </form>
+
+        <p id="chatLoading" class="chat-loading" hidden>Gringo is thinking...</p>
+      </section>
+    </main>
+
+    <script src="/chat.js"></script>
+  </body>
+</html>

@@ -1,0 +1,24 @@
+[
+  {
+    "id": "housing-001",
+    "title": "Renting an apartment",
+    "category": "Housing",
+    "language": "English",
+    "keywords": ["rent", "apartment", "housing", "house", "room", "landlord"],
+    "question": "What should I check before renting an apartment?",
+    "answer": "Check the price, bills, contract length, deposit, location, public transport, and who is responsible for repairs. Do not pay large amounts before seeing the place and understanding the agreement.",
+    "relatedTopics": ["Workers Rights"],
+    "lastUpdated": "2026-06-30"
+  },
+  {
+    "id": "housing-002",
+    "title": "Problems with landlord",
+    "category": "Housing",
+    "language": "English",
+    "keywords": ["landlord", "deposit", "repair", "rent problem", "apartment problem"],
+    "question": "What can I do if I have a problem with my landlord?",
+    "answer": "Keep messages, photos, receipts, and the rental agreement. Explain the problem in writing. If it is serious, ask for help before leaving or stopping payment.",
+    "relatedTopics": ["Workers Rights"],
+    "lastUpdated": "2026-06-30"
+  }
+]

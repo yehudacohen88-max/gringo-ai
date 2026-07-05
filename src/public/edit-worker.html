@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Edit Worker | Gringo Community</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Workers</p>
+        <h1>Edit worker</h1>
+      </div>
+      <nav class="nav-actions" aria-label="Workers navigation">
+        <a class="button button-secondary" href="/workers.html">Worker list</a>
+      </nav>
+    </header>
+
+    <main class="page-shell">
+      <section class="form-panel">
+        <div class="section-heading">
+          <h2>Worker profile</h2>
+          <p>Update worker details and save changes.</p>
+        </div>
+        <div id="workerFormAlert" class="alert" role="status" hidden></div>
+        <div id="workerFormLoading" class="loading-state">Loading worker...</div>
+        <form id="workerForm" class="contact-form" data-mode="edit" hidden>
+          <input type="hidden" name="worker_id">
+          <div id="workerFormFields" class="form-grid"></div>
+          <div class="form-actions">
+            <button id="saveWorkerButton" class="button" type="submit">Save changes</button>
+            <a class="button button-secondary" href="/workers.html">Cancel</a>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <script src="/worker-form-fields.js"></script>
+    <script src="/worker-form.js"></script>
+  </body>
+</html>

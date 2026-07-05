@@ -1,0 +1,24 @@
+[
+  {
+    "id": "emergency-001",
+    "title": "Emergency numbers in Israel",
+    "category": "Emergency Numbers",
+    "language": "English",
+    "keywords": ["emergency", "police", "ambulance", "fire", "help", "danger"],
+    "question": "What are the emergency numbers in Israel?",
+    "answer": "In Israel, call 100 for police, 101 for ambulance, and 102 for fire and rescue. If someone is in immediate danger, call emergency services now.",
+    "relatedTopics": ["Healthcare"],
+    "lastUpdated": "2026-06-30"
+  },
+  {
+    "id": "emergency-002",
+    "title": "Medical emergency",
+    "category": "Emergency Numbers",
+    "language": "English",
+    "keywords": ["medical emergency", "ambulance", "hospital", "urgent", "101"],
+    "question": "What should I do in a medical emergency?",
+    "answer": "For a medical emergency in Israel, call 101 for an ambulance. If you can safely reach a hospital emergency room, go there immediately.",
+    "relatedTopics": ["Healthcare"],
+    "lastUpdated": "2026-06-30"
+  }
+]

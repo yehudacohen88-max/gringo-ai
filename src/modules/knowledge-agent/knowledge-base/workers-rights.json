@@ -1,0 +1,24 @@
+[
+  {
+    "id": "workers-rights-001",
+    "title": "Basic worker rights",
+    "category": "Workers Rights",
+    "language": "English",
+    "keywords": ["rights", "worker rights", "salary", "pay", "hours", "employer"],
+    "question": "What basic rights do workers have in Israel?",
+    "answer": "Workers in Israel generally have rights around payment, work hours, rest days, payslips, and safe working conditions. The exact rules can depend on your visa, job type, and agreement.",
+    "relatedTopics": ["Documents", "Jobs FAQ"],
+    "lastUpdated": "2026-06-30"
+  },
+  {
+    "id": "workers-rights-002",
+    "title": "Not getting paid",
+    "category": "Workers Rights",
+    "language": "English",
+    "keywords": ["not paid", "salary", "pay", "employer", "missing salary", "wage"],
+    "question": "What should I do if my employer did not pay me?",
+    "answer": "Keep records of your work days, messages, contract, and payslips. Ask the employer clearly about the missing payment. If it is not solved, you may need help from a worker rights organization or legal support.",
+    "relatedTopics": ["Documents"],
+    "lastUpdated": "2026-06-30"
+  }
+]

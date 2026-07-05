@@ -1,0 +1,24 @@
+[
+  {
+    "id": "healthcare-001",
+    "title": "Seeing a doctor",
+    "category": "Healthcare",
+    "language": "English",
+    "keywords": ["doctor", "health", "healthcare", "clinic", "hospital", "sick"],
+    "question": "How can I see a doctor in Israel?",
+    "answer": "If you have health insurance, check which clinic or provider you can use. For urgent medical danger, call emergency services or go to an emergency room.",
+    "relatedTopics": ["Emergency Numbers", "Documents"],
+    "lastUpdated": "2026-06-30"
+  },
+  {
+    "id": "healthcare-002",
+    "title": "Health insurance",
+    "category": "Healthcare",
+    "language": "English",
+    "keywords": ["insurance", "health insurance", "medical insurance", "clinic"],
+    "question": "Do foreign workers need health insurance?",
+    "answer": "Foreign workers should have medical insurance. Ask your employer or agency for the insurance details and keep the policy information somewhere safe.",
+    "relatedTopics": ["Workers Rights"],
+    "lastUpdated": "2026-06-30"
+  }
+]
