@@ -42,6 +42,54 @@ function languagePrimary(value) {
   return String(value || '').trim().toLowerCase().split(/[-_]/)[0];
 }
 
+const INCOMING_TRANSLATION_INCOMPLETE_WARNING = 'incoming_translation_incomplete';
+const TRANSLATION_UNCERTAINTY_NOTICE = Object.freeze({
+  he: 'ייתכן שחלק מההודעה לא הובן בגלל בעיה זמנית בעיבוד השפה. אפשר לשלוח שוב או לנסח את החלק הזה מחדש.',
+  en: 'Part of your message may not have been understood because of a temporary language-processing problem. Please resend or rephrase that part.',
+});
+
+function translationUncertaintyNotice(userLanguage = '') {
+  return languagePrimary(userLanguage) === 'he'
+    ? TRANSLATION_UNCERTAINTY_NOTICE.he
+    : TRANSLATION_UNCERTAINTY_NOTICE.en;
+}
+
+function incomingTranslationIsUncertain(metadata = {}, originalQuestion = '', languages = {}) {
+  if (!metadata?.fallbackUsed) return false;
+  if (supervisorService.shouldPreserveOriginalTransferLanguage(originalQuestion, languages)) return false;
+  return !supervisorService.hasCompleteNativeIntentCoverage(originalQuestion);
+}
+
+function appendTranslationUncertaintyNotice(reply = '', userLanguage = '') {
+  const notice = translationUncertaintyNotice(userLanguage);
+  const text = String(reply || '').trim();
+  if (!text) return notice;
+  if (text.includes(notice)) return text;
+  return `${text}\n\n${notice}`;
+}
+
+function recordIncomingTranslationUncertainty(plan, aggregatedResult, metadata = {}) {
+  if (!Array.isArray(aggregatedResult.warnings)) aggregatedResult.warnings = [];
+  if (!aggregatedResult.warnings.includes(INCOMING_TRANSLATION_INCOMPLETE_WARNING)) {
+    aggregatedResult.warnings.push(INCOMING_TRANSLATION_INCOMPLETE_WARNING);
+  }
+  if (aggregatedResult.status === 'completed' || aggregatedResult.status === 'success' || aggregatedResult.status === 'empty') {
+    aggregatedResult.status = 'partial';
+  }
+  if (plan.status === 'completed') plan.status = 'partial';
+  if (!Array.isArray(plan.warnings)) plan.warnings = [];
+  if (!plan.warnings.includes(INCOMING_TRANSLATION_INCOMPLETE_WARNING)) {
+    plan.warnings.push(INCOMING_TRANSLATION_INCOMPLETE_WARNING);
+  }
+  plan.incomingTranslation = {
+    fallbackUsed: true,
+    errorCode: String(metadata.errorCode || '').trim(),
+    failureType: String(metadata.failureType || '').trim(),
+  };
+  plan.updatedAt = new Date().toISOString();
+  storeSupervisorPlan(plan, 'storeIncomingTranslationUncertainty');
+}
+
 function explicitDomainReplyLanguage(aggregatedResult = {}) {
   const domainResults = Array.isArray(aggregatedResult.domainResults) ? aggregatedResult.domainResults : [];
   const useful = domainResults.find((result) => (
@@ -203,6 +251,8 @@ async function buildActiveSupervisorResponse({
   conversationContext,
   profile,
   userLanguage,
+  incomingTranslationUncertain = false,
+  incomingTranslationMetadata = null,
 }) {
   if (!isActiveSupervisorDeliveryEnabled()) {
     return null;
@@ -312,10 +362,17 @@ async function buildActiveSupervisorResponse({
       return null;
     }
     const aggregatedResult = supervisorService.aggregatePlanResults(executedPlan);
-    const reply = await supervisorService.buildUserResponse(aggregatedResult, {
+    if (incomingTranslationUncertain) {
+      recordIncomingTranslationUncertainty(executedPlan, aggregatedResult, incomingTranslationMetadata);
+    }
+    let reply = await supervisorService.buildUserResponse(aggregatedResult, {
       resolvedLanguage: CORE_AGENT_RESPONSE_LANGUAGE,
       requestContext,
     });
+
+    if (incomingTranslationUncertain) {
+      reply = appendTranslationUncertaintyNotice(reply, userLanguage);
+    }
 
     if (!String(reply || '').trim()) {
       return null;
@@ -433,6 +490,8 @@ async function buildLiveMultiIntentSupervisorResponse({
   conversationContext,
   profile,
   profileMemoryUpdates,
+  userLanguage,
+  incomingTranslationUncertain = false,
 }) {
   if (!isSupervisorMultiIntentLiveEnabled()) {
     return null;
@@ -475,7 +534,15 @@ async function buildLiveMultiIntentSupervisorResponse({
       },
     });
     const synthesis = supervisorService.synthesizeResults(results);
-    const reply = supervisorService.composeResponse(synthesis);
+    let reply = supervisorService.composeResponse(synthesis);
+    let status = `SUPERVISOR_MULTI_INTENT_${String(synthesis.status || 'partial').toUpperCase()}`;
+
+    if (incomingTranslationUncertain) {
+      if (synthesis.status === 'success' || synthesis.status === 'completed') {
+        status = 'SUPERVISOR_MULTI_INTENT_PARTIAL';
+      }
+      reply = appendTranslationUncertaintyNotice(reply, userLanguage);
+    }
 
     if (!String(reply || '').trim()) {
       return null;
@@ -484,7 +551,7 @@ async function buildLiveMultiIntentSupervisorResponse({
     return {
       reply,
       category: 'Supervisor',
-      status: `SUPERVISOR_MULTI_INTENT_${String(synthesis.status || 'partial').toUpperCase()}`,
+      status,
       multiIntent: {
         handled: true,
         intentCount: detectedIntents.intents.length,
@@ -994,6 +1061,8 @@ async function resolveIncomingProcessingText(originalText, languageResolution) {
     metadata.provider = result.provider;
     metadata.translated = Boolean(result.translated);
     metadata.fallbackUsed = Boolean(result.fallbackUsed);
+    if (result.errorCode) metadata.errorCode = result.errorCode;
+    if (result.failureType) metadata.failureType = result.failureType;
 
     return {
       processingText: result.translated && !result.fallbackUsed ? result.translatedText : originalText,
@@ -1005,6 +1074,7 @@ async function resolveIncomingProcessingText(originalText, languageResolution) {
       metadata: {
         ...metadata,
         fallbackUsed: true,
+        failureType: 'exception',
       },
     };
   }
@@ -1374,11 +1444,12 @@ async function processWebMessage(messageContext = {}) {
     }
   }
 
+  const nativeTransferLanguages = {
+    userLanguage,
+    textLanguage: incomingLanguageResolution.language,
+  };
   const keepNativeTransferLanguage = isActiveSupervisorDeliveryEnabled()
-    && supervisorService.shouldPreserveOriginalTransferLanguage(originalQuestion, {
-      userLanguage,
-      textLanguage: incomingLanguageResolution.language,
-    });
+    && supervisorService.shouldPreserveOriginalTransferLanguage(originalQuestion, nativeTransferLanguages);
   const incomingTranslation = keepNativeTransferLanguage
     ? {
         processingText: originalQuestion,
@@ -1396,6 +1467,11 @@ async function processWebMessage(messageContext = {}) {
   messageContext.originalText = originalQuestion;
   messageContext.processingText = question;
   messageContext.translation = incomingTranslation.metadata;
+  const incomingTranslationUncertain = incomingTranslationIsUncertain(
+    incomingTranslation.metadata,
+    originalQuestion,
+    nativeTransferLanguages
+  );
 
   const personalization = await applyPersonalization(question, userContext, onboardingStatus.profile);
   const userProfile = personalization.profile;
@@ -1449,6 +1525,8 @@ async function processWebMessage(messageContext = {}) {
     conversationContext,
     profile: userProfile || onboardingStatus.profile,
     profileMemoryUpdates: personalization.profileMemoryUpdates || {},
+    userLanguage,
+    incomingTranslationUncertain,
   });
 
   if (liveMultiIntentSupervisorResponse) {
@@ -1551,6 +1629,8 @@ async function processWebMessage(messageContext = {}) {
     conversationContext,
     profile: userProfile || onboardingStatus.profile,
     userLanguage,
+    incomingTranslationUncertain,
+    incomingTranslationMetadata: incomingTranslation.metadata,
   });
 
   if (supervisorResponse) {

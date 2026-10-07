@@ -1052,6 +1052,27 @@ class SupervisorService {
     return this.isExclusiveFinanceTransferRequest(message);
   }
 
+  hasCompleteNativeIntentCoverage(message = '') {
+    const text = cleanText(message);
+    const detected = this.detectIntents({ message: text });
+    const intents = Array.isArray(detected?.intents) ? detected.intents : [];
+
+    if (detected?.isMultiIntent && intents.length > 1) return true;
+    if (detected?.isMultiIntent || intents.length !== 1) return false;
+
+    const clauses = splitCoordinatingClauses(text);
+    if (clauses.length <= 1) return true;
+
+    const signature = intentSignature(intents[0]);
+    return clauses.every((clause) => {
+      const clauseDetected = this.detectIntents({ message: clause });
+      const clauseIntents = Array.isArray(clauseDetected?.intents) ? clauseDetected.intents : [];
+      return !clauseDetected?.isMultiIntent
+        && clauseIntents.length === 1
+        && intentSignature(clauseIntents[0]) === signature;
+    });
+  }
+
   createRequestContext(input = {}) {
     const safeInput = isPlainObject(input) ? input : {};
 
