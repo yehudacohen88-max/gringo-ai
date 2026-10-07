@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "node --test",
+    "test": "node --require ./scripts/configure-test-env.cjs --test",
     "test:sheets": "node scripts/testGoogleSheetsConnection.js",
     "setup:workers": "node scripts/setupWorkerSheets.js",
     "setup:crm-agent": "node scripts/setupCrmAgentSheets.js",
