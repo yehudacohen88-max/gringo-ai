@@ -487,6 +487,7 @@ async function executeTransfer(task, input) {
     directAmountMatch: hasSameAmount,
     corridorObservationCount: corridorQuotes.length,
     message,
+    responseLanguage,
     safetyNotice: moneyService.SAFETY_NOTICE,
     suppressGenericFollowUp: true,
   }, warnings);
