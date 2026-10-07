@@ -56,7 +56,8 @@ function translationUncertaintyNotice(userLanguage = '') {
 
 function incomingTranslationIsUncertain(metadata = {}, originalQuestion = '', languages = {}) {
   if (!metadata?.fallbackUsed) return false;
-  return !supervisorService.shouldPreserveOriginalTransferLanguage(originalQuestion, languages);
+  if (supervisorService.shouldPreserveOriginalTransferLanguage(originalQuestion, languages)) return false;
+  return !supervisorService.hasCompleteNativeIntentCoverage(originalQuestion);
 }
 
 function appendTranslationUncertaintyNotice(reply = '', userLanguage = '') {
