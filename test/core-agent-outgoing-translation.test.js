@@ -175,13 +175,16 @@ test('Empty response skips outgoing translation', async () => {
   assert.equal(outgoingCalls(state).length, 0);
 });
 
-test('Translation failure sends original English response', async () => {
+test('Translation failure keeps the English answer and adds a Hebrew notice', async () => {
+  const english = 'You can ask your employer for payment and keep records.';
   const { result, state } = await ask(completeProfile({ preferredLanguage: 'he' }), {
     failTranslation: true,
   });
 
-  assert.equal(result.reply, 'You can ask your employer for payment and keep records.');
+  assert.equal(result.reply, `לא הצלחתי לתרגם כרגע את התשובה לעברית, אז היא מוצגת באנגלית.\n\n${english}`);
+  assert.equal(result.reply.includes(english), true);
   assert.equal(outgoingCalls(state).length, 1);
+  assert.equal(result.reply.includes('insufficient_quota'), false);
 });
 
 test('originalResponse remains unchanged internally and CRM saves English answer', async () => {
