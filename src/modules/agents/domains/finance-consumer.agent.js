@@ -22,6 +22,13 @@ const SUPPORTED_CAPABILITIES = Object.freeze([
   'consumer.services',
 ]);
 
+const TRANSFER_RESPONSE_LANGUAGES = Object.freeze(['he', 'en']);
+
+function supportsTransferResponseLanguage(language = '') {
+  const primary = cleanText(language).toLowerCase().split(/[-_]/)[0];
+  return TRANSFER_RESPONSE_LANGUAGES.includes(primary);
+}
+
 function cleanText(value) {
   return value === undefined || value === null ? '' : String(value).trim();
 }
@@ -1182,6 +1189,8 @@ const financeConsumerAgent = {
   version: multiAgentConfig.defaultAgentVersion,
   domain: 'finance_consumer',
   capabilities: [...SUPPORTED_CAPABILITIES],
+  transferResponseLanguages: TRANSFER_RESPONSE_LANGUAGES,
+  supportsTransferResponseLanguage,
   initialize: async () => ({ initialized: true }),
   health: async () => ({ status: 'ok' }),
   validate: async (task = {}) => {

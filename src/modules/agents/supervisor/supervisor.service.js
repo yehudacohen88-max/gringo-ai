@@ -343,6 +343,27 @@ function firstUniqueQuestion(questions = []) {
   return '';
 }
 
+function languagePrimary(value) {
+  return cleanText(value).toLowerCase().split(/[-_]/)[0];
+}
+
+function splitCoordinatingClauses(message = '') {
+  return cleanText(message)
+    .split(/\s+ו(?:אני|גם)?\s+|\s+\b(?:and|also|plus)\b\s+/i)
+    .map((clause) => clause.trim())
+    .filter(Boolean);
+}
+
+function transferResponseAlreadyComplete(domainResults = []) {
+  const spoken = domainResults.filter((result) => (
+    ['completed', 'success', 'partial'].includes(cleanText(result?.status))
+    && outputText(result?.output)
+  ));
+
+  return spoken.length > 0
+    && spoken.every((result) => cleanText(result?.output?.capability) === 'finance.transfer');
+}
+
 function outputText(output = {}) {
   if (!isPlainObject(output)) return '';
 
@@ -1006,15 +1027,29 @@ class SupervisorService {
     );
   }
 
-  usesNativeUserLanguage(message = '') {
-    if (!isHebrewThailandTransferRequest(message)) return false;
+  isSingleFinanceTransferRequest(message = '') {
+    const detected = this.detectIntents({ message: cleanText(message) });
+    const intents = Array.isArray(detected?.intents) ? detected.intents : [];
+    if (detected?.isMultiIntent || intents.length !== 1) return false;
+    return taskCapabilityForIntent(intents[0], { message }) === 'finance.transfer';
+  }
 
-    const clauses = cleanText(message).split(/\s+ו(?:אני|גם)?\s+/);
-    return clauses.every((clause) => (
-      !clause
-      || isHebrewThailandTransferRequest(clause)
-      || /(?:איפה|הכי)\s+משתלם/.test(clause)
-    ));
+  isExclusiveFinanceTransferRequest(message = '') {
+    const text = cleanText(message);
+    if (!this.isSingleFinanceTransferRequest(text)) return false;
+
+    const clauses = splitCoordinatingClauses(text);
+    if (clauses.length <= 1) return true;
+    return clauses.every((clause) => this.isSingleFinanceTransferRequest(clause));
+  }
+
+  shouldPreserveOriginalTransferLanguage(message = '', languages = {}) {
+    const requested = isPlainObject(languages) ? languages : { userLanguage: languages, textLanguage: languages };
+    const userLanguage = languagePrimary(requested.userLanguage);
+    const textLanguage = languagePrimary(requested.textLanguage || requested.userLanguage);
+    if (!userLanguage || textLanguage !== userLanguage) return false;
+    if (!financeConsumerAgent.supportsTransferResponseLanguage(userLanguage)) return false;
+    return this.isExclusiveFinanceTransferRequest(message);
   }
 
   createRequestContext(input = {}) {
@@ -2101,6 +2136,7 @@ class SupervisorService {
       .map((result) => outputText(result.output))
       .filter(Boolean);
     const suppressGenericFollowUp = domainResults.some((result) => result.output?.suppressGenericFollowUp === true);
+    const suppressTransferPartialNotice = transferResponseAlreadyComplete(domainResults);
     const warning = firstSafeWarning(safeResult.warnings);
     const question = firstUniqueQuestion(safeResult.followUpQuestions);
 
@@ -2130,7 +2166,7 @@ class SupervisorService {
       parts.push(warning);
     }
 
-    if (status === 'partial') {
+    if (status === 'partial' && !suppressTransferPartialNotice) {
       parts.push('Some parts could not be completed yet.');
     }
 
@@ -2138,7 +2174,7 @@ class SupervisorService {
       parts.push(question);
     } else if (status === 'completed' && !suppressGenericFollowUp) {
       parts.push('Tell me which detail you want to check next.');
-    } else if (status === 'partial') {
+    } else if (status === 'partial' && !suppressTransferPartialNotice) {
       parts.push('Tell me the missing detail and I can continue.');
     }
 

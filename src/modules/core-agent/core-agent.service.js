@@ -1375,7 +1375,10 @@ async function processWebMessage(messageContext = {}) {
   }
 
   const keepNativeTransferLanguage = isActiveSupervisorDeliveryEnabled()
-    && supervisorService.usesNativeUserLanguage(originalQuestion);
+    && supervisorService.shouldPreserveOriginalTransferLanguage(originalQuestion, {
+      userLanguage,
+      textLanguage: incomingLanguageResolution.language,
+    });
   const incomingTranslation = keepNativeTransferLanguage
     ? {
         processingText: originalQuestion,

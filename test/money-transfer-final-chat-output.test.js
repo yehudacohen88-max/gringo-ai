@@ -98,7 +98,24 @@ function mockCore(profile) {
   });
 }
 
-function seedTransferQuotes() {
+function seedTransferQuotes({ sendAmount = 2000, quotes = null } = {}) {
+  const storedQuotes = Array.isArray(quotes) ? quotes : [
+    {
+      providerId: 'neema',
+      providerName: 'Neema',
+      sendAmount,
+      recipientAmount: 21800,
+      transferFee: 20,
+    },
+    {
+      providerId: 'monox_money',
+      providerName: 'Monox / Monox Money',
+      sendAmount,
+      recipientAmount: 21500,
+      transferFee: null,
+    },
+  ];
+
   setUserSubmittedTransferQuoteRepositoryForTest({
     findRecentUserSubmittedTransferQuotes: async (payload) => {
       assert.equal(payload.userId, 'usr_transfer_chat');
@@ -107,44 +124,24 @@ function seedTransferQuotes() {
       assert.equal(payload.targetCurrency, 'THB');
       return {
         ok: true,
-        quotes: [
-          {
-            providerId: 'neema',
-            providerName: 'Neema',
-            quote: {
-              providerId: 'neema',
-              providerName: 'Neema',
-              sourceCurrency: 'ILS',
-              targetCurrency: 'THB',
-              sendAmount: 2000,
-              recipientAmount: 21800,
-              transferFee: 20,
-              totalCustomerCost: null,
-              customerExchangeRate: null,
-              observedAt: null,
-              reporterType: 'user',
-              evidenceStatus: 'none',
-            },
+        quotes: storedQuotes.map((item) => ({
+          providerId: item.providerId,
+          providerName: item.providerName,
+          quote: {
+            providerId: item.providerId,
+            providerName: item.providerName,
+            sourceCurrency: 'ILS',
+            targetCurrency: 'THB',
+            sendAmount: item.sendAmount,
+            recipientAmount: item.recipientAmount,
+            transferFee: item.transferFee,
+            totalCustomerCost: null,
+            customerExchangeRate: null,
+            observedAt: null,
+            reporterType: 'user',
+            evidenceStatus: 'none',
           },
-          {
-            providerId: 'monox_money',
-            providerName: 'Monox / Monox Money',
-            quote: {
-              providerId: 'monox_money',
-              providerName: 'Monox / Monox Money',
-              sourceCurrency: 'ILS',
-              targetCurrency: 'THB',
-              sendAmount: 2000,
-              recipientAmount: 21500,
-              transferFee: null,
-              totalCustomerCost: null,
-              customerExchangeRate: null,
-              observedAt: null,
-              reporterType: 'user',
-              evidenceStatus: 'none',
-            },
-          },
-        ],
+        })),
       };
     },
   });
@@ -274,4 +271,96 @@ test('unrelated English Supervisor answers are still translated for a Hebrew use
   } finally {
     supervisorService.executeAgent = originalExecuteAgent;
   }
+});
+
+const HEBREW_ALT_REQUEST = 'תעזור לי להעביר 1500 שקלים לתאילנד';
+const GENERIC_PARTIAL = 'Some parts could not be completed yet.';
+const GENERIC_PARTIAL_FOLLOW_UP = 'Tell me the missing detail and I can continue.';
+
+test('another Hebrew finance.transfer phrasing skips the translation round trip', async () => {
+  enableActiveSupervisor();
+  mockCore(completeProfile({ preferredLanguage: 'he', language: 'he' }));
+  seedTransferQuotes({ sendAmount: 1500 });
+
+  await withTranslationSpy(async (calls) => {
+    const response = await coreAgentService.processWebMessage({
+      requestId: 'req_he_transfer_alt_phrase',
+      message: HEBREW_ALT_REQUEST,
+      channel: 'web',
+      channelUserId: 'he-transfer-alt-phrase',
+    });
+    const plan = supervisorService.getPlan('req_he_transfer_alt_phrase');
+
+    assert.equal(calls.length, 0);
+    assert.equal(plan.tasks[0].input.question, HEBREW_ALT_REQUEST);
+    assert.equal(plan.tasks[0].result.output.responseLanguage, 'he');
+    assert.equal(response.reply, HEBREW_FINAL_REPLY.replaceAll('2,000', '1,500'));
+    assert.equal(response.reply.includes(GENERIC_PARTIAL), false);
+  });
+});
+
+test('money-transfer no-data partial stays partial and omits the generic English limitation', async () => {
+  enableActiveSupervisor();
+  mockCore(completeProfile({ preferredLanguage: 'he', language: 'he' }));
+  seedTransferQuotes({ quotes: [] });
+
+  await withTranslationSpy(async (calls) => {
+    const response = await coreAgentService.processWebMessage({
+      requestId: 'req_he_transfer_no_data',
+      message: HEBREW_REQUEST,
+      channel: 'web',
+      channelUserId: 'he-transfer-no-data',
+    });
+    const result = supervisorService.getPlan('req_he_transfer_no_data').tasks[0].result;
+
+    assert.equal(calls.length, 0);
+    assert.equal(result.status, 'partial');
+    assert.equal(result.warnings.includes('insufficient_reported_quote_data'), true);
+    assert.equal(result.warnings.includes('reported_quote_unverified'), true);
+    assert.equal(response.reply, 'אין לי כרגע מספיק דיווחים אמיתיים עבור ILS → THB כדי לבצע השוואה. לא אציג דירוג הדגמה כספק מומלץ.');
+    assert.equal(response.reply.includes(GENERIC_PARTIAL), false);
+    assert.equal(response.reply.includes(GENERIC_PARTIAL_FOLLOW_UP), false);
+    assert.equal(response.reply.includes('insufficient_reported_quote_data'), false);
+  });
+});
+
+test('money-transfer different-amount partial stays partial and omits the generic English limitation', async () => {
+  enableActiveSupervisor();
+  mockCore(completeProfile({ preferredLanguage: 'he', language: 'he' }));
+  seedTransferQuotes({ sendAmount: 2000 });
+
+  await withTranslationSpy(async (calls) => {
+    const response = await coreAgentService.processWebMessage({
+      requestId: 'req_he_transfer_different_amount',
+      message: 'אני רוצה לשלוח 1500 שקל לתאילנד',
+      channel: 'web',
+      channelUserId: 'he-transfer-different-amount',
+    });
+    const result = supervisorService.getPlan('req_he_transfer_different_amount').tasks[0].result;
+
+    assert.equal(calls.length, 0);
+    assert.equal(result.status, 'partial');
+    assert.equal(result.warnings.includes('no_same_amount_reported_quote'), true);
+    assert.equal(response.reply.includes('אין לי כרגע מספיק דיווחים'), false);
+    assert.equal(response.reply.includes('יש לי דיווחים שמורים עבור ILS → THB, אבל לא דיווח ישיר עבור 1500 ILS:'), true);
+    assert.equal(response.reply.includes('לא חישבתי סכומי קבלה'), true);
+    assert.equal(response.reply.includes(GENERIC_PARTIAL), false);
+    assert.equal(response.reply.includes(GENERIC_PARTIAL_FOLLOW_UP), false);
+  });
+});
+
+test('an unrecognized Hebrew destination still uses incoming translation', async () => {
+  enableActiveSupervisor();
+  mockCore(completeProfile({ preferredLanguage: 'he', language: 'he' }));
+
+  await withTranslationSpy(async (calls) => {
+    await coreAgentService.processWebMessage({
+      requestId: 'req_he_transfer_india',
+      message: 'אני רוצה לשלוח 2000 שקל להודו',
+      channel: 'web',
+      channelUserId: 'he-transfer-india',
+    });
+
+    assert.equal(calls.some((call) => call.sourceLanguage === 'he' && call.targetLanguage === 'en'), true);
+  });
 });
