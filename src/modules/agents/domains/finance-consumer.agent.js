@@ -168,59 +168,185 @@ function sameSendAmount(quote = {}, amount = 0) {
   return Number.isFinite(sendAmount) && sendAmount === Number(amount);
 }
 
-function reporterLabel(quote = {}, language = 'en') {
-  const useHebrew = String(language || '').toLowerCase().startsWith('he');
-  const reporterType = cleanText(quote.reporterType) || 'user';
+function isHebrewLanguage(language = 'en') {
+  return String(language || '').toLowerCase().startsWith('he');
+}
 
-  if (reporterType === 'ambassador') {
-    return useHebrew ? 'דווח על ידי שגריר Gringo' : 'Reported by a Gringo ambassador';
+function hasStoredValue(value) {
+  return value !== null && value !== undefined && value !== '';
+}
+
+function formatGroupedNumber(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return cleanText(value);
+  const fractionMatch = String(value).trim().match(/\.(\d+)/);
+  const fractionDigits = fractionMatch ? Math.min(fractionMatch[1].length, 8) : 0;
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(number);
+}
+
+function formatObservationDate(value, language = 'en') {
+  const text = cleanText(value);
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return text;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const utc = new Date(Date.UTC(year, month - 1, day));
+  if (utc.getUTCFullYear() !== year || utc.getUTCMonth() !== month - 1 || utc.getUTCDate() !== day) {
+    return text;
   }
 
-  return useHebrew ? 'דווח על ידי משתמש Gringo' : 'Reported by a Gringo user';
+  return new Intl.DateTimeFormat(isHebrewLanguage(language) ? 'he-IL' : 'en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(utc);
+}
+
+function reportedProviderName(storedQuote = {}, language = 'en') {
+  const quote = quotePayload(storedQuote);
+  const useHebrew = isHebrewLanguage(language);
+  return quote.providerName || storedQuote.providerName || quote.providerId || storedQuote.providerId || (useHebrew ? 'לא ידוע' : 'unknown');
+}
+
+function reporterLabel(quote = {}, language = 'en') {
+  if (cleanText(quote.reporterType) !== 'ambassador') return '';
+  return isHebrewLanguage(language) ? 'דווח על ידי שגריר.' : 'Reported by an ambassador.';
 }
 
 function evidenceLabel(quote = {}, language = 'en') {
   if (cleanText(quote.evidenceStatus) !== 'submitted') return '';
-  const useHebrew = String(language || '').toLowerCase().startsWith('he');
-
-  return useHebrew
-    ? 'קיימת אסמכתא שנמסרה ל-Gringo; היא לא אומתה מול הספק.'
-    : 'Evidence was submitted to Gringo; it was not verified with the provider.';
+  return isHebrewLanguage(language)
+    ? 'אסמכתא נמסרה; היא לא אומתה מול הספק.'
+    : 'Evidence was submitted; it was not verified with the provider.';
 }
 
 function formatReportedQuoteLine(storedQuote = {}, language = 'en') {
   const quote = quotePayload(storedQuote);
-  const useHebrew = String(language || '').toLowerCase().startsWith('he');
-  const provider = quote.providerName || storedQuote.providerName || quote.providerId || storedQuote.providerId || (useHebrew ? 'לא ידוע' : 'unknown');
-  const parts = [];
+  const useHebrew = isHebrewLanguage(language);
+  const lines = [reportedProviderName(storedQuote, language)];
+  const sourceCurrency = cleanText(quote.sourceCurrency);
+  const targetCurrency = cleanText(quote.targetCurrency);
 
-  if (quote.observedAt || storedQuote.observedAt) {
-    parts.push(useHebrew ? `תאריך תצפית: ${quote.observedAt || storedQuote.observedAt}` : `Observed: ${quote.observedAt || storedQuote.observedAt}`);
+  if (hasStoredValue(quote.sendAmount) && sourceCurrency) {
+    lines.push(useHebrew
+      ? `שליחה: ${formatGroupedNumber(quote.sendAmount)} ${sourceCurrency}`
+      : `Send: ${formatGroupedNumber(quote.sendAmount)} ${sourceCurrency}`);
   }
-  if (quote.sendAmount !== null && quote.sendAmount !== undefined && quote.sourceCurrency) {
-    parts.push(useHebrew ? `שליחה: ${quote.sendAmount} ${quote.sourceCurrency}` : `Send: ${quote.sendAmount} ${quote.sourceCurrency}`);
+  if (hasStoredValue(quote.recipientAmount) && targetCurrency) {
+    lines.push(useHebrew
+      ? `קבלה: ${formatGroupedNumber(quote.recipientAmount)} ${targetCurrency}`
+      : `Recipient: ${formatGroupedNumber(quote.recipientAmount)} ${targetCurrency}`);
   }
-  if (quote.recipientAmount !== null && quote.recipientAmount !== undefined && quote.targetCurrency) {
-    parts.push(useHebrew ? `קבלה: ${quote.recipientAmount} ${quote.targetCurrency}` : `Recipient: ${quote.recipientAmount} ${quote.targetCurrency}`);
+  if (hasStoredValue(quote.transferFee)) {
+    const fee = formatGroupedNumber(quote.transferFee);
+    lines.push(useHebrew
+      ? `עמלה שדווחה: ${fee}${sourceCurrency ? ` ${sourceCurrency}` : ''}`
+      : `Reported fee: ${fee}${sourceCurrency ? ` ${sourceCurrency}` : ''}`);
   }
-  if (quote.transferFee !== null && quote.transferFee !== undefined) {
-    parts.push(useHebrew ? `עמלה: ${quote.transferFee} ${quote.sourceCurrency}` : `Fee: ${quote.transferFee} ${quote.sourceCurrency}`);
+  if (hasStoredValue(quote.totalCustomerCost)) {
+    const total = formatGroupedNumber(quote.totalCustomerCost);
+    lines.push(useHebrew
+      ? `עלות כוללת שדווחה: ${total}${sourceCurrency ? ` ${sourceCurrency}` : ''}`
+      : `Reported total cost: ${total}${sourceCurrency ? ` ${sourceCurrency}` : ''}`);
   }
-  if (quote.totalCustomerCost !== null && quote.totalCustomerCost !== undefined) {
-    parts.push(useHebrew ? `עלות כוללת: ${quote.totalCustomerCost} ${quote.sourceCurrency}` : `Total cost: ${quote.totalCustomerCost} ${quote.sourceCurrency}`);
+  if (hasStoredValue(quote.customerExchangeRate) && sourceCurrency && targetCurrency) {
+    const rate = formatGroupedNumber(quote.customerExchangeRate);
+    lines.push(useHebrew
+      ? `שער לקוח שדווח: ${rate} ${targetCurrency} לכל ${sourceCurrency}`
+      : `Reported customer rate: ${rate} ${targetCurrency} per ${sourceCurrency}`);
   }
-  if (quote.customerExchangeRate !== null && quote.customerExchangeRate !== undefined) {
-    parts.push(useHebrew
-      ? `שער לקוח שדווח: ${quote.customerExchangeRate} ${quote.targetCurrency} לכל ${quote.sourceCurrency}`
-      : `Reported customer rate: ${quote.customerExchangeRate} ${quote.targetCurrency} per ${quote.sourceCurrency}`);
+
+  const observedAt = quote.observedAt || storedQuote.observedAt;
+  if (hasStoredValue(observedAt)) {
+    lines.push(useHebrew
+      ? `תאריך תצפית: ${formatObservationDate(observedAt, language)}`
+      : `Observation date: ${formatObservationDate(observedAt, language)}`);
   }
-  parts.push(reporterLabel(quote, language));
+
+  const reporter = reporterLabel(quote, language);
+  if (reporter) lines.push(reporter);
   const evidence = evidenceLabel(quote, language);
-  if (evidence) parts.push(evidence);
+  if (evidence) lines.push(evidence);
+
+  return lines.join('\n');
+}
+
+function sameReportedCorridor(quotes = []) {
+  const payloads = quotes.map((storedQuote) => quotePayload(storedQuote));
+  if (payloads.length < 2) return false;
+
+  const sourceCurrency = cleanText(payloads[0].sourceCurrency).toUpperCase();
+  const targetCurrency = cleanText(payloads[0].targetCurrency).toUpperCase();
+  const sendAmount = Number(payloads[0].sendAmount);
+  if (!sourceCurrency || !targetCurrency || !Number.isFinite(sendAmount)) return false;
+
+  return payloads.every((quote) => (
+    cleanText(quote.sourceCurrency).toUpperCase() === sourceCurrency
+    && cleanText(quote.targetCurrency).toUpperCase() === targetCurrency
+    && Number(quote.sendAmount) === sendAmount
+    && hasStoredValue(quote.recipientAmount)
+    && Number.isFinite(Number(quote.recipientAmount))
+  ));
+}
+
+function formatRecipientAmountDifference(quotes = [], language = 'en') {
+  if (!sameReportedCorridor(quotes)) return '';
+
+  const useHebrew = isHebrewLanguage(language);
+  const ranked = quotes.map((storedQuote) => {
+    const quote = quotePayload(storedQuote);
+    return {
+      name: reportedProviderName(storedQuote, language),
+      recipientAmount: Number(quote.recipientAmount),
+      targetCurrency: cleanText(quote.targetCurrency),
+    };
+  });
+  const highest = Math.max(...ranked.map((item) => item.recipientAmount));
+  const leaders = ranked.filter((item) => item.recipientAmount === highest);
+  const others = ranked.filter((item) => item.recipientAmount !== highest);
+  const targetCurrency = ranked[0].targetCurrency;
+  const formatGap = (higher, lower) => {
+    const gap = Math.abs(higher - lower);
+    if (Number.isInteger(higher) && Number.isInteger(lower)) return formatGroupedNumber(String(Math.round(gap)));
+    return formatGroupedNumber(gap.toFixed(8).replace(/\.?0+$/, ''));
+  };
+
+  if (others.length === 0) {
+    return useHebrew
+      ? 'לפי סכום הקבלה בלבד, הדיווחים האלה נותנים אותו סכום למקבל. לא נבחר ספק.'
+      : 'By recipient amount only, these reports give the recipient the same amount. No provider is selected.';
+  }
+
+  if (leaders.length !== 1) {
+    return useHebrew
+      ? 'לפי סכום הקבלה בלבד, יותר מדיווח אחד נותן את אותו סכום קבלה גבוה יותר. לא נבחר ספק.'
+      : 'By recipient amount only, more than one report gives the same higher recipient amount. No provider is selected.';
+  }
+
+  if (ranked.length === 2) {
+    const difference = formatGap(highest, others[0].recipientAmount);
+    return useHebrew
+      ? `לפי סכום הקבלה בלבד, בדיווח של ${leaders[0].name} המקבל קיבל ${difference} ${targetCurrency} יותר.`
+      : `By recipient amount only, in the ${leaders[0].name} report the recipient received ${difference} ${targetCurrency} more.`;
+  }
+
+  const gaps = others.map((item) => {
+    const difference = formatGap(highest, item.recipientAmount);
+    return useHebrew
+      ? `${difference} ${targetCurrency} יותר מ-${item.name}`
+      : `${difference} ${targetCurrency} more than ${item.name}`;
+  });
+  const joinedGaps = useHebrew ? gaps.join(' ו-') : gaps.join(' and ');
 
   return useHebrew
-    ? `${provider}: ${parts.join('. ')}.`
-    : `${provider}: ${parts.join('. ')}.`;
+    ? `לפי סכום הקבלה בלבד, בדיווח של ${leaders[0].name} המקבל קיבל ${joinedGaps}.`
+    : `By recipient amount only, in the ${leaders[0].name} report the recipient received ${joinedGaps}.`;
 }
 
 function formatReportedTransferObservationsForChat({
@@ -232,7 +358,7 @@ function formatReportedTransferObservationsForChat({
   hasCorridorObservations = false,
   language = 'en',
 } = {}) {
-  const useHebrew = String(language || '').toLowerCase().startsWith('he');
+  const useHebrew = isHebrewLanguage(language);
 
   if (!quotes.length && hasCorridorObservations) {
     return useHebrew
@@ -246,24 +372,29 @@ function formatReportedTransferObservationsForChat({
       : `I do not currently have enough real reported observations for ${sourceCurrency} → ${targetCurrency} to compare options. I will not show demo provider ranking as a recommendation.`;
   }
 
+  const formattedAmount = formatGroupedNumber(amount);
+  const destination = cleanText(targetCurrency).toUpperCase() === 'THB'
+    ? (useHebrew ? 'לתאילנד' : 'Thailand')
+    : (useHebrew ? `ל-${targetCurrency}` : targetCurrency);
   const header = useHebrew
     ? (hasSameAmount
-      ? `לפי דיווחים שנשמרו ב-Gringo עבור העברות דומות של ${amount} ${sourceCurrency} → ${targetCurrency}:`
+      ? `לפי דיווחים שנשמרו ב-Gringo עבור העברות של ${formattedAmount} ${sourceCurrency} ${destination}:`
       : `יש לי דיווחים שמורים עבור ${sourceCurrency} → ${targetCurrency}, אבל לא דיווח ישיר עבור ${amount} ${sourceCurrency}:`)
     : (hasSameAmount
-      ? `Based on reports saved in Gringo for similar transfers of ${amount} ${sourceCurrency} → ${targetCurrency}:`
+      ? `Based on reports saved in Gringo for transfers of ${formattedAmount} ${sourceCurrency} to ${destination}:`
       : `I have saved reports for ${sourceCurrency} → ${targetCurrency}, but no direct report for ${amount} ${sourceCurrency}:`);
-  const lines = quotes.map((quote) => `- ${formatReportedQuoteLine(quote, language)}`);
+  const blocks = quotes.map((quote) => formatReportedQuoteLine(quote, language)).join('\n\n');
+  const difference = hasSameAmount ? formatRecipientAmountDifference(quotes, language) : '';
   const safety = useHebrew
-    ? 'הדיווחים האלה אינם הצעות חיות, אינם מידע רשמי, לא אומתו מול הספק, אינם מובטחים, ואינם הוראה לבצע העברה.'
-    : 'These reports are not live quotes, official information, provider-verified, guaranteed, or an instruction to transfer money.';
+    ? 'חשוב: אלה דיווחים שנמסרו ואינם הצעות חיות או מידע רשמי מהחברות. נתונים חסרים לא חושבו.'
+    : 'Important: these are submitted reports, not live quotes or official company information. Missing values were not calculated.';
   const amountNotice = hasSameAmount
     ? ''
     : (useHebrew
       ? 'לא חישבתי סכומי קבלה, עמלות או שערים חסרים, ולא הסקתי מה היה קורה בסכום אחר.'
       : 'I did not calculate missing recipient amounts, fees, or rates, and did not infer what would happen for a different amount.');
 
-  return [header, ...lines, amountNotice, safety].filter(Boolean).join('\n');
+  return [header, blocks, difference, amountNotice, safety].filter(Boolean).join('\n\n');
 }
 
 async function executeBudget(task, input) {

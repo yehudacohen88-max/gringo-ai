@@ -196,7 +196,7 @@ test('finance.transfer uses saved reported observations instead of demo provider
     assert.equal(result.output.directAmountMatch, true);
     assert.equal(result.output.reportedQuotes.length, 1);
     assert.match(result.output.message, /Monox \/ Monox Money/);
-    assert.match(result.output.message, /21800 THB/);
+    assert.match(result.output.message, /21,800 THB/);
     assert.match(result.output.message, /20 ILS/);
     assert.doesNotMatch(result.output.message, /Demo data/i);
     assert.equal(result.output.bestOption, undefined);
@@ -226,6 +226,8 @@ test('finance.transfer does not scale different-amount reported observations', a
   assert.match(result.output.message, /no direct report for 4000 ILS/i);
   assert.match(result.output.message, /did not calculate missing recipient amounts/i);
   assert.doesNotMatch(result.output.message, /43600/);
+  assert.doesNotMatch(result.output.message, /43,600/);
+  assert.doesNotMatch(result.output.message, /By recipient amount only/);
   assert.equal(result.warnings.includes('no_same_amount_reported_quote'), true);
   assertResultContract(result);
 });
@@ -256,9 +258,10 @@ test('finance.transfer preserves ambassador and evidence-submitted provenance wo
   }));
 
   assert.equal(result.status, 'success');
-  assert.match(result.output.message, /Reported by a Gringo ambassador/);
-  assert.match(result.output.message, /Evidence was submitted to Gringo/);
+  assert.match(result.output.message, /Reported by an ambassador/);
+  assert.match(result.output.message, /Evidence was submitted; it was not verified with the provider/);
   assert.match(result.output.message, /not verified with the provider/);
+  assert.equal((result.output.message.match(/Gringo/g) || []).length, 1);
   assert.doesNotMatch(result.output.message, /provider verified/i);
   assert.doesNotMatch(result.output.message, /verified by Gringo/i);
   assertResultContract(result);
@@ -287,7 +290,7 @@ test('finance.transfer omits missing optional quote fields without calculation',
   }));
 
   assert.equal(result.status, 'success');
-  assert.match(result.output.message, /21500 THB/);
+  assert.match(result.output.message, /21,500 THB/);
   assert.doesNotMatch(result.output.message, /Fee:/);
   assert.doesNotMatch(result.output.message, /Total cost:/);
   assert.doesNotMatch(result.output.message, /Reported customer rate:/);
@@ -352,10 +355,267 @@ test('finance.transfer returns Hebrew reported-observation summary for Hebrew tr
   }));
 
   assert.equal(result.status, 'success');
-  assert.match(result.output.message, /לפי דיווחים שנשמרו ב-Gringo/);
-  assert.match(result.output.message, /דווח על ידי שגריר Gringo/);
-  assert.match(result.output.message, /קיימת אסמכתא שנמסרה ל-Gringo/);
+  assert.match(result.output.message, /לפי דיווחים שנשמרו ב-Gringo עבור העברות של 2,000 ILS לתאילנד:/);
+  assert.match(result.output.message, /דווח על ידי שגריר/);
+  assert.match(result.output.message, /אסמכתא נמסרה; היא לא אומתה מול הספק/);
+  assert.equal((result.output.message.match(/Gringo/g) || []).length, 1);
+  assert.doesNotMatch(result.output.message, /\.\./);
   assert.doesNotMatch(result.output.message, /האסמכתא אומתה/);
+  assert.doesNotMatch(result.output.message, /אומתה על ידי/);
+  assertResultContract(result);
+});
+
+function reportedQuote(overrides = {}) {
+  return createStoredQuote({
+    quote: {
+      transferFee: null,
+      totalCustomerCost: null,
+      customerExchangeRate: null,
+      observedAt: null,
+      reporterType: 'user',
+      evidenceStatus: 'none',
+      evidenceType: null,
+      evidenceReference: null,
+      ...overrides,
+    },
+  });
+}
+
+function hebrewTransferInput(amount = 2000) {
+  return {
+    question: 'אני רוצה לשלוח 2000 שקל לתאילנד, איפה הכי משתלם?',
+    amount,
+    sourceCurrency: 'ILS',
+    targetCurrency: 'THB',
+    userId: 'user_finance_1',
+  };
+}
+
+test('finance.transfer Hebrew layout compares two same-amount reports by recipient amount only', async () => {
+  setQuoteRepositoryReturning([
+    reportedQuote({
+      providerId: 'neema',
+      providerName: 'Neema',
+      recipientAmount: 21800,
+      transferFee: 20,
+    }),
+    reportedQuote({
+      providerId: 'monox_money',
+      providerName: 'Monox / Monox Money',
+      recipientAmount: 21500,
+    }),
+  ]);
+
+  const result = await financeConsumerAgent.execute(createTask({
+    capability: 'finance.transfer',
+    input: hebrewTransferInput(),
+  }));
+
+  assert.equal(result.output.message, [
+    'לפי דיווחים שנשמרו ב-Gringo עבור העברות של 2,000 ILS לתאילנד:',
+    'Neema\nשליחה: 2,000 ILS\nקבלה: 21,800 THB\nעמלה שדווחה: 20 ILS',
+    'Monox / Monox Money\nשליחה: 2,000 ILS\nקבלה: 21,500 THB',
+    'לפי סכום הקבלה בלבד, בדיווח של Neema המקבל קיבל 300 THB יותר.',
+    'חשוב: אלה דיווחים שנמסרו ואינם הצעות חיות או מידע רשמי מהחברות. נתונים חסרים לא חושבו.',
+  ].join('\n\n'));
+  assert.equal((result.output.message.match(/Gringo/g) || []).length, 1);
+  assert.doesNotMatch(result.output.message, /הכי|משתלם|best|cheapest/i);
+  assertResultContract(result);
+});
+
+test('finance.transfer does not invent a fee when one same-amount report omitted it', async () => {
+  setQuoteRepositoryReturning([
+    reportedQuote({
+      providerId: 'neema',
+      providerName: 'Neema',
+      recipientAmount: 21800,
+      transferFee: 20,
+    }),
+    reportedQuote({
+      providerId: 'monox_money',
+      providerName: 'Monox / Monox Money',
+      recipientAmount: 21500,
+      transferFee: null,
+    }),
+  ]);
+
+  const result = await financeConsumerAgent.execute(createTask({
+    capability: 'finance.transfer',
+    input: hebrewTransferInput(),
+  }));
+  const monoxBlock = result.output.message.split('\n\n').find((block) => block.startsWith('Monox / Monox Money'));
+
+  assert.match(result.output.message, /עמלה שדווחה: 20 ILS/);
+  assert.equal((result.output.message.match(/עמלה/g) || []).length, 1);
+  assert.doesNotMatch(monoxBlock, /עמלה|2020|10\.9/);
+  assert.match(result.output.message, /קיבל 300 THB יותר/);
+  assertResultContract(result);
+});
+
+test('finance.transfer shows an observation date only when observedAt is stored', async () => {
+  setQuoteRepositoryReturning([
+    reportedQuote({
+      providerId: 'neema',
+      providerName: 'Neema',
+      recipientAmount: 21800,
+      observedAt: '2026-10-05T10:30:00.000Z',
+    }),
+  ]);
+
+  const withDate = await financeConsumerAgent.execute(createTask({
+    capability: 'finance.transfer',
+    input: hebrewTransferInput(),
+  }));
+
+  assert.match(withDate.output.message, /תאריך תצפית: 5 באוקטובר 2026/);
+  assert.doesNotMatch(withDate.output.message, /T10:30|11:00:00|savedAt/);
+
+  setQuoteRepositoryReturning([
+    reportedQuote({
+      providerId: 'neema',
+      providerName: 'Neema',
+      recipientAmount: 21800,
+      observedAt: null,
+      savedAt: '2026-10-05T11:00:00.000Z',
+    }),
+  ]);
+
+  const withoutDate = await financeConsumerAgent.execute(createTask({
+    capability: 'finance.transfer',
+    input: hebrewTransferInput(),
+  }));
+
+  assert.doesNotMatch(withoutDate.output.message, /תאריך תצפית|2026-10-05|11:00/);
+  assertResultContract(withoutDate);
+});
+
+test('finance.transfer Hebrew different-amount reports stay unscaled and have no difference line', async () => {
+  setQuoteRepositoryReturning([
+    reportedQuote({
+      providerId: 'neema',
+      providerName: 'Neema',
+      sendAmount: 2000,
+      recipientAmount: 21800,
+    }),
+  ]);
+
+  const result = await financeConsumerAgent.execute(createTask({
+    capability: 'finance.transfer',
+    input: hebrewTransferInput(4000),
+  }));
+
+  assert.equal(result.status, 'partial');
+  assert.match(result.output.message, /לא דיווח ישיר עבור 4000 ILS/);
+  assert.match(result.output.message, /לא חישבתי סכומי קבלה/);
+  assert.match(result.output.message, /שליחה: 2,000 ILS/);
+  assert.match(result.output.message, /קבלה: 21,800 THB/);
+  assert.doesNotMatch(result.output.message, /לפי סכום הקבלה בלבד|43,600|43600/);
+  assertResultContract(result);
+});
+
+test('finance.transfer does not choose a provider when recipient amounts tie', async () => {
+  setQuoteRepositoryReturning([
+    reportedQuote({
+      providerId: 'neema',
+      providerName: 'Neema',
+      recipientAmount: 21800,
+    }),
+    reportedQuote({
+      providerId: 'monox_money',
+      providerName: 'Monox / Monox Money',
+      recipientAmount: 21800,
+    }),
+  ]);
+
+  const result = await financeConsumerAgent.execute(createTask({
+    capability: 'finance.transfer',
+    input: hebrewTransferInput(),
+  }));
+
+  assert.match(result.output.message, /לפי סכום הקבלה בלבד, הדיווחים האלה נותנים אותו סכום למקבל\. לא נבחר ספק\./);
+  assert.doesNotMatch(result.output.message, /יותר\.|הכי|best|cheapest/i);
+  assertResultContract(result);
+});
+
+test('finance.transfer names recipient gaps for three reports without selecting a best provider', async () => {
+  setQuoteRepositoryReturning([
+    reportedQuote({
+      providerId: 'neema',
+      providerName: 'Neema',
+      recipientAmount: 22100,
+    }),
+    reportedQuote({
+      providerId: 'monox_money',
+      providerName: 'Monox / Monox Money',
+      recipientAmount: 21800,
+    }),
+    reportedQuote({
+      providerId: 'wise',
+      providerName: 'Wise',
+      recipientAmount: 21600,
+    }),
+  ]);
+
+  const result = await financeConsumerAgent.execute(createTask({
+    capability: 'finance.transfer',
+    input: hebrewTransferInput(),
+  }));
+
+  assert.match(
+    result.output.message,
+    /לפי סכום הקבלה בלבד, בדיווח של Neema המקבל קיבל 300 THB יותר מ-Monox \/ Monox Money ו-500 THB יותר מ-Wise\./
+  );
+  assert.doesNotMatch(result.output.message, /הכי|best|cheapest/i);
+  assertResultContract(result);
+});
+
+test('finance.transfer keeps the Hebrew insufficient-data message when no observations exist', async () => {
+  setQuoteRepositoryReturning([]);
+
+  const result = await financeConsumerAgent.execute(createTask({
+    capability: 'finance.transfer',
+    input: hebrewTransferInput(),
+  }));
+
+  assert.equal(result.status, 'partial');
+  assert.equal(
+    result.output.message,
+    'אין לי כרגע מספיק דיווחים אמיתיים עבור ILS → THB כדי לבצע השוואה. לא אציג דירוג הדגמה כספק מומלץ.'
+  );
+  assert.equal(result.warnings.includes('insufficient_reported_quote_data'), true);
+  assertResultContract(result);
+});
+
+test('finance.transfer English same-amount comparison uses the same recipient-only difference rule', async () => {
+  setQuoteRepositoryReturning([
+    reportedQuote({
+      providerId: 'neema',
+      providerName: 'Neema',
+      recipientAmount: 21800,
+      transferFee: 20,
+    }),
+    reportedQuote({
+      providerId: 'monox_money',
+      providerName: 'Monox / Monox Money',
+      recipientAmount: 21500,
+    }),
+  ]);
+
+  const result = await financeConsumerAgent.execute(createTask({
+    capability: 'finance.transfer',
+    input: {
+      amount: 2000,
+      sourceCurrency: 'ILS',
+      targetCurrency: 'THB',
+      userId: 'user_finance_1',
+    },
+  }));
+
+  assert.match(result.output.message, /Based on reports saved in Gringo for transfers of 2,000 ILS to Thailand:/);
+  assert.match(result.output.message, /Reported fee: 20 ILS/);
+  assert.match(result.output.message, /By recipient amount only, in the Neema report the recipient received 300 THB more\./);
+  assert.equal((result.output.message.match(/Gringo/g) || []).length, 1);
+  assert.doesNotMatch(result.output.message, /best|cheapest/i);
   assertResultContract(result);
 });
 
