@@ -110,6 +110,33 @@ test('internal warnings are filtered and safe warnings may be shown', async () =
   assert.equal(response.includes('Demo data - not a live rate.'), true);
 });
 
+test('reported_quote_unverified stays internal and is not rendered as user text', async () => {
+  const service = new SupervisorService();
+  const input = aggregate({
+    warnings: ['reported_quote_unverified', 'Demo data - not a live rate.'],
+    domainResults: [
+      {
+        taskId: 'task_transfer',
+        domain: 'finance_consumer',
+        status: 'completed',
+        output: {
+          message: 'Saved transfer reports.',
+          responseLanguage: 'en',
+          suppressGenericFollowUp: true,
+        },
+      },
+    ],
+  });
+  const before = JSON.stringify(input);
+  const response = await service.buildUserResponse(input, { resolvedLanguage: 'en' });
+
+  assert.equal(JSON.stringify(input), before);
+  assert.equal(input.warnings.includes('reported_quote_unverified'), true);
+  assert.equal(response.includes('reported_quote_unverified'), false);
+  assert.equal(response.includes('Saved transfer reports.'), true);
+  assert.equal(response.includes('Demo data - not a live rate.'), true);
+});
+
 test('translation called once for non-English response', async () => {
   const service = new SupervisorService();
   const calls = [];

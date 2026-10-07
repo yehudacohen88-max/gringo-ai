@@ -38,6 +38,25 @@ function createInternalRequestId() {
   return `req_${randomUUID()}`;
 }
 
+function languagePrimary(value) {
+  return String(value || '').trim().toLowerCase().split(/[-_]/)[0];
+}
+
+function explicitDomainReplyLanguage(aggregatedResult = {}) {
+  const domainResults = Array.isArray(aggregatedResult.domainResults) ? aggregatedResult.domainResults : [];
+  const useful = domainResults.find((result) => (
+    ['completed', 'success', 'partial'].includes(String(result?.status || '').trim())
+    && String(result?.output?.message || '').trim()
+  ));
+  return languagePrimary(useful?.output?.responseLanguage);
+}
+
+function responseAlreadyMatchesUserLanguage(response = {}, userLanguage = '') {
+  const replyLanguage = languagePrimary(response.replyLanguage);
+  const targetLanguage = languagePrimary(userLanguage);
+  return Boolean(replyLanguage && targetLanguage && replyLanguage === targetLanguage);
+}
+
 function logSupervisorWarning(stage, error) {
   const message = error && error.message ? error.message : 'unknown error';
   console.warn(`Supervisor integration warning: ${stage}: ${message}`);
@@ -302,8 +321,10 @@ async function buildActiveSupervisorResponse({
       return null;
     }
 
+    const replyLanguage = explicitDomainReplyLanguage(aggregatedResult);
     return {
       reply,
+      ...(replyLanguage ? { replyLanguage } : {}),
       category: 'Supervisor',
       status: `SUPERVISOR_${String(aggregatedResult.status || 'partial').toUpperCase()}`,
     };
@@ -1323,12 +1344,13 @@ async function processWebMessage(messageContext = {}) {
     } catch (error) {
       // Lifecycle maintenance should never block a user response.
     }
-    if (response.skipOutgoingTranslation) {
-      const finalized = { ...response };
+    const finalized = { ...response };
+    delete finalized.replyLanguage;
+    if (response.skipOutgoingTranslation || responseAlreadyMatchesUserLanguage(response, userLanguage)) {
       delete finalized.skipOutgoingTranslation;
       return finalized;
     }
-    return applyOutgoingTranslation(response, userLanguage);
+    return applyOutgoingTranslation(finalized, userLanguage);
   };
 
   if (!onboardingStatus.complete || /^(restart onboarding|restart profile|start over|reset profile|correct|correct previous|change previous|fix previous)$/i.test(originalQuestion)) {
@@ -1352,7 +1374,20 @@ async function processWebMessage(messageContext = {}) {
     }
   }
 
-  const incomingTranslation = await resolveIncomingProcessingText(originalQuestion, incomingLanguageResolution);
+  const keepNativeTransferLanguage = isActiveSupervisorDeliveryEnabled()
+    && supervisorService.usesNativeUserLanguage(originalQuestion);
+  const incomingTranslation = keepNativeTransferLanguage
+    ? {
+        processingText: originalQuestion,
+        metadata: {
+          originalLanguage: incomingLanguageResolution.language || CORE_AGENT_WORKING_LANGUAGE,
+          processingLanguage: incomingLanguageResolution.language || CORE_AGENT_WORKING_LANGUAGE,
+          translated: false,
+          provider: translationService.getProviderName(),
+          fallbackUsed: false,
+        },
+      }
+    : await resolveIncomingProcessingText(originalQuestion, incomingLanguageResolution);
   question = incomingTranslation.processingText;
   userContext.translation = incomingTranslation.metadata;
   messageContext.originalText = originalQuestion;

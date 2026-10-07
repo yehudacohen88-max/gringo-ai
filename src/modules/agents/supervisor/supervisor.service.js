@@ -388,7 +388,9 @@ function isUserSafeWarning(warning) {
 }
 
 function firstSafeWarning(warnings = []) {
-  return cleanText(warnings.find(isUserSafeWarning));
+  return cleanText(warnings.find((warning) => (
+    isUserSafeWarning(warning) && cleanText(warning) !== 'reported_quote_unverified'
+  )));
 }
 
 function taskCapabilityForDomain(domain, requestContext = {}) {
@@ -1002,6 +1004,17 @@ class SupervisorService {
     this.agentsByDomain = new Map(
       this.agentRegistry.listAgents().map((agent) => [agent.domain, agent])
     );
+  }
+
+  usesNativeUserLanguage(message = '') {
+    if (!isHebrewThailandTransferRequest(message)) return false;
+
+    const clauses = cleanText(message).split(/\s+ו(?:אני|גם)?\s+/);
+    return clauses.every((clause) => (
+      !clause
+      || isHebrewThailandTransferRequest(clause)
+      || /(?:איפה|הכי)\s+משתלם/.test(clause)
+    ));
   }
 
   createRequestContext(input = {}) {
