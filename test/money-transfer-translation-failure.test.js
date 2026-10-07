@@ -311,23 +311,217 @@ test('English finance.transfer is unchanged when translation is unavailable', as
   });
 });
 
-test('Hebrew salary-only translation failure does not report completed', async () => {
+const INCOMING_LANGUAGE_FAILURE_REPLY = 'לא הצלחתי להבין את כל ההודעה בגלל בעיה זמנית בעיבוד השפה. אפשר לשלוח אותה שוב או לנסח אותה מחדש.';
+const OUTGOING_HEBREW_TRANSLATION_NOTICE = 'לא הצלחתי לתרגם כרגע את התשובה לעברית, אז היא מוצגת באנגלית.';
+
+test('Hebrew salary-only translation failure returns a Hebrew language fallback', async () => {
   enableActiveSupervisor();
   mockCore(completeProfile());
 
   await withTranslation(async (text, sourceLanguage, targetLanguage) => (
     failedIncomingTranslation(text, sourceLanguage, targetLanguage)
-  ), async () => {
+  ), async (calls) => {
     const response = await coreAgentService.processWebMessage({
       requestId: 'req_salary_only_fallback',
       message: HE_SALARY_ONLY,
       channel: 'web',
       channelUserId: 'salary-only-fallback',
     });
+    const plan = supervisorService.getPlan('req_salary_only_fallback');
 
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].targetLanguage, 'en');
+    assert.equal(response.status, 'SUPERVISOR_PARTIAL');
     assert.notEqual(response.status, 'SUPERVISOR_COMPLETED');
-    assert.equal(response.status, 'SUPERVISOR_NEEDS_CLARIFICATION');
+    assert.equal(response.reply, INCOMING_LANGUAGE_FAILURE_REPLY);
+    assert.equal(response.reply.includes('Which area do you need help with'), false);
+    assert.equal(response.reply.includes('Employment & Salary'), false);
+    assert.equal(response.reply.includes('Finance & Consumer'), false);
+    assert.equal(response.reply.includes('employment_salary'), false);
     assert.equal(response.reply.includes('insufficient_quota'), false);
     assert.equal(response.reply.includes('PROVIDER_RATE_LIMIT'), false);
+    assert.equal(response.reply.includes('429'), false);
+    assert.equal(plan.status, 'partial');
+    assert.equal(plan.requiresUserInput, false);
+    assert.equal(plan.warnings.includes('incoming_translation_incomplete'), true);
+    assert.equal(plan.incomingTranslation.fallbackUsed, true);
+    assert.equal(plan.incomingTranslation.errorCode, 'PROVIDER_RATE_LIMIT');
+  });
+});
+
+test('Hebrew-preferred English transfer keeps the English answer when outgoing translation fails', async () => {
+  enableActiveSupervisor();
+  mockCore(completeProfile({ preferredLanguage: 'he', language: 'he' }));
+  seedTransferQuotes();
+
+  await withTranslation(async (text, sourceLanguage, targetLanguage) => (
+    failedIncomingTranslation(text, sourceLanguage, targetLanguage)
+  ), async (calls) => {
+    const response = await coreAgentService.processWebMessage({
+      requestId: 'req_english_transfer_outgoing_failed',
+      message: ENGLISH_TRANSFER,
+      channel: 'web',
+      channelUserId: 'english-transfer-outgoing-failed',
+    });
+    const plan = supervisorService.getPlan('req_english_transfer_outgoing_failed');
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].sourceLanguage, 'en');
+    assert.equal(calls[0].targetLanguage, 'he');
+    assert.equal(response.status, 'SUPERVISOR_COMPLETED');
+    assert.equal(plan.status, 'completed');
+    assert.equal(plan.tasks[0].result.status, 'success');
+    assert.equal(response.reply, `${OUTGOING_HEBREW_TRANSLATION_NOTICE}\n\n${ENGLISH_TRANSFER_REPLY}`);
+    assert.equal(response.reply.includes(HEBREW_NOTICE), false);
+    assert.equal(response.reply.includes(INCOMING_LANGUAGE_FAILURE_REPLY), false);
+    assert.equal(response.reply.includes('insufficient_quota'), false);
+    assert.equal(response.reply.includes('PROVIDER_RATE_LIMIT'), false);
+    assert.equal(response.reply.includes('429'), false);
+    assert.equal(response.reply.includes('Employment & Salary'), false);
+    assert.equal(plan.responseTranslation.fallbackUsed, true);
+    assert.equal(plan.responseTranslation.errorCode, 'PROVIDER_RATE_LIMIT');
+    assert.equal(plan.responseTranslation.failureType, 'rate_limit');
+  });
+});
+
+const HEBREW_QUOTE_INTAKE = 'שמור לי הצעה של Neema: אני שולח 2000 ILS, העמלה 20 ILS, והמקבל מקבל 21800 THB';
+const HEBREW_QUOTE_RECALL = 'מה ההצעה האחרונה שלי להעברת כסף?';
+const HEBREW_QUOTE_INTAKE_REPLY = [
+  'רשמתי את הצעת ההעברה כפי שדיווחת עליה, לא כמידע מאומת מהספק.',
+  'ספק: Neema.',
+  'סכום לשליחה: 2000 ILS.',
+  'סכום לקבלה: 21800 THB.',
+  'עמלה: 20 ILS.',
+  'עלות כוללת: לא ידוע.',
+  'שער לקוח שדווח: לא ידוע.',
+  'שמרתי את ההצעה בפרופיל שלך כדי שתוכל להשתמש בה בהמשך.',
+  'המידע הזה הוא user-reported בלבד. לא בדקתי אותו מול הספק, לא חישבתי שדות חסרים, ולא מדובר בהוראה לבצע העברה.',
+].join('\n');
+const HEBREW_QUOTE_RECALL_REPLY = [
+  'זו הצעת העברת הכספים האחרונה ששמורה אצלך.',
+  'ספק: Neema.',
+  'סכום לשליחה: 2000 ILS.',
+  'סכום לקבלה: 21800 THB.',
+  'עמלה: 20 ILS.',
+  'נשמר בתאריך: 2026-09-28T12:00:00.000Z.',
+  'ההצעה הזו היא user-reported בלבד ולא אומתה מול הספק. היא לא הצעה חיה, לא מידע רשמי, ולא הוראה לבצע העברה.',
+].join('\n');
+
+function assertHebrewReplyWithoutTranslationNotice(response, expectedReply) {
+  assert.equal(response.reply, expectedReply);
+  assert.equal(response.reply.includes(OUTGOING_HEBREW_TRANSLATION_NOTICE), false);
+  assert.equal(response.reply.includes(HEBREW_NOTICE), false);
+  assert.equal(response.reply.includes(INCOMING_LANGUAGE_FAILURE_REPLY), false);
+  assert.equal(response.reply.includes('PROVIDER_RATE_LIMIT'), false);
+  assert.equal(response.reply.includes('insufficient_quota'), false);
+  assert.equal(response.reply.includes('429'), false);
+}
+
+test('Hebrew quote intake stays the Hebrew reply when both translations fail', async () => {
+  enableActiveSupervisor();
+  mockCore(completeProfile());
+  setUserSubmittedTransferQuoteRepositoryForTest({
+    saveUserSubmittedTransferQuote: async () => ({ saved: true, quote: { storedQuoteId: 'stored_quote_intake' } }),
+    findRecentUserSubmittedTransferQuotes: async () => ({ ok: true, quotes: [] }),
+  });
+
+  await withTranslation(async (text, sourceLanguage, targetLanguage) => (
+    failedIncomingTranslation(text, sourceLanguage, targetLanguage)
+  ), async (calls) => {
+    const response = await coreAgentService.processWebMessage({
+      requestId: 'req_hebrew_quote_intake_both_failed',
+      message: HEBREW_QUOTE_INTAKE,
+      channel: 'web',
+      channelUserId: 'hebrew-quote-intake-both-failed',
+    });
+    const plan = supervisorService.getPlan('req_hebrew_quote_intake_both_failed');
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].sourceLanguage, 'he');
+    assert.equal(calls[0].targetLanguage, 'en');
+    assert.equal(calls.some((call) => call.targetLanguage === 'he'), false);
+    assert.equal(response.status, 'SUPERVISOR_COMPLETED');
+    assert.equal(plan.status, 'completed');
+    assert.equal(plan.tasks[0].result.output.responseLanguage, 'he');
+    assert.equal(plan.responseTranslation, undefined);
+    assertHebrewReplyWithoutTranslationNotice(response, HEBREW_QUOTE_INTAKE_REPLY);
+  });
+});
+
+test('Hebrew quote recall stays the Hebrew reply when both translations fail', async () => {
+  enableActiveSupervisor();
+  mockCore(completeProfile());
+  setUserSubmittedTransferQuoteRepositoryForTest({
+    findRecentUserSubmittedTransferQuotes: async () => ({
+      ok: true,
+      quotes: [
+        {
+          storedQuoteId: 'stored_quote_latest',
+          savedAt: '2026-09-28T12:00:00.000Z',
+          providerId: 'neema',
+          providerName: 'Neema',
+          quote: {
+            providerId: 'neema',
+            providerName: 'Neema',
+            sourceCurrency: 'ILS',
+            targetCurrency: 'THB',
+            sendAmount: 2000,
+            recipientAmount: 21800,
+            transferFee: 20,
+            totalCustomerCost: null,
+            customerExchangeRate: null,
+            sourceTrust: {
+              sourceType: 'user_submitted_quote',
+              verificationStatus: 'user_reported',
+            },
+          },
+        },
+      ],
+    }),
+  });
+
+  await withTranslation(async (text, sourceLanguage, targetLanguage) => (
+    failedIncomingTranslation(text, sourceLanguage, targetLanguage)
+  ), async (calls) => {
+    const response = await coreAgentService.processWebMessage({
+      requestId: 'req_hebrew_quote_recall_both_failed',
+      message: HEBREW_QUOTE_RECALL,
+      channel: 'web',
+      channelUserId: 'hebrew-quote-recall-both-failed',
+    });
+    const plan = supervisorService.getPlan('req_hebrew_quote_recall_both_failed');
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].sourceLanguage, 'he');
+    assert.equal(calls[0].targetLanguage, 'en');
+    assert.equal(calls.some((call) => call.targetLanguage === 'he'), false);
+    assert.equal(response.status, 'SUPERVISOR_COMPLETED');
+    assert.equal(plan.status, 'completed');
+    assert.equal(plan.tasks[0].result.output.responseLanguage, 'he');
+    assert.equal(plan.responseTranslation, undefined);
+    assertHebrewReplyWithoutTranslationNotice(response, HEBREW_QUOTE_RECALL_REPLY);
+  });
+});
+
+test('English ambiguous clarification is unchanged when translation is not required', async () => {
+  enableActiveSupervisor();
+  mockCore(completeProfile({ preferredLanguage: 'en', language: 'en' }));
+
+  await withTranslation(async () => {
+    throw new Error('insufficient_quota');
+  }, async (calls) => {
+    const response = await coreAgentService.processWebMessage({
+      requestId: 'req_ambiguous_money_unchanged',
+      message: 'I need help with money',
+      channel: 'web',
+      channelUserId: 'ambiguous-money-unchanged',
+    });
+
+    assert.equal(calls.length, 0);
+    assert.equal(response.status, 'SUPERVISOR_NEEDS_CLARIFICATION');
+    assert.match(response.reply, /Which area do you need help with/i);
+    assert.match(response.reply, /Finance & Consumer/);
+    assert.equal(response.reply.includes(INCOMING_LANGUAGE_FAILURE_REPLY), false);
+    assert.equal(response.reply.includes(OUTGOING_HEBREW_TRANSLATION_NOTICE), false);
   });
 });

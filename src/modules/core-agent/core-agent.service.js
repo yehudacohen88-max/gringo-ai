@@ -47,6 +47,8 @@ const TRANSLATION_UNCERTAINTY_NOTICE = Object.freeze({
   he: 'ייתכן שחלק מההודעה לא הובן בגלל בעיה זמנית בעיבוד השפה. אפשר לשלוח שוב או לנסח את החלק הזה מחדש.',
   en: 'Part of your message may not have been understood because of a temporary language-processing problem. Please resend or rephrase that part.',
 });
+const INCOMING_LANGUAGE_FAILURE_REPLY = 'לא הצלחתי להבין את כל ההודעה בגלל בעיה זמנית בעיבוד השפה. אפשר לשלוח אותה שוב או לנסח אותה מחדש.';
+const OUTGOING_HEBREW_TRANSLATION_NOTICE = 'לא הצלחתי לתרגם כרגע את התשובה לעברית, אז היא מוצגת באנגלית.';
 
 function translationUncertaintyNotice(userLanguage = '') {
   return languagePrimary(userLanguage) === 'he'
@@ -103,6 +105,16 @@ function responseAlreadyMatchesUserLanguage(response = {}, userLanguage = '') {
   const replyLanguage = languagePrimary(response.replyLanguage);
   const targetLanguage = languagePrimary(userLanguage);
   return Boolean(replyLanguage && targetLanguage && replyLanguage === targetLanguage);
+}
+
+function deliveredTextLanguage(text = '') {
+  return languagePrimary(languageDetectionService.detectLanguage(text).language);
+}
+
+function deliveredTextAlreadyInLanguage(text = '', language = '') {
+  const textLanguage = deliveredTextLanguage(text);
+  const targetLanguage = languagePrimary(language);
+  return Boolean(textLanguage && targetLanguage && textLanguage === targetLanguage);
 }
 
 function logSupervisorWarning(stage, error) {
@@ -311,6 +323,32 @@ async function buildActiveSupervisorResponse({
     }
 
     if (plan.requiresUserInput) {
+      const domainMenu = Array.isArray(plan.missingInformation)
+        && plan.missingInformation.includes('business_domain');
+      if (incomingTranslationUncertain && domainMenu) {
+        plan.requiresUserInput = false;
+        plan.status = 'partial';
+        plan.missingInformation = [];
+        if (!Array.isArray(plan.warnings)) plan.warnings = [];
+        if (!plan.warnings.includes(INCOMING_TRANSLATION_INCOMPLETE_WARNING)) {
+          plan.warnings.push(INCOMING_TRANSLATION_INCOMPLETE_WARNING);
+        }
+        plan.incomingTranslation = {
+          fallbackUsed: true,
+          errorCode: String(incomingTranslationMetadata?.errorCode || '').trim(),
+          failureType: String(incomingTranslationMetadata?.failureType || '').trim(),
+        };
+        plan.updatedAt = new Date().toISOString();
+        storeSupervisorPlan(plan, 'storeIncomingLanguageFailure');
+        return {
+          reply: INCOMING_LANGUAGE_FAILURE_REPLY,
+          replyLanguage: 'he',
+          skipOutgoingTranslation: true,
+          category: 'Supervisor',
+          status: 'SUPERVISOR_PARTIAL',
+        };
+      }
+
       storeSupervisorPlan(plan, 'storeWaitingPlan');
       const reply = plan.clarificationQuestion
         ? `${plan.clarificationQuestion.question}\n\n${plan.clarificationQuestion.options
@@ -1113,7 +1151,11 @@ async function applyOutgoingTranslation(response = {}, targetLanguage = CORE_AGE
     reply: originalResponse,
   };
 
-  if (!originalResponse.trim() || metadata.targetLanguage === CORE_AGENT_RESPONSE_LANGUAGE) {
+  if (
+    !originalResponse.trim()
+    || metadata.targetLanguage === CORE_AGENT_RESPONSE_LANGUAGE
+    || deliveredTextAlreadyInLanguage(originalResponse, metadata.targetLanguage)
+  ) {
     Object.defineProperty(finalized, OUTGOING_TRANSLATION_METADATA, {
       value: {
         ...metadata,
@@ -1135,12 +1177,32 @@ async function applyOutgoingTranslation(response = {}, targetLanguage = CORE_AGE
     metadata.provider = result.provider;
     metadata.translated = Boolean(result.translated);
     metadata.fallbackUsed = Boolean(result.fallbackUsed);
+    if (result.errorCode) metadata.errorCode = result.errorCode;
+    if (result.failureType) metadata.failureType = result.failureType;
 
     if (result.translated && !result.fallbackUsed) {
       finalized.reply = protectedResponse.restore(result.translatedText);
     }
   } catch (error) {
     metadata.fallbackUsed = true;
+    metadata.failureType = 'exception';
+  }
+
+  const outgoingDelivered = metadata.translated && !metadata.fallbackUsed;
+  const showHebrewTranslationNotice = metadata.targetLanguage !== CORE_AGENT_RESPONSE_LANGUAGE
+    && languagePrimary(metadata.targetLanguage) === 'he'
+    && !outgoingDelivered
+    && !deliveredTextAlreadyInLanguage(finalized.reply, metadata.targetLanguage)
+    && !finalized.reply.includes(OUTGOING_HEBREW_TRANSLATION_NOTICE)
+    && !finalized.reply.includes(TRANSLATION_UNCERTAINTY_NOTICE.he)
+    && !finalized.reply.includes(INCOMING_LANGUAGE_FAILURE_REPLY);
+  if (showHebrewTranslationNotice) {
+    finalized.reply = `${OUTGOING_HEBREW_TRANSLATION_NOTICE}\n\n${finalized.reply}`;
+    finalized.responseTranslation = {
+      fallbackUsed: true,
+      errorCode: String(metadata.errorCode || '').trim(),
+      failureType: String(metadata.failureType || '').trim(),
+    };
   }
 
   Object.defineProperty(finalized, OUTGOING_TRANSLATION_METADATA, {
@@ -1418,9 +1480,32 @@ async function processWebMessage(messageContext = {}) {
     delete finalized.replyLanguage;
     if (response.skipOutgoingTranslation || responseAlreadyMatchesUserLanguage(response, userLanguage)) {
       delete finalized.skipOutgoingTranslation;
+      if (response.skipOutgoingTranslation && finalized.reply === INCOMING_LANGUAGE_FAILURE_REPLY) {
+        Object.defineProperty(finalized, OUTGOING_TRANSLATION_METADATA, {
+          value: {
+            sourceLanguage: CORE_AGENT_RESPONSE_LANGUAGE,
+            targetLanguage: userLanguage,
+            translated: false,
+            provider: translationService.getProviderName(),
+            fallbackUsed: true,
+            originalResponse: finalized.reply,
+            deliveryResponse: finalized.reply,
+          },
+          enumerable: false,
+        });
+      }
       return finalized;
     }
-    return applyOutgoingTranslation(finalized, userLanguage);
+    const delivered = await applyOutgoingTranslation(finalized, userLanguage);
+    if (delivered.responseTranslation?.fallbackUsed && messageContext.requestId) {
+      const plan = supervisorService.getPlan(messageContext.requestId);
+      if (plan) {
+        plan.responseTranslation = delivered.responseTranslation;
+        plan.updatedAt = new Date().toISOString();
+        storeSupervisorPlan(plan, 'storeResponseTranslationFailure');
+      }
+    }
+    return delivered;
   };
 
   if (!onboardingStatus.complete || /^(restart onboarding|restart profile|start over|reset profile|correct|correct previous|change previous|fix previous)$/i.test(originalQuestion)) {
