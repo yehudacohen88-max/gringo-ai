@@ -10,6 +10,11 @@
     "test:sheets": "node scripts/testGoogleSheetsConnection.js",
     "setup:workers": "node scripts/setupWorkerSheets.js",
     "setup:crm-agent": "node scripts/setupCrmAgentSheets.js",
+    "setup:jobs": "node scripts/setupJobsSheet.js",
+    "setup:money": "node scripts/setupMoneySheets.js",
+    "setup:housing": "node scripts/setupHousingSheet.js",
+    "setup:community": "node scripts/setupCommunitySheets.js",
+    "setup:admin": "node scripts/setupAdminSheets.js",
     "setup:manager-agent": "node scripts/setupManagerAgentSheets.js",
     "setup:content-agent": "node scripts/setupContentAgentSheets.js"
   },

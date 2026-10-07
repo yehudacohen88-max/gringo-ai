@@ -1,5 +1,6 @@
 const contentRepository = require('./content-agent.repository');
 const { CONTENT_DRAFT_STATUS, CONTENT_TYPES } = require('./content-draft.model');
+const communityService = require('../community/community.service');
 
 function generateId(prefix) {
   const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, '');
@@ -150,10 +151,17 @@ async function generateContentDrafts(options = {}) {
   return savedDrafts;
 }
 
+async function publishApprovedDraftToCommunity(draftId) {
+  const drafts = await contentRepository.readContentDrafts();
+  const draft = drafts.find((item) => item.draftId === draftId);
+  return communityService.publishApprovedDraft(draft);
+}
+
 module.exports = {
   detectRecurringTopics,
   generateContentDrafts,
   generateDraftFromTemplate,
+  publishApprovedDraftToCommunity,
   readConversationHistory,
   readManagerRecommendations,
 };

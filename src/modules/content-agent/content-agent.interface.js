@@ -4,6 +4,7 @@ const CONTENT_AGENT_INTERFACE = {
   detectRecurringTopics: 'detectRecurringTopics(options)',
   generateContentDrafts: 'generateContentDrafts(options)',
   generateDraftFromTemplate: 'generateDraftFromTemplate(topic, contentType)',
+  publishApprovedDraftToCommunity: 'publishApprovedDraftToCommunity(draftId)',
 };
 
 module.exports = {

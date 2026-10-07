@@ -4,6 +4,12 @@ This is the starting foundation for the Gringo Community platform.
 
 The main product direction is now an agent-powered community platform. The CRM remains in the project, but it is an internal service used by agents rather than the main product.
 
+## Current Development Stage
+
+The project is being prepared for Milestone 8: Active Supervisor. Milestone 8 will move the Supervisor from internal planning infrastructure toward active orchestration, domain agent execution, multi-agent coordination, result aggregation, workflows, approvals, and production readiness.
+
+See `docs/MILESTONE_8.md` for the current status and roadmap.
+
 Current scope includes only:
 
 - Node.js project setup

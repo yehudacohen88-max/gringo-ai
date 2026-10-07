@@ -1,5 +1,5 @@
 const { env } = require('../../config/env');
-const { appendSheetRow, readSheetRows } = require('../../config/googleSheets');
+const { appendSheetRow, readSheetRows, updateSheetRow } = require('../../config/googleSheets');
 const { CONVERSATION_HISTORY_FIELDS } = require('../crm-agent/conversation-history.model');
 const { USER_PROFILE_FIELDS } = require('../crm-agent/user-profile.model');
 const {
@@ -57,10 +57,37 @@ async function saveRecommendation(recommendation) {
   return recommendation;
 }
 
+async function readDailyReports() {
+  const rows = await readSheetRows(env.googleSheets.sheets.dailyReports);
+  return rows
+    .slice(1)
+    .map((row) => rowToObject(DAILY_REPORT_FIELDS, row))
+    .filter(hasValues);
+}
+
+async function readRecommendations() {
+  const rows = await readSheetRows(env.googleSheets.sheets.recommendations);
+  return rows
+    .slice(1)
+    .map((row) => rowToObject(RECOMMENDATION_FIELDS, row))
+    .filter(hasValues);
+}
+
+async function updateRecommendation(recommendationId, recommendation) {
+  const rows = await readSheetRows(env.googleSheets.sheets.recommendations);
+  const rowIndex = rows.findIndex((row, index) => index > 0 && row[0] === recommendationId);
+  if (rowIndex < 1) return null;
+  await updateSheetRow(env.googleSheets.sheets.recommendations, rowIndex + 1, objectToRow(RECOMMENDATION_FIELDS, recommendation));
+  return recommendation;
+}
+
 module.exports = {
+  readDailyReports,
   readConversationHistory,
+  readRecommendations,
   readUserProfiles,
   saveDailyReport,
   saveRecommendation,
   saveWeeklyReport,
+  updateRecommendation,
 };

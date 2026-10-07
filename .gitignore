@@ -9,3 +9,7 @@ pnpm-debug.log*
 coverage/
 dist/
 build/
+
+.pnpm-store/
+.codex-server.*.log
+*.log

@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Gringo Admin Operations</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="page-shell admin-shell">
+      <section class="form-panel">
+        <div class="section-heading">
+          <h1>Admin Operations Center</h1>
+          <p>Internal morning view for Gringo operations.</p>
+          <label class="admin-key-field">
+            <span>Admin API key</span>
+            <input id="adminApiKey" type="password" value="dev-admin-key">
+          </label>
+          <div class="nav-actions">
+            <button id="generateDailyReportButton" class="button" type="button">Generate Daily Report</button>
+            <button id="generateWeeklyReportButton" class="button button-secondary" type="button">Generate Weekly Report</button>
+            <button id="refreshAdminButton" class="button button-secondary" type="button">Refresh Data</button>
+          </div>
+        </div>
+
+        <div id="adminAlert" class="alert alert-error" hidden></div>
+
+        <nav class="admin-nav" aria-label="Admin sections">
+          <button class="button button-secondary button-small" data-admin-section="overviewSection" type="button">Overview</button>
+          <button class="button button-secondary button-small" data-admin-section="followUpSection" type="button">Human Follow-up</button>
+          <button class="button button-secondary button-small" data-admin-section="missingKnowledgeSection" type="button">Missing Knowledge</button>
+          <button class="button button-secondary button-small" data-admin-section="contentDraftsSection" type="button">Content Drafts</button>
+          <button class="button button-secondary button-small" data-admin-section="communityModerationSection" type="button">Community Moderation</button>
+          <button class="button button-secondary button-small" data-admin-section="documentsSection" type="button">Documents</button>
+          <button class="button button-secondary button-small" data-admin-section="notificationsSection" type="button">Notifications</button>
+          <button class="button button-secondary button-small" data-admin-section="translationSection" type="button">Translation</button>
+          <button class="button button-secondary button-small" data-admin-section="whatsappSection" type="button">WhatsApp</button>
+          <button class="button button-secondary button-small" data-admin-section="lineSection" type="button">LINE</button>
+          <button class="button button-secondary button-small" data-admin-section="tasksSection" type="button">Tasks</button>
+          <button class="button button-secondary button-small" data-admin-section="reportsSection" type="button">Reports</button>
+          <button class="button button-secondary button-small" data-admin-section="recommendationsSection" type="button">Recommendations</button>
+        </nav>
+
+        <section id="overviewSection" class="admin-section">
+          <h2>Overview</h2>
+          <div id="overviewGrid" class="admin-grid"></div>
+        </section>
+
+        <section id="followUpSection" class="admin-section" hidden>
+          <h2>Needs Human Response</h2>
+          <div id="followUpList" class="admin-list"></div>
+        </section>
+
+        <section id="missingKnowledgeSection" class="admin-section" hidden>
+          <h2>Missing Knowledge</h2>
+          <div id="missingKnowledgeList" class="admin-list"></div>
+        </section>
+
+        <section id="contentDraftsSection" class="admin-section" hidden>
+          <h2>Content Drafts</h2>
+          <div id="contentDraftsList" class="admin-list"></div>
+        </section>
+
+        <section id="communityModerationSection" class="admin-section" hidden>
+          <h2>Community Moderation</h2>
+          <div id="communityModerationList" class="admin-list"></div>
+        </section>
+
+        <section id="documentsSection" class="admin-section" hidden>
+          <h2>Documents</h2>
+          <p>Gringo helps you organize information but does not replace official legal or immigration advice.</p>
+          <div id="adminDocumentsList" class="admin-list"></div>
+        </section>
+
+        <section id="notificationsSection" class="admin-section" hidden>
+          <h2>Notifications</h2>
+          <p>Delivery is inside Gringo only. No external messages are sent.</p>
+          <form id="adminNotificationForm" class="profile-grid">
+            <label><span>Title</span><input name="title" value="Construction update in Tel Aviv"></label>
+            <label><span>Message</span><input name="message" value="There is a new update for construction workers in Tel Aviv."></label>
+            <label>
+              <span>Type</span>
+              <select name="type">
+                <option>System</option>
+                <option>Job Match</option>
+                <option>Housing Match</option>
+                <option>Document Expiry</option>
+                <option>Community Update</option>
+                <option>Human Response</option>
+              </select>
+            </label>
+            <label>
+              <span>Priority</span>
+              <select name="priority">
+                <option>Normal</option>
+                <option>Low</option>
+                <option>High</option>
+                <option>Urgent</option>
+              </select>
+            </label>
+            <label><span>Action label</span><input name="actionLabel" value="Open Community"></label>
+            <label><span>Action URL</span><input name="actionUrl" value="#community"></label>
+            <label><span>Scheduled date</span><input name="scheduledAt" type="datetime-local"></label>
+            <label><span>One user ID</span><input name="targetUserId" placeholder="optional"></label>
+            <label><span>Country</span><input name="country" placeholder="Thailand"></label>
+            <label><span>Language</span><input name="language" placeholder="Thai"></label>
+            <label><span>Work sector</span><input name="sector" value="Construction"></label>
+            <label><span>City</span><input name="city" value="Tel Aviv"></label>
+            <label><span>Active goal</span><input name="activeGoal" placeholder="Find Job"></label>
+            <button class="button" type="submit">Create Notification</button>
+          </form>
+          <div id="adminNotificationsList" class="admin-list"></div>
+        </section>
+
+        <section id="translationSection" class="admin-section" hidden>
+          <h2>Translation</h2>
+          <p>Read-only technical overview. Message text and provider secrets are not shown.</p>
+          <div id="translationStatusGrid" class="admin-grid"></div>
+          <div id="translationMetricsGrid" class="admin-grid"></div>
+          <h3>Settings</h3>
+          <form id="translationSettingsForm" class="profile-grid">
+            <label><span>Enable translation</span><input name="translationEnabled" type="checkbox"></label>
+            <label>
+              <span>Provider</span>
+              <select name="provider"></select>
+            </label>
+            <label><span>Enable cache</span><input name="cacheEnabled" type="checkbox"></label>
+            <label><span>Cache TTL minutes</span><input name="cacheTtlMinutes" type="number" min="1" max="10080"></label>
+            <fieldset class="wide">
+              <legend>Supported languages</legend>
+              <div id="translationLanguageToggles" class="profile-grid"></div>
+            </fieldset>
+            <button class="button" type="submit">Save Translation Settings</button>
+          </form>
+          <div id="translationSettingsFeedback" class="alert" hidden></div>
+        </section>
+
+        <section id="whatsappSection" class="admin-section" hidden>
+          <h2>WhatsApp</h2>
+          <p>Internal connector dashboard. Secrets are never shown here.</p>
+          <div id="whatsappHealthGrid" class="admin-grid"></div>
+          <div id="whatsappCardsGrid" class="admin-grid"></div>
+          <form id="whatsappManualNotificationForm" class="profile-grid">
+            <label><span>Title</span><input name="title" value="WhatsApp update from Gringo"></label>
+            <label><span>Message</span><input name="message" value="There is an update waiting for you inside Gringo."></label>
+            <label>
+              <span>Type</span>
+              <select name="type">
+                <option>Admin Message</option>
+                <option>Job Match</option>
+                <option>Housing Match</option>
+                <option>Document Expiry</option>
+                <option>Missing Document</option>
+                <option>Community Update</option>
+                <option>Human Response</option>
+                <option>Task Reminder</option>
+              </select>
+            </label>
+            <label>
+              <span>Priority</span>
+              <select name="priority">
+                <option>Normal</option>
+                <option>Low</option>
+                <option>High</option>
+                <option>Urgent</option>
+              </select>
+            </label>
+            <label><span>Action label</span><input name="actionLabel" value="Open Gringo"></label>
+            <label><span>Action URL</span><input name="actionUrl" value="#notifications"></label>
+            <label><span>Single user ID</span><input name="targetUserId" placeholder="optional"></label>
+            <label><span>Country</span><input name="country" placeholder="Thailand"></label>
+            <label><span>Language</span><input name="language" placeholder="Thai"></label>
+            <label><span>Sector</span><input name="sector" placeholder="Construction"></label>
+            <label><span>City</span><input name="city" placeholder="Tel Aviv"></label>
+            <label><span>Active goal</span><input name="activeGoal" placeholder="Find Job"></label>
+            <button class="button" type="submit">Create WhatsApp Notification</button>
+          </form>
+          <form id="whatsappFilters" class="profile-grid">
+            <label><span>Country</span><input name="country" placeholder="Thailand"></label>
+            <label><span>Date</span><input name="date" type="date"></label>
+            <label><span>Notification type</span><input name="notificationType" placeholder="Task Reminder"></label>
+            <label><span>Language</span><input name="language" placeholder="Thai"></label>
+            <label><span>Sector</span><input name="sector" placeholder="Construction"></label>
+            <label>
+              <span>Status</span>
+              <select name="status">
+                <option value="">All</option>
+                <option>Open</option>
+                <option>Closed</option>
+                <option>Pending</option>
+                <option>Queued</option>
+                <option>Failed</option>
+                <option>Sent</option>
+                <option>Delivered</option>
+                <option>Read</option>
+              </select>
+            </label>
+            <button class="button button-secondary" type="submit">Filter</button>
+          </form>
+          <div id="whatsappDashboardList" class="admin-list"></div>
+        </section>
+
+        <section id="lineSection" class="admin-section" hidden>
+          <h2>LINE</h2>
+          <p>Internal connector dashboard. Secrets are never shown here.</p>
+          <div id="lineHealthGrid" class="admin-grid"></div>
+          <div id="lineCardsGrid" class="admin-grid"></div>
+          <form id="lineFilters" class="profile-grid">
+            <label><span>Country</span><input name="country" placeholder="Thailand"></label>
+            <label><span>Language</span><input name="language" placeholder="Thai"></label>
+            <label><span>Sector</span><input name="sector" placeholder="Construction"></label>
+            <button class="button button-secondary" type="submit">Filter</button>
+          </form>
+          <div id="lineDashboardList" class="admin-list"></div>
+        </section>
+
+        <section id="tasksSection" class="admin-section" hidden>
+          <h2>Tasks</h2>
+          <form id="adminTaskForm" class="profile-grid">
+            <label><span>User ID</span><input name="userId" value="usr_somchai"></label>
+            <label><span>Country</span><input name="country" placeholder="Thailand"></label>
+            <label><span>Language</span><input name="language" placeholder="Thai"></label>
+            <label><span>Sector</span><input name="sector" placeholder="Construction"></label>
+            <label><span>City</span><input name="city" placeholder="Tel Aviv"></label>
+            <label><span>Active goal</span><input name="activeGoal" placeholder="Find Job"></label>
+            <label><span>Title</span><input name="title" value="Call employer"></label>
+            <label><span>Category</span><select name="category"><option>Work</option><option>Housing</option><option>Documents</option><option>Money</option><option>Healthcare</option><option>Community</option><option>Personal</option><option>Other</option></select></label>
+            <label><span>Priority</span><select name="priority"><option>Normal</option><option>Low</option><option>High</option><option>Urgent</option></select></label>
+            <label><span>Due date</span><input name="dueDate" type="date"></label>
+            <label><span>Due time</span><input name="dueTime" type="time"></label>
+            <label><span>Related module</span><input name="relatedModule" placeholder="Jobs"></label>
+            <label><span>Recurrence</span><select name="recurrenceType"><option>None</option><option>Daily</option><option>Weekly</option><option>Monthly</option></select></label>
+            <label><span>Every</span><input name="recurrenceInterval" type="number" min="1" value="1"></label>
+            <label class="wide"><span>Description</span><textarea name="description" rows="2"></textarea></label>
+            <label class="wide"><span>Internal note</span><textarea name="internalNote" rows="2"></textarea></label>
+            <button class="button" type="submit">Assign Task</button>
+          </form>
+          <div id="adminTasksList" class="admin-list"></div>
+        </section>
+
+        <section id="reportsSection" class="admin-section" hidden>
+          <h2>Morning Report</h2>
+          <div id="reportDetail" class="admin-list"></div>
+        </section>
+
+        <section id="recommendationsSection" class="admin-section" hidden>
+          <h2>Recommendations</h2>
+          <div id="recommendationsList" class="admin-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/admin.js"></script>
+  </body>
+</html>

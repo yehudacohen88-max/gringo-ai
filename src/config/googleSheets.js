@@ -1,7 +1,23 @@
-const { google } = require('googleapis');
 const { env } = require('./env');
 
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
+const READ_CACHE_TTL_MS = 45 * 1000;
+let googleClient;
+const readCache = new Map();
+
+function getGoogleClient() {
+  if (googleClient !== undefined) {
+    return googleClient;
+  }
+
+  try {
+    googleClient = require('googleapis').google;
+  } catch (error) {
+    googleClient = null;
+  }
+
+  return googleClient;
+}
 
 function assertGoogleSheetsEnv() {
   const missing = [];
@@ -17,6 +33,12 @@ function assertGoogleSheetsEnv() {
 
 function createGoogleSheetsClient() {
   assertGoogleSheetsEnv();
+
+  const google = getGoogleClient();
+
+  if (!google) {
+    throw new Error('Google Sheets client library is not installed.');
+  }
 
   const auth = new google.auth.JWT({
     email: env.googleSheets.clientEmail,
@@ -40,15 +62,67 @@ function numberToColumnName(number) {
   return columnName;
 }
 
+function cloneRows(rows = []) {
+  return rows.map((row) => [...row]);
+}
+
+function cacheKey(range) {
+  return `${env.googleSheets.spreadsheetId}::${range}`;
+}
+
+function getCachedRows(key, now = Date.now()) {
+  const cached = readCache.get(key);
+
+  if (!cached) return null;
+
+  if (cached.expiresAt <= now) {
+    readCache.delete(key);
+    return null;
+  }
+
+  return cloneRows(cached.rows);
+}
+
+function setCachedRows(key, rows, now = Date.now()) {
+  readCache.set(key, {
+    rows: cloneRows(rows),
+    expiresAt: now + READ_CACHE_TTL_MS,
+  });
+}
+
+function invalidateReadCacheForSheet(sheetName) {
+  const prefix = `${env.googleSheets.spreadsheetId}::${sheetName}!`;
+
+  for (const key of readCache.keys()) {
+    if (key.startsWith(prefix)) {
+      readCache.delete(key);
+    }
+  }
+}
+
+function clearReadCache() {
+  readCache.clear();
+}
+
 async function readSheetRows(sheetName) {
+  const range = `${sheetName}!A:ZZ`;
+  const key = cacheKey(range);
+  const cachedRows = getCachedRows(key);
+
+  if (cachedRows) {
+    return cachedRows;
+  }
+
   const sheets = createGoogleSheetsClient();
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: env.googleSheets.spreadsheetId,
-    range: `${sheetName}!A:ZZ`,
+    range,
   });
 
-  return response.data.values || [];
+  const rows = response.data.values || [];
+  setCachedRows(key, rows);
+  return cloneRows(rows);
 }
 
 async function appendSheetRow(sheetName, row) {
@@ -63,6 +137,8 @@ async function appendSheetRow(sheetName, row) {
       values: [row],
     },
   });
+
+  invalidateReadCacheForSheet(sheetName);
 }
 
 async function updateSheetRow(sheetName, rowNumber, row) {
@@ -77,6 +153,8 @@ async function updateSheetRow(sheetName, rowNumber, row) {
       values: [row],
     },
   });
+
+  invalidateReadCacheForSheet(sheetName);
 }
 
 async function ensureSheetWithHeader(sheetName, headerRow) {
@@ -102,6 +180,7 @@ async function ensureSheetWithHeader(sheetName, headerRow) {
         ],
       },
     });
+    invalidateReadCacheForSheet(sheetName);
   }
 
   const lastColumn = numberToColumnName(headerRow.length);
@@ -114,6 +193,8 @@ async function ensureSheetWithHeader(sheetName, headerRow) {
       values: [headerRow],
     },
   });
+
+  invalidateReadCacheForSheet(sheetName);
 }
 
 async function readContactRows() {
@@ -122,8 +203,10 @@ async function readContactRows() {
 
 module.exports = {
   appendSheetRow,
+  clearReadCache,
   createGoogleSheetsClient,
   ensureSheetWithHeader,
+  invalidateReadCacheForSheet,
   readContactRows,
   readSheetRows,
   updateSheetRow,

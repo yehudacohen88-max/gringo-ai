@@ -12,17 +12,656 @@
         <div class="section-heading">
           <h1>Chat with Gringo</h1>
           <p>Ask a question and Gringo will try to help.</p>
+          <button id="communityButton" class="button button-secondary button-small" type="button">Community</button>
+          <button id="moneyButton" class="button button-secondary button-small" type="button">Money</button>
+          <button id="housingButton" class="button button-secondary button-small" type="button">Housing</button>
+          <button id="jobsButton" class="button button-secondary button-small" type="button">Jobs</button>
+          <button id="servicesButton" class="button button-secondary button-small" type="button">Services</button>
+          <button id="documentsButton" class="button button-secondary button-small" type="button">Documents</button>
+          <button id="tasksButton" class="button button-secondary button-small" type="button">Tasks</button>
+          <button id="notificationsButton" class="button button-secondary button-small" type="button">Notifications <span id="notificationsBadge" class="notification-badge" hidden>0</span></button>
+          <button id="profileButton" class="button button-secondary button-small" type="button">My Profile</button>
         </div>
 
         <div id="chatAlert" class="alert alert-error" hidden></div>
-        <div id="chatHistory" class="chat-history" aria-live="polite"></div>
+        <div id="chatView">
+          <div id="chatHistory" class="chat-history" aria-live="polite"></div>
+          <div id="documentAlerts" class="jobs-list" hidden></div>
+          <div id="goalActions" class="row-actions">
+            <button class="button button-secondary button-small" data-goal-message="I found a job" type="button">I found a job</button>
+            <button class="button button-secondary button-small" data-goal-message="I found housing" type="button">I found housing</button>
+            <button class="button button-secondary button-small" data-goal-message="I no longer need this alert" type="button">I no longer need this alert</button>
+          </div>
 
-        <form id="chatForm" class="chat-form">
-          <input id="chatInput" name="message" placeholder="Type your message..." autocomplete="off" required>
-          <button id="chatSendButton" class="button" type="submit">Send</button>
-        </form>
+          <form id="chatForm" class="chat-form">
+            <input id="chatInput" name="message" placeholder="Type your message..." autocomplete="off" required>
+            <button id="chatSendButton" class="button" type="submit">Send</button>
+          </form>
 
-        <p id="chatLoading" class="chat-loading" hidden>Gringo is thinking...</p>
+          <p id="chatLoading" class="chat-loading" hidden>Gringo is thinking...</p>
+        </div>
+
+        <section id="profileView" class="profile-panel" hidden>
+          <h2>My Profile</h2>
+          <form id="profileForm" class="form-grid">
+            <label>
+              <span>Name</span>
+              <input id="profileFullName" name="fullName">
+            </label>
+            <label>
+              <span>Country</span>
+              <input id="profileCountry" name="country">
+            </label>
+            <label>
+              <span>Telegram user ID</span>
+              <input id="profileTelegramUserId" name="telegramUserId" readonly>
+            </label>
+            <label>
+              <span>Telegram chat ID</span>
+              <input id="profileTelegramChatId" name="telegramChatId" readonly>
+            </label>
+            <label>
+              <span>Telegram username</span>
+              <input id="profileTelegramUsername" name="telegramUsername" readonly>
+            </label>
+            <label>
+              <span>Telegram connected</span>
+              <input id="profileTelegramConnectedAt" name="telegramConnectedAt" readonly>
+            </label>
+            <div class="wide">
+              <h3>Telegram</h3>
+              <p id="telegramLinkStatus" class="muted-text"></p>
+              <div class="row-actions">
+                <button id="connectTelegramButton" class="button button-secondary button-small" type="button">Connect Telegram</button>
+                <button id="disconnectTelegramButton" class="button button-secondary button-small" type="button" hidden>Disconnect Telegram</button>
+              </div>
+            </div>
+            <div class="wide">
+              <h3>LINE</h3>
+              <p id="lineLinkStatus" class="muted-text"></p>
+              <div class="row-actions">
+                <button id="connectLineButton" class="button button-secondary button-small" type="button">Connect LINE</button>
+                <button id="disconnectLineButton" class="button button-secondary button-small" type="button" hidden>Disconnect LINE</button>
+              </div>
+            </div>
+            <div class="wide">
+              <h3>Communication Settings</h3>
+              <p id="connectedChannelsSummary" class="muted-text"></p>
+            </div>
+            <label>
+              <span>Preferred channel</span>
+              <select id="profilePreferredChannel" name="preferredChannel">
+                <option value="Web">Web</option>
+                <option value="Telegram">Telegram</option>
+                <option value="WhatsApp">WhatsApp</option>
+                <option value="LINE">LINE</option>
+              </select>
+            </label>
+            <label>
+              <span>Fallback channel</span>
+              <select id="profileFallbackChannel" name="fallbackChannel">
+                <option value="None">None</option>
+                <option value="Web">Web</option>
+                <option value="Telegram">Telegram</option>
+                <option value="WhatsApp">WhatsApp</option>
+                <option value="LINE">LINE</option>
+              </select>
+            </label>
+            <label>
+              <span>Language</span>
+              <select id="profilePreferredLanguage" name="preferredLanguage">
+                <option value="">Auto</option>
+                <option value="en">English</option>
+                <option value="he">Hebrew</option>
+                <option value="ar">Arabic</option>
+                <option value="th">Thai</option>
+                <option value="si">Sinhala</option>
+                <option value="hi">Hindi</option>
+                <option value="ru">Russian</option>
+                <option value="tl">Filipino</option>
+              </select>
+            </label>
+            <div class="wide">
+              <p id="profileLanguageStatus" class="muted-text"></p>
+            </div>
+            <label>
+              <span>Work sector</span>
+              <select id="profileWorkSector" name="workSector">
+                <option value="">Select sector</option>
+                <option value="Construction">Construction</option>
+                <option value="Agriculture">Agriculture</option>
+                <option value="Caregiving">Caregiving</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
+            <label>
+              <span>Profession</span>
+              <input id="profileProfession" name="profession">
+            </label>
+            <label>
+              <span>City</span>
+              <input id="profileCity" name="city">
+            </label>
+            <div class="wide">
+              <h3>Active Needs</h3>
+            </div>
+            <label>
+              <span>Looking for work</span>
+              <select id="profileLookingForJob" name="lookingForJob">
+                <option value="">No preference</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </label>
+            <label>
+              <span>Preferred job city</span>
+              <input id="profilePreferredJobCity" name="preferredJobCity">
+            </label>
+            <label>
+              <span>Preferred job profession</span>
+              <input id="profilePreferredJobProfession" name="preferredJobProfession">
+            </label>
+            <label>
+              <span>Job alerts</span>
+              <select id="profileWantsJobAlerts" name="wantsJobAlerts">
+                <option value="">No preference</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </label>
+            <label>
+              <span>Preferred currency</span>
+              <input id="profilePreferredCurrency" name="preferredCurrency">
+            </label>
+            <label>
+              <span>Exchange-rate alerts</span>
+              <select id="profileWantsExchangeRateAlerts" name="wantsExchangeRateAlerts">
+                <option value="">No preference</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </label>
+            <label>
+              <span>Money transfer interest</span>
+              <select id="profileInterestedInMoneyTransfers" name="interestedInMoneyTransfers">
+                <option value="">No preference</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </label>
+            <label>
+              <span>Looking for housing</span>
+              <select id="profileLookingForHousing" name="lookingForHousing">
+                <option value="">No preference</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </label>
+            <label>
+              <span>Preferred housing city</span>
+              <input id="profilePreferredHousingCity" name="preferredHousingCity">
+            </label>
+            <label>
+              <span>Preferred housing area</span>
+              <input id="profilePreferredHousingArea" name="preferredHousingArea">
+            </label>
+            <label>
+              <span>Preferred housing type</span>
+              <select id="profilePreferredHousingType" name="preferredHousingType">
+                <option value="">No preference</option>
+                <option value="Room">Room</option>
+                <option value="Shared Room">Shared Room</option>
+                <option value="Apartment">Apartment</option>
+                <option value="Bed Space">Bed Space</option>
+                <option value="Employer Housing">Employer Housing</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
+            <label>
+              <span>Maximum monthly budget</span>
+              <input id="profileMaximumMonthlyBudget" name="maximumMonthlyBudget" inputmode="decimal">
+            </label>
+            <label>
+              <span>Maximum housing budget</span>
+              <input id="profileMaximumHousingBudget" name="maximumHousingBudget" inputmode="decimal">
+            </label>
+            <label>
+              <span>Preferred move-in date</span>
+              <input id="profilePreferredMoveInDate" name="preferredMoveInDate">
+            </label>
+            <label class="wide">
+              <span>Active Goals</span>
+              <textarea id="profileActiveGoals" name="activeGoals" rows="2"></textarea>
+            </label>
+            <label class="wide">
+              <span>Completed Goals</span>
+              <textarea id="profileCompletedGoals" name="completedGoals" rows="2"></textarea>
+            </label>
+            <div class="wide">
+              <h3>Documents Summary</h3>
+            </div>
+            <label>
+              <span>Documents complete</span>
+              <input id="profileDocumentsComplete" name="documentsComplete" readonly>
+            </label>
+            <label>
+              <span>Expiring documents</span>
+              <input id="profileExpiringDocumentCount" name="expiringDocumentCount" readonly>
+            </label>
+            <label>
+              <span>Expired documents</span>
+              <input id="profileExpiredDocumentCount" name="expiredDocumentCount" readonly>
+            </label>
+            <label>
+              <span>Next expiry date</span>
+              <input id="profileNextDocumentExpiryDate" name="nextDocumentExpiryDate" readonly>
+            </label>
+            <label class="wide">
+              <span>Missing document types</span>
+              <input id="profileMissingDocumentTypes" name="missingDocumentTypes" readonly>
+            </label>
+            <div class="wide">
+              <h3>Notification Preferences</h3>
+            </div>
+            <label>
+              <span>Job notifications</span>
+              <select id="profileJobNotifications" name="jobNotifications"><option value="Yes">Yes</option><option value="No">No</option></select>
+            </label>
+            <label>
+              <span>Housing notifications</span>
+              <select id="profileHousingNotifications" name="housingNotifications"><option value="Yes">Yes</option><option value="No">No</option></select>
+            </label>
+            <label>
+              <span>Document notifications</span>
+              <select id="profileDocumentNotifications" name="documentNotifications"><option value="Yes">Yes</option><option value="No">No</option></select>
+            </label>
+            <label>
+              <span>Money notifications</span>
+              <select id="profileMoneyNotifications" name="moneyNotifications"><option value="Yes">Yes</option><option value="No">No</option></select>
+            </label>
+            <label>
+              <span>Community notifications</span>
+              <select id="profileCommunityNotifications" name="communityNotifications"><option value="Yes">Yes</option><option value="No">No</option></select>
+            </label>
+            <label>
+              <span>Human response notifications</span>
+              <select id="profileHumanResponseNotifications" name="humanResponseNotifications"><option value="Yes">Yes</option><option value="No">No</option></select>
+            </label>
+            <label>
+              <span>Telegram notifications</span>
+              <select id="profileTelegramNotificationsEnabled" name="telegramNotificationsEnabled"><option value="No">No</option><option value="Yes">Yes</option></select>
+            </label>
+            <label>
+              <span>Telegram quiet hours</span>
+              <select id="profileTelegramQuietHoursEnabled" name="telegramQuietHoursEnabled"><option value="No">No</option><option value="Yes">Yes</option></select>
+            </label>
+            <label>
+              <span>Quiet hours start</span>
+              <input id="profileTelegramQuietHoursStart" name="telegramQuietHoursStart" type="time">
+            </label>
+            <label>
+              <span>Quiet hours end</span>
+              <input id="profileTelegramQuietHoursEnd" name="telegramQuietHoursEnd" type="time">
+            </label>
+            <label>
+              <span>Telegram timezone</span>
+              <input id="profileTelegramTimezone" name="telegramTimezone" placeholder="Asia/Jerusalem">
+            </label>
+            <label>
+              <span>WhatsApp notifications</span>
+              <select id="profileWhatsappNotificationsEnabled" name="whatsappNotificationsEnabled"><option value="No">No</option><option value="Yes">Yes</option></select>
+            </label>
+            <label>
+              <span>LINE notifications</span>
+              <select id="profileLineNotificationsEnabled" name="lineNotificationsEnabled"><option value="No">No</option><option value="Yes">Yes</option></select>
+            </label>
+            <label>
+              <span>LINE quiet hours</span>
+              <select id="profileLineQuietHoursEnabled" name="lineQuietHoursEnabled"><option value="No">No</option><option value="Yes">Yes</option></select>
+            </label>
+            <label>
+              <span>LINE quiet start</span>
+              <input id="profileLineQuietHoursStart" name="lineQuietHoursStart" type="time">
+            </label>
+            <label>
+              <span>LINE quiet end</span>
+              <input id="profileLineQuietHoursEnd" name="lineQuietHoursEnd" type="time">
+            </label>
+            <label>
+              <span>LINE timezone</span>
+              <input id="profileLineTimezone" name="lineTimezone" placeholder="Asia/Jerusalem">
+            </label>
+            <label>
+              <span>WhatsApp quiet hours</span>
+              <select id="profileWhatsappQuietHoursEnabled" name="whatsappQuietHoursEnabled"><option value="No">No</option><option value="Yes">Yes</option></select>
+            </label>
+            <label>
+              <span>WhatsApp quiet start</span>
+              <input id="profileWhatsappQuietHoursStart" name="whatsappQuietHoursStart" type="time">
+            </label>
+            <label>
+              <span>WhatsApp quiet end</span>
+              <input id="profileWhatsappQuietHoursEnd" name="whatsappQuietHoursEnd" type="time">
+            </label>
+            <label>
+              <span>WhatsApp timezone</span>
+              <input id="profileWhatsappTimezone" name="whatsappTimezone" placeholder="Asia/Jerusalem">
+            </label>
+            <div class="wide">
+              <h3>Task Preferences</h3>
+            </div>
+            <label>
+              <span>Task reminders</span>
+              <select id="profileTaskRemindersEnabled" name="taskRemindersEnabled"><option value="Yes">Yes</option><option value="No">No</option></select>
+            </label>
+            <label>
+              <span>Default reminder time</span>
+              <input id="profileDefaultReminderTime" name="defaultReminderTime" type="time">
+            </label>
+            <label>
+              <span>Show completed tasks</span>
+              <select id="profileShowCompletedTasks" name="showCompletedTasks"><option value="Yes">Yes</option><option value="No">No</option></select>
+            </label>
+            <label>
+              <span>Tasks today</span>
+              <input id="profileTasksToday" name="tasksToday" readonly>
+            </label>
+            <label>
+              <span>Overdue tasks</span>
+              <input id="profileOverdueTasks" name="overdueTasks" readonly>
+            </label>
+            <label>
+              <span>Upcoming tasks</span>
+              <input id="profileUpcomingTasks" name="upcomingTasks" readonly>
+            </label>
+            <div class="form-actions wide">
+              <button class="button" type="submit">Save profile</button>
+              <button id="returnToChatButton" class="button button-secondary" type="button">Return to chat</button>
+            </div>
+          </form>
+        </section>
+
+        <section id="jobsView" class="profile-panel" hidden>
+          <h2>Jobs</h2>
+          <div id="jobsList" class="jobs-list"></div>
+          <div class="form-actions">
+            <button id="returnToChatFromJobsButton" class="button button-secondary" type="button">Return to chat</button>
+          </div>
+        </section>
+
+        <section id="servicesView" class="profile-panel" hidden>
+          <h2>Services</h2>
+          <div id="servicesList" class="jobs-list"></div>
+          <div class="form-actions">
+            <button id="returnToChatFromServicesButton" class="button button-secondary" type="button">Return to chat</button>
+          </div>
+        </section>
+
+        <section id="documentsView" class="profile-panel" hidden>
+          <h2>Documents</h2>
+          <form id="documentsFilters" class="filters-form">
+            <label>
+              <span>Type</span>
+              <select id="documentTypeFilter" name="documentType">
+                <option value="">Any type</option>
+                <option value="Passport">Passport</option>
+                <option value="Visa">Visa</option>
+                <option value="Work Permit">Work Permit</option>
+                <option value="Employment Contract">Employment Contract</option>
+                <option value="Health Insurance">Health Insurance</option>
+                <option value="Payslip">Payslip</option>
+                <option value="Bank Document">Bank Document</option>
+                <option value="Residence Document">Residence Document</option>
+                <option value="Driving License">Driving License</option>
+                <option value="Medical Document">Medical Document</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
+            <label>
+              <span>Status</span>
+              <select id="documentStatusFilter" name="status">
+                <option value="">Any status</option>
+                <option value="Valid">Valid</option>
+                <option value="Expiring Soon">Expiring Soon</option>
+                <option value="Expired">Expired</option>
+                <option value="Missing">Missing</option>
+                <option value="Under Review">Under Review</option>
+              </select>
+            </label>
+            <button class="button" type="submit">Filter</button>
+          </form>
+
+          <div id="documentsChecklist" class="jobs-list"></div>
+          <div id="documentsList" class="jobs-list"></div>
+
+          <form id="documentForm" class="form-grid">
+            <input id="documentId" name="documentId" type="hidden">
+            <label>
+              <span>Document type</span>
+              <select id="documentType" name="documentType" required>
+                <option value="">Select type</option>
+                <option value="Passport">Passport</option>
+                <option value="Visa">Visa</option>
+                <option value="Work Permit">Work Permit</option>
+                <option value="Employment Contract">Employment Contract</option>
+                <option value="Health Insurance">Health Insurance</option>
+                <option value="Payslip">Payslip</option>
+                <option value="Bank Document">Bank Document</option>
+                <option value="Residence Document">Residence Document</option>
+                <option value="Driving License">Driving License</option>
+                <option value="Medical Document">Medical Document</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
+            <label>
+              <span>Last four / number</span>
+              <input id="documentNumber" name="documentNumber">
+            </label>
+            <label>
+              <span>Issuing country</span>
+              <input id="documentIssuingCountry" name="issuingCountry">
+            </label>
+            <label>
+              <span>Issue date</span>
+              <input id="documentIssueDate" name="issueDate" type="date">
+            </label>
+            <label>
+              <span>Expiry date</span>
+              <input id="documentExpiryDate" name="expiryDate" type="date">
+            </label>
+            <label>
+              <span>Status</span>
+              <select id="documentStatus" name="status">
+                <option value="">Auto</option>
+                <option value="Valid">Valid</option>
+                <option value="Expiring Soon">Expiring Soon</option>
+                <option value="Expired">Expired</option>
+                <option value="Missing">Missing</option>
+                <option value="Under Review">Under Review</option>
+              </select>
+            </label>
+            <label>
+              <span>Reminder days before</span>
+              <input id="documentReminderDaysBefore" name="reminderDaysBefore" inputmode="numeric" value="30">
+            </label>
+            <label>
+              <span>Verified</span>
+              <select id="documentVerified" name="verified">
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </label>
+            <label class="wide">
+              <span>Optional local file</span>
+              <input id="documentFile" name="file" type="file" accept=".pdf,.jpg,.jpeg,.png">
+            </label>
+            <label class="wide">
+              <span>Notes</span>
+              <textarea id="documentNotes" name="notes" rows="2"></textarea>
+            </label>
+            <div class="form-actions wide">
+              <button class="button" type="submit">Save document</button>
+              <button id="clearDocumentFormButton" class="button button-secondary" type="button">Clear form</button>
+              <button id="returnToChatFromDocumentsButton" class="button button-secondary" type="button">Return to chat</button>
+            </div>
+          </form>
+        </section>
+
+        <section id="notificationsView" class="profile-panel" hidden>
+          <h2>Notifications</h2>
+          <form id="notificationsFilters" class="filters-form">
+            <label>
+              <span>Filter</span>
+              <select id="notificationsFilter" name="filter">
+                <option value="All">All</option>
+                <option value="Unread">Unread</option>
+                <option value="Jobs">Jobs</option>
+                <option value="Housing">Housing</option>
+                <option value="Documents">Documents</option>
+                <option value="Money">Money</option>
+                <option value="Community">Community</option>
+                <option value="Human Responses">Human Responses</option>
+                <option value="Tasks">Tasks</option>
+              </select>
+            </label>
+            <button class="button" type="submit">Filter</button>
+          </form>
+          <div id="notificationsList" class="jobs-list"></div>
+          <div class="form-actions">
+            <button id="returnToChatFromNotificationsButton" class="button button-secondary" type="button">Return to chat</button>
+          </div>
+        </section>
+
+        <section id="tasksView" class="profile-panel" hidden>
+          <h2>Tasks</h2>
+          <form id="tasksFilters" class="filters-form">
+            <label>
+              <span>View</span>
+              <select id="tasksViewFilter" name="view">
+                <option value="Today">Today</option>
+                <option value="Upcoming">Upcoming</option>
+                <option value="Overdue">Overdue</option>
+                <option value="Completed">Completed</option>
+                <option value="All">All</option>
+              </select>
+            </label>
+            <button class="button" type="submit">Filter</button>
+          </form>
+          <form id="tasksScheduleFilters" class="filters-form">
+            <label>
+              <span>Schedule</span>
+              <select id="tasksScheduleView" name="scheduleView">
+                <option value="Today">Today</option>
+                <option value="This Week">This Week</option>
+                <option value="This Month">This Month</option>
+              </select>
+            </label>
+            <button class="button button-secondary" type="submit">Show schedule</button>
+          </form>
+          <div id="tasksSummary" class="jobs-list"></div>
+          <div id="tasksList" class="jobs-list"></div>
+          <form id="taskForm" class="form-grid">
+            <input id="taskId" name="taskId" type="hidden">
+            <label><span>Title</span><input id="taskTitle" name="title" required></label>
+            <label><span>Category</span><select id="taskCategory" name="category"><option>Work</option><option>Housing</option><option>Documents</option><option>Money</option><option>Healthcare</option><option>Community</option><option>Personal</option><option>Other</option></select></label>
+            <label><span>Priority</span><select id="taskPriority" name="priority"><option>Low</option><option selected>Normal</option><option>High</option><option>Urgent</option></select></label>
+            <label><span>Due date</span><input id="taskDueDate" name="dueDate" type="date"></label>
+            <label><span>Due time</span><input id="taskDueTime" name="dueTime" type="time"></label>
+            <label><span>Reminder</span><input id="taskReminderAt" name="reminderAt" type="datetime-local"></label>
+            <label><span>Related module</span><input id="taskRelatedModule" name="relatedModule" placeholder="Documents"></label>
+            <label><span>Recurrence</span><select id="taskRecurrenceType" name="recurrenceType"><option>None</option><option>Daily</option><option>Weekly</option><option>Monthly</option></select></label>
+            <label><span>Every</span><input id="taskRecurrenceInterval" name="recurrenceInterval" type="number" min="1" value="1"></label>
+            <label><span>Repeat until</span><input id="taskRecurrenceEndDate" name="recurrenceEndDate" type="date"></label>
+            <label class="wide"><span>Description</span><textarea id="taskDescription" name="description" rows="2"></textarea></label>
+            <div class="form-actions wide">
+              <button class="button" type="submit">Save task</button>
+              <button id="clearTaskFormButton" class="button button-secondary" type="button">Clear form</button>
+              <button id="returnToChatFromTasksButton" class="button button-secondary" type="button">Return to chat</button>
+            </div>
+          </form>
+        </section>
+
+        <section id="communityView" class="profile-panel" hidden>
+          <h2>Community</h2>
+          <div id="communityList" class="jobs-list"></div>
+          <div class="form-actions">
+            <button id="returnToChatFromCommunityButton" class="button button-secondary" type="button">Return to chat</button>
+          </div>
+        </section>
+
+        <section id="communityPostView" class="profile-panel" hidden>
+          <button id="returnToCommunityButton" class="button button-secondary button-small" type="button">Return to Community</button>
+          <article id="communityPostDetail" class="community-detail"></article>
+          <section class="comments-panel">
+            <h3>Discussion</h3>
+            <div id="communityComments" class="comments-list"></div>
+            <form id="communityCommentForm" class="comment-form">
+              <label>
+                <span>Add a comment</span>
+                <textarea id="communityCommentBody" name="body" maxlength="500" rows="3" required></textarea>
+              </label>
+              <button class="button" type="submit">Post comment</button>
+            </form>
+          </section>
+        </section>
+
+        <section id="housingView" class="profile-panel" hidden>
+          <h2>Housing</h2>
+          <form id="housingFilters" class="filters-form">
+            <label>
+              <span>City</span>
+              <input id="housingCityFilter" name="city" placeholder="Tel Aviv">
+            </label>
+            <label>
+              <span>Housing type</span>
+              <select id="housingTypeFilter" name="housingType">
+                <option value="">Any type</option>
+                <option value="Room">Room</option>
+                <option value="Shared Room">Shared Room</option>
+                <option value="Apartment">Apartment</option>
+                <option value="Bed Space">Bed Space</option>
+                <option value="Employer Housing">Employer Housing</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
+            <label>
+              <span>Maximum budget</span>
+              <input id="housingBudgetFilter" name="maximumMonthlyBudget" inputmode="decimal" placeholder="2000">
+            </label>
+            <button class="button" type="submit">Filter</button>
+          </form>
+          <div id="housingList" class="jobs-list"></div>
+          <div class="form-actions">
+            <button id="returnToChatFromHousingButton" class="button button-secondary" type="button">Return to chat</button>
+          </div>
+        </section>
+
+        <section id="moneyView" class="profile-panel" hidden>
+          <h2>Money</h2>
+          <form id="moneyForm" class="form-grid">
+            <label>
+              <span>Amount</span>
+              <input id="moneyAmount" name="amount" inputmode="decimal" value="2000">
+            </label>
+            <label>
+              <span>Destination country</span>
+              <input id="moneyDestinationCountry" name="destinationCountry" value="Thailand">
+            </label>
+            <label>
+              <span>Target currency</span>
+              <input id="moneyTargetCurrency" name="targetCurrency" value="THB">
+            </label>
+            <label>
+              <span>Source currency</span>
+              <input id="moneySourceCurrency" name="sourceCurrency" value="ILS">
+            </label>
+            <div class="form-actions wide">
+              <button class="button" type="submit">Compare</button>
+              <button id="returnToChatFromMoneyButton" class="button button-secondary" type="button">Return to chat</button>
+            </div>
+          </form>
+          <div id="moneyResults" class="money-results"></div>
+        </section>
       </section>
     </main>
 

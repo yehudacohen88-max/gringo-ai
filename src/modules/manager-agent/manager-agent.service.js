@@ -1,4 +1,9 @@
 const managerRepository = require('./manager-agent.repository');
+const notificationService = require('../notifications/notification.service');
+const taskService = require('../tasks/task.service');
+const { translationMetricsService } = require('../translation');
+const lineDeliveryService = require('../line/line-delivery.service');
+const { whatsappDeliveryService } = require('../whatsapp');
 
 function generateId(prefix) {
   const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, '');
@@ -37,9 +42,21 @@ function topCounts(counts, limit = 5) {
     .join(', ');
 }
 
+function splitList(value) {
+  return String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function includesAny(value, terms) {
   const normalized = String(value || '').toLowerCase();
   return terms.some((term) => normalized.includes(term));
+}
+
+function percent(part, total) {
+  if (!total) return '0%';
+  return `${Math.round((part / total) * 100)}%`;
 }
 
 function getDailyRange(options = {}) {
@@ -88,6 +105,23 @@ function summarizeJobs(conversations) {
   return summarizeQuestions(jobQuestions);
 }
 
+function summarizeServices(conversations) {
+  const serviceQuestions = conversations.filter((event) =>
+    includesAny(`${event.question} ${event.category}`, [
+      'service',
+      'doctor',
+      'clinic',
+      'lawyer',
+      'sim',
+      'transport',
+      'insurance',
+      'embassy',
+      'government',
+    ])
+  );
+  return summarizeQuestions(serviceQuestions);
+}
+
 function summarizeLocations(userProfiles, conversations) {
   const profileLocations = countBy(userProfiles, (profile) => profile.city);
   const locationMentions = countBy(conversations, (event) => {
@@ -115,10 +149,152 @@ function getNeedsHumanCount(conversations) {
   ).length;
 }
 
-function createDailyReport({ reportDate, conversations, userProfiles }) {
+function extractReceivedAt(event = {}) {
+  const match = String(event.question || '').match(/receivedAt:([^;\]]+)/i);
+  if (!match) return null;
+  const receivedAt = new Date(match[1]).getTime();
+  return Number.isNaN(receivedAt) ? null : receivedAt;
+}
+
+function averageWhatsAppResponseTime(conversations = []) {
+  const durations = conversations
+    .map((event) => {
+      const receivedAt = extractReceivedAt(event);
+      const repliedAt = new Date(event.createdAt).getTime();
+      if (!receivedAt || Number.isNaN(repliedAt) || repliedAt < receivedAt) return null;
+      return repliedAt - receivedAt;
+    })
+    .filter((duration) => duration !== null);
+  if (!durations.length) return 'Not available';
+  const averageMs = durations.reduce((sum, duration) => sum + duration, 0) / durations.length;
+  const seconds = Math.round(averageMs / 1000);
+  return seconds < 60 ? `${seconds}s` : `${Math.round(seconds / 60)}m`;
+}
+
+function averageLineResponseTime(conversations = []) {
+  const durations = conversations
+    .map((event) => {
+      const receivedAt = extractReceivedAt(event);
+      const repliedAt = new Date(event.createdAt).getTime();
+      if (!receivedAt || Number.isNaN(repliedAt) || repliedAt < receivedAt) return null;
+      return repliedAt - receivedAt;
+    })
+    .filter((duration) => duration !== null);
+  if (!durations.length) return 'Not available';
+  const averageMs = durations.reduce((sum, duration) => sum + duration, 0) / durations.length;
+  const seconds = Math.round(averageMs / 1000);
+  return seconds < 60 ? `${seconds}s` : `${Math.round(seconds / 60)}m`;
+}
+
+function summarizeWhatsAppCommands(conversations = []) {
+  const commandCounts = countBy(conversations, (event) => {
+    const text = String(event.question || '').trim().replace(/^\//, '').split(/\s+/)[0].toLowerCase();
+    return ['start', 'help', 'link', 'profile', 'jobs', 'housing', 'money', 'community', 'services', 'documents', 'notifications', 'tasks'].includes(text)
+      ? text
+      : '';
+  });
+  return topCounts(commandCounts, 5) || 'None';
+}
+
+function summarizeWhatsAppActions(conversations = []) {
+  const actionCounts = countBy(conversations, (event) => {
+    const status = String(event.status || '');
+    if (status.startsWith('WHATSAPP_ACTION_')) return status.replace('WHATSAPP_ACTION_', '').toLowerCase();
+    const adminEvent = String(event.question || '').match(/WhatsApp admin event:\s*(.+)$/i);
+    return adminEvent ? adminEvent[1].toLowerCase() : '';
+  });
+  return topCounts(actionCounts, 5) || 'None';
+}
+
+function summarizeLineCommands(conversations = []) {
+  const commandCounts = countBy(conversations, (event) => {
+    const text = String(event.question || '').trim().replace(/^\//, '').split(/\s+/)[0].toLowerCase();
+    return ['help', 'link', 'unlink', 'profile', 'jobs', 'housing', 'money', 'community', 'services', 'documents', 'notifications', 'tasks'].includes(text)
+      ? text
+      : '';
+  });
+  return topCounts(commandCounts, 5) || 'None';
+}
+
+function summarizeLineActions(conversations = []) {
+  const actionCounts = countBy(conversations, (event) => {
+    const status = String(event.status || '');
+    const text = String(event.question || '');
+    if (text.startsWith('LINE action:')) return text.replace(/^LINE action:\s*/i, '').split(':')[0].toLowerCase();
+    if (status.startsWith('LINE_DUPLICATE_ACTION_')) return 'duplicate action prevented';
+    if (status.startsWith('LINE_ACTION_')) return status.replace('LINE_ACTION_', '').toLowerCase();
+    return '';
+  });
+  return topCounts(actionCounts, 5) || 'None';
+}
+
+function buildWhatsAppReportStats(userProfiles = [], conversations = [], deliveries = []) {
+  const whatsappConversations = conversations.filter((event) => event.channel === 'whatsapp');
+  const connectedUsers = userProfiles.filter((profile) => profile.whatsappPhone);
+  const activeUsers = new Set(whatsappConversations.map((event) => event.userId).filter(Boolean));
+  const successfulDeliveries = deliveries.filter((delivery) => ['Sent', 'Delivered', 'Read'].includes(delivery.status));
+  const failedDeliveries = deliveries.filter((delivery) => delivery.status === 'Failed');
+  const retryCount = deliveries.reduce((sum, delivery) => sum + Number(delivery.retryCount || 0), 0);
+
+  return {
+    whatsappConnectedUsers: connectedUsers.length,
+    whatsappActiveUsers: activeUsers.size,
+    whatsappMessagesReceived: whatsappConversations.filter((event) => !String(event.question).startsWith('WhatsApp admin event:')).length,
+    whatsappMessagesSent: successfulDeliveries.length,
+    whatsappSessionMessages: deliveries.filter((delivery) => delivery.deliveryMode === 'Session Message').length,
+    whatsappTemplateMessages: deliveries.filter((delivery) => delivery.deliveryMode === 'Template Message').length,
+    whatsappSuccessRate: percent(successfulDeliveries.length, deliveries.length),
+    whatsappFailedDeliveries: failedDeliveries.length,
+    whatsappRetryStatistics: `${retryCount} retries across ${deliveries.length} deliveries`,
+    whatsappAverageResponseTime: averageWhatsAppResponseTime(whatsappConversations),
+    whatsappMostCommonCommands: summarizeWhatsAppCommands(whatsappConversations),
+    whatsappMostCommonActions: summarizeWhatsAppActions(whatsappConversations),
+  };
+}
+
+function buildLineReportStats(userProfiles = [], conversations = [], deliveries = []) {
+  const lineConversations = conversations.filter((event) => event.channel === 'line');
+  const connectedUsers = userProfiles.filter(
+    (profile) => profile.lineUserId && String(profile.lineLinkStatus || 'Connected') === 'Connected'
+  );
+  const activeUsers = new Set(lineConversations.map((event) => event.userId).filter(Boolean));
+  const successfulDeliveries = deliveries.filter((delivery) => ['Sent', 'Delivered', 'Read'].includes(delivery.status));
+  const failedDeliveries = deliveries.filter((delivery) => delivery.status === 'Failed');
+
+  return {
+    lineConnectedUsers: connectedUsers.length,
+    lineDailyActiveUsers: activeUsers.size,
+    lineMessagesReceived: lineConversations.length,
+    lineMessagesSent: successfulDeliveries.length,
+    lineNotificationSuccessRate: percent(successfulDeliveries.length, deliveries.length),
+    lineFailedDeliveries: failedDeliveries.length,
+    lineAverageResponseTime: averageLineResponseTime(lineConversations),
+    lineMostUsedCommands: summarizeLineCommands(lineConversations),
+    lineMostUsedActions: summarizeLineActions(lineConversations),
+  };
+}
+
+function createDailyReport({
+  reportDate,
+  conversations,
+  userProfiles,
+  notifications = [],
+  tasks = [],
+  taskHistory = [],
+  whatsappDeliveries = [],
+  lineDeliveries = [],
+}) {
   const unansweredQuestions = conversations.filter((event) => String(event.status).toUpperCase() === 'NOT_FOUND');
   const newUsers = userProfiles.filter((profile) => toDateKey(profile.createdAt) === reportDate);
   const activeUserIds = new Set(conversations.map((event) => event.userId).filter(Boolean));
+  const activeGoals = userProfiles.flatMap((profile) => splitList(profile.activeGoals));
+  const completedGoals = userProfiles.flatMap((profile) => splitList(profile.completedGoals));
+  const missingRequiredDocuments = userProfiles.flatMap((profile) => splitList(profile.missingDocumentTypes));
+  const notificationSummary = notificationService.buildAdminSummary(notifications);
+  const taskStats = taskService.getTaskStatistics(tasks, taskHistory);
+  const whatsappStats = buildWhatsAppReportStats(userProfiles, conversations, whatsappDeliveries);
+  const lineStats = buildLineReportStats(userProfiles, conversations, lineDeliveries);
+  const translationMetrics = translationMetricsService.getMetrics();
 
   return {
     reportId: generateId('daily'),
@@ -132,6 +308,7 @@ function createDailyReport({ reportDate, conversations, userProfiles }) {
     needsHumanQuestions: getNeedsHumanCount(conversations),
     missingKnowledgeTopics: getMissingKnowledgeTopics(conversations),
     mostRequestedJobs: summarizeJobs(conversations),
+    mostRequestedServices: summarizeServices(conversations),
     mostRequestedLocations: summarizeLocations(userProfiles, conversations),
     moneyTransferRequests: conversations.filter((event) =>
       includesAny(`${event.question} ${event.category}`, ['money', 'transfer'])
@@ -139,21 +316,90 @@ function createDailyReport({ reportDate, conversations, userProfiles }) {
     exchangeRateRequests: conversations.filter((event) =>
       includesAny(`${event.question} ${event.category}`, ['exchange', 'rate'])
     ).length,
+    usersLookingForWork: userProfiles.filter((profile) => String(profile.lookingForJob).toLowerCase() === 'yes').length,
+    usersLookingForHousing: userProfiles.filter((profile) => String(profile.lookingForHousing).toLowerCase() === 'yes').length,
+    completedGoals: topCounts(countBy(completedGoals, (goal) => goal), 5),
+    repeatedIgnoredRecommendations: conversations.filter((event) =>
+      includesAny(`${event.question} ${event.answer} ${event.status}`, ['no longer need', 'stop alert', 'ignored recommendation'])
+    ).length,
+    mostCommonActiveGoals: topCounts(countBy(activeGoals, (goal) => goal), 5),
+    expiringDocuments: userProfiles.reduce((sum, profile) => sum + Number(profile.expiringDocumentCount || 0), 0),
+    expiredDocuments: userProfiles.reduce((sum, profile) => sum + Number(profile.expiredDocumentCount || 0), 0),
+    missingRequiredDocuments: topCounts(countBy(missingRequiredDocuments, (documentType) => documentType), 5),
+    completedRenewals: conversations.filter((event) =>
+      includesAny(`${event.question} ${event.answer} ${event.status}`, ['renewed', 'document renewal', 'mark as renewed'])
+    ).length,
+    notificationsCreated: notificationSummary.notificationsCreated,
+    unreadNotifications: notificationSummary.unreadNotifications,
+    notificationOpenRate: notificationSummary.notificationOpenRate,
+    dismissedNotifications: notificationSummary.dismissedNotifications,
+    urgentNotifications: notificationSummary.urgentNotifications.length,
+    topNotificationCategories: topCounts(notificationSummary.topNotificationCategories, 5),
+    usersWithNoEngagement: notificationSummary.usersWithNoEngagement.length,
+    scheduledNotificationsDueToday: notificationSummary.scheduledNotificationsDueToday.length,
+    tasksCreated: taskStats.tasksCreated,
+    tasksCompleted: taskStats.tasksCompleted,
+    overdueTasks: taskStats.overdueTasks,
+    taskCompletionRate: taskStats.taskCompletionRate,
+    mostCommonTaskCategories: taskStats.mostCommonTaskCategories,
+    usersWithRepeatedOverdueTasks: taskStats.usersWithRepeatedOverdueTasks,
+    tasksGeneratedFromDocuments: taskStats.tasksGeneratedFromDocuments,
+    tasksGeneratedFromAdmin: taskStats.tasksGeneratedFromAdmin,
+    ...whatsappStats,
+    ...lineStats,
+    translationRequests: translationMetrics.translationRequests,
+    translationSuccesses: translationMetrics.successfulTranslations,
+    translationFailures: translationMetrics.failedTranslations,
+    translationCacheHits: translationMetrics.cacheHits,
+    translationCacheMisses: translationMetrics.cacheMisses,
+    translationAverageLatencyMs: translationMetrics.averageLatencyMs,
+    translationProviderLatencyMs: translationMetrics.providerLatencyMs,
     createdAt: new Date().toISOString(),
   };
 }
 
 async function generateDailySummary(options = {}) {
   const { reportDate, startDate, endDate } = getDailyRange(options);
-  const [allConversations, allUserProfiles] = await Promise.all([
+  const [
+    allConversations,
+    allUserProfiles,
+    allNotifications,
+    allTasks,
+    allTaskHistory,
+    allWhatsAppDeliveries,
+    allLineDeliveries,
+  ] = await Promise.all([
     managerRepository.readConversationHistory(),
     managerRepository.readUserProfiles(),
+    notificationService.getAllNotifications().catch(() => []),
+    taskService.getUserTasks('usr_somchai').catch(() => []),
+    taskService.getUserTaskHistory('usr_somchai').catch(() => []),
+    whatsappDeliveryService.getAllWhatsAppDeliveries().catch(() => []),
+    lineDeliveryService.getAllLineDeliveries().catch(() => []),
   ]);
   const conversations = allConversations.filter((event) => isWithinDateRange(event.createdAt, startDate, endDate));
   const userProfiles = allUserProfiles.filter((profile) =>
     isWithinDateRange(profile.lastInteractionAt || profile.createdAt, startDate, endDate)
   );
-  const report = createDailyReport({ reportDate, conversations, userProfiles });
+  const notifications = allNotifications.filter((notification) => isWithinDateRange(notification.createdAt, startDate, endDate));
+  const tasks = allTasks.filter((task) => isWithinDateRange(task.createdAt || task.updatedAt || task.dueDate, startDate, endDate));
+  const taskHistory = allTaskHistory.filter((event) => isWithinDateRange(event.createdAt, startDate, endDate));
+  const whatsappDeliveries = allWhatsAppDeliveries.filter((delivery) =>
+    isWithinDateRange(delivery.createdAt || delivery.attemptedAt || delivery.updatedAt, startDate, endDate)
+  );
+  const lineDeliveries = allLineDeliveries.filter((delivery) =>
+    isWithinDateRange(delivery.createdAt || delivery.attemptedAt || delivery.updatedAt, startDate, endDate)
+  );
+  const report = createDailyReport({
+    reportDate,
+    conversations,
+    userProfiles,
+    notifications,
+    tasks,
+    taskHistory,
+    whatsappDeliveries,
+    lineDeliveries,
+  });
 
   return managerRepository.saveDailyReport(report);
 }
@@ -173,7 +419,12 @@ async function generateWeeklySummary(options = {}) {
     growth: `${users.length} new users, ${conversations.length} conversations`,
     trends: summarizeCategories(conversations) || 'No trends yet',
     recurringProblems: getMissingKnowledgeTopics(conversations) || 'No recurring problems yet',
-    communityOpportunities: summarizeJobs(conversations) || 'No clear opportunities yet',
+    communityOpportunities: [
+      summarizeJobs(conversations) || 'No clear job opportunities yet',
+      `Users looking for work: ${users.filter((profile) => String(profile.lookingForJob).toLowerCase() === 'yes').length}`,
+      `Users looking for housing: ${users.filter((profile) => String(profile.lookingForHousing).toLowerCase() === 'yes').length}`,
+      `Most common active goals: ${topCounts(countBy(users.flatMap((profile) => splitList(profile.activeGoals)), (goal) => goal), 5) || 'None yet'}`,
+    ].join('; '),
     createdAt: new Date().toISOString(),
   };
 
@@ -192,6 +443,7 @@ async function generateRecommendations(options = {}) {
       reason: 'Users asked questions that were not answered.',
       priority: 'high',
       sourceReportId: dailyReport.reportId,
+      status: 'New',
       createdAt: new Date().toISOString(),
     });
   }
@@ -204,6 +456,7 @@ async function generateRecommendations(options = {}) {
       reason: 'Users asked about money transfer.',
       priority: 'normal',
       sourceReportId: dailyReport.reportId,
+      status: 'New',
       createdAt: new Date().toISOString(),
     });
   }
@@ -216,6 +469,7 @@ async function generateRecommendations(options = {}) {
       reason: 'Job-related questions appeared in conversations.',
       priority: 'normal',
       sourceReportId: dailyReport.reportId,
+      status: 'New',
       createdAt: new Date().toISOString(),
     });
   }

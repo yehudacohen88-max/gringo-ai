@@ -1,5 +1,5 @@
 const { env } = require('../../config/env');
-const { appendSheetRow, readSheetRows } = require('../../config/googleSheets');
+const { appendSheetRow, readSheetRows, updateSheetRow } = require('../../config/googleSheets');
 const { CONVERSATION_HISTORY_FIELDS } = require('../crm-agent/conversation-history.model');
 const { RECOMMENDATION_FIELDS } = require('../manager-agent/manager-report.model');
 const { CONTENT_DRAFT_FIELDS } = require('./content-draft.model');
@@ -40,8 +40,26 @@ async function saveContentDraft(draft) {
   return draft;
 }
 
+async function readContentDrafts() {
+  const rows = await readSheetRows(env.googleSheets.sheets.contentDrafts);
+  return rows
+    .slice(1)
+    .map((row) => rowToObject(CONTENT_DRAFT_FIELDS, row))
+    .filter(hasValues);
+}
+
+async function updateContentDraft(draftId, draft) {
+  const rows = await readSheetRows(env.googleSheets.sheets.contentDrafts);
+  const rowIndex = rows.findIndex((row, index) => index > 0 && row[0] === draftId);
+  if (rowIndex < 1) return null;
+  await updateSheetRow(env.googleSheets.sheets.contentDrafts, rowIndex + 1, objectToRow(CONTENT_DRAFT_FIELDS, draft));
+  return draft;
+}
+
 module.exports = {
+  readContentDrafts,
   readConversationHistory,
   readManagerRecommendations,
   saveContentDraft,
+  updateContentDraft,
 };
