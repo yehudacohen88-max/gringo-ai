@@ -946,6 +946,7 @@ async function executeUserSubmittedQuote(task, input) {
     sourceTrust: result.quote.sourceTrust,
     quotePersistence: persistence,
     message: formatUserSubmittedQuoteForChat(result, responseLanguage, persistence),
+    responseLanguage,
     suppressGenericFollowUp: true,
   }, ['user_reported_unverified_quote']);
 }
@@ -964,6 +965,7 @@ async function executeSavedUserSubmittedQuote(task, input) {
     return createResult(task, 'blocked', {
       capability: 'finance.saved_user_submitted_quote',
       message: question,
+      responseLanguage,
       suppressGenericFollowUp: true,
     }, ['missing_trusted_user_identity'], [question]);
   }
@@ -975,6 +977,7 @@ async function executeSavedUserSubmittedQuote(task, input) {
     return createResult(task, 'blocked', {
       capability: 'finance.saved_user_submitted_quote',
       message,
+      responseLanguage,
       suppressGenericFollowUp: true,
     }, ['ambiguous_saved_quote_provider'], [message]);
   }
@@ -998,6 +1001,7 @@ async function executeSavedUserSubmittedQuote(task, input) {
     return createResult(task, 'partial', {
       capability: 'finance.saved_user_submitted_quote',
       message,
+      responseLanguage,
       suppressGenericFollowUp: true,
     }, ['saved_quote_retrieval_failed']);
   }
@@ -1014,6 +1018,7 @@ async function executeSavedUserSubmittedQuote(task, input) {
     return createResult(task, 'partial', {
       capability: 'finance.saved_user_submitted_quote',
       message,
+      responseLanguage,
       suppressGenericFollowUp: true,
     }, ['no_saved_user_submitted_quote']);
   }
@@ -1024,6 +1029,7 @@ async function executeSavedUserSubmittedQuote(task, input) {
     storedQuote: latestQuote,
     sourceTrust: latestQuote.quote?.sourceTrust || latestQuote.sourceTrust || {},
     message: formatSavedUserSubmittedQuoteForChat(latestQuote, responseLanguage),
+    responseLanguage,
     suppressGenericFollowUp: true,
   }, ['user_reported_unverified_quote']);
 }

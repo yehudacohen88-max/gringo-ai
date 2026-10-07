@@ -107,6 +107,16 @@ function responseAlreadyMatchesUserLanguage(response = {}, userLanguage = '') {
   return Boolean(replyLanguage && targetLanguage && replyLanguage === targetLanguage);
 }
 
+function deliveredTextLanguage(text = '') {
+  return languagePrimary(languageDetectionService.detectLanguage(text).language);
+}
+
+function deliveredTextAlreadyInLanguage(text = '', language = '') {
+  const textLanguage = deliveredTextLanguage(text);
+  const targetLanguage = languagePrimary(language);
+  return Boolean(textLanguage && targetLanguage && textLanguage === targetLanguage);
+}
+
 function logSupervisorWarning(stage, error) {
   const message = error && error.message ? error.message : 'unknown error';
   console.warn(`Supervisor integration warning: ${stage}: ${message}`);
@@ -1141,7 +1151,11 @@ async function applyOutgoingTranslation(response = {}, targetLanguage = CORE_AGE
     reply: originalResponse,
   };
 
-  if (!originalResponse.trim() || metadata.targetLanguage === CORE_AGENT_RESPONSE_LANGUAGE) {
+  if (
+    !originalResponse.trim()
+    || metadata.targetLanguage === CORE_AGENT_RESPONSE_LANGUAGE
+    || deliveredTextAlreadyInLanguage(originalResponse, metadata.targetLanguage)
+  ) {
     Object.defineProperty(finalized, OUTGOING_TRANSLATION_METADATA, {
       value: {
         ...metadata,
@@ -1178,6 +1192,7 @@ async function applyOutgoingTranslation(response = {}, targetLanguage = CORE_AGE
   const showHebrewTranslationNotice = metadata.targetLanguage !== CORE_AGENT_RESPONSE_LANGUAGE
     && languagePrimary(metadata.targetLanguage) === 'he'
     && !outgoingDelivered
+    && !deliveredTextAlreadyInLanguage(finalized.reply, metadata.targetLanguage)
     && !finalized.reply.includes(OUTGOING_HEBREW_TRANSLATION_NOTICE)
     && !finalized.reply.includes(TRANSLATION_UNCERTAINTY_NOTICE.he)
     && !finalized.reply.includes(INCOMING_LANGUAGE_FAILURE_REPLY);
