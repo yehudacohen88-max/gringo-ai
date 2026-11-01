@@ -59,7 +59,7 @@ async function adminFetch(path, options = {}) {
     ...options,
     headers: {
       'content-type': 'application/json',
-      'x-admin-api-key': adminApiKeyInput.value || 'dev-admin-key',
+      'x-admin-api-key': adminApiKeyInput.value.trim(),
       ...(options.headers || {}),
     },
   });

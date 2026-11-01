@@ -138,6 +138,10 @@ On Mac or Linux, use:
 cp .env.example .env
 ```
 
+For local admin pages, leave `ALLOW_DEV_ADMIN_KEY=true` in that file. It enables the built-in development admin key only when `NODE_ENV` is `development` or `test` and the process is not on a hosted platform. Open the admin UI from this machine at `http://127.0.0.1:3000`. An unset `NODE_ENV` does not enable that key.
+
+Before any deployment, set `NODE_ENV=production`, leave `ALLOW_DEV_ADMIN_KEY` unset, and set `ADMIN_API_KEY` in the hosting provider's secret store. Do not commit the key. Generate it with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` or `openssl rand -hex 32`. Production requires at least 32 characters and rejects obvious placeholders and low-diversity values. That check does not prove the key is truly random.
+
 3. Start the local server:
 
 ```bash
