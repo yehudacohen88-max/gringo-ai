@@ -10,43 +10,121 @@ function normalizePrivateKey(value) {
 
 const DEV_ADMIN_API_KEY = 'dev-admin-key';
 const MIN_PRODUCTION_ADMIN_API_KEY_LENGTH = 32;
+const MIN_UNIQUE_PRODUCTION_ADMIN_KEY_CHARACTERS = 4;
+const HOSTING_ENV_MARKERS = [
+  'VERCEL',
+  'RENDER',
+  'RAILWAY_ENVIRONMENT',
+  'FLY_APP_NAME',
+  'K_SERVICE',
+  'DYNO',
+  'HEROKU_APP_NAME',
+  'AWS_EXECUTION_ENV',
+];
+const WEAK_ADMIN_KEY_PLACEHOLDERS = [
+  'change-me',
+  'changeme',
+  'password',
+  'secret',
+  'placeholder',
+  'replace-me',
+  'your-secret-here',
+];
 
-function resolveAdminApiKey(nodeEnv, rawValue) {
-  const normalizedEnv = nodeEnv || 'development';
+function envValuePresent(sourceEnv, name) {
+  const value = sourceEnv ? sourceEnv[name] : '';
+  return typeof value === 'string' && value.trim() !== '';
+}
+
+function isHostedDeployment(sourceEnv) {
+  return HOSTING_ENV_MARKERS.some((name) => envValuePresent(sourceEnv, name));
+}
+
+function isDevAdminOptIn(sourceEnv) {
+  const value = sourceEnv && typeof sourceEnv.ALLOW_DEV_ADMIN_KEY === 'string'
+    ? sourceEnv.ALLOW_DEV_ADMIN_KEY.trim().toLowerCase()
+    : '';
+  return value === 'true' || value === '1' || value === 'yes';
+}
+
+function devDefaultPermitted(nodeEnv, sourceEnv) {
+  if (nodeEnv !== 'development' && nodeEnv !== 'test') return false;
+  if (isHostedDeployment(sourceEnv)) return false;
+  return isDevAdminOptIn(sourceEnv);
+}
+
+function isOnlyRepeatedToken(value, token) {
+  if (!token || value.length < token.length) return false;
+  return value === token.repeat(Math.ceil(value.length / token.length)).slice(0, value.length);
+}
+
+// Rejects obvious placeholders and low-diversity values only. A passing key is not proof of randomness.
+function isObviouslyWeakProductionKey(key) {
+  const normalized = key.toLowerCase();
+  if (new Set(normalized).size < MIN_UNIQUE_PRODUCTION_ADMIN_KEY_CHARACTERS) return true;
+  return WEAK_ADMIN_KEY_PLACEHOLDERS.some(
+    (placeholder) => normalized === placeholder || isOnlyRepeatedToken(normalized, placeholder)
+  );
+}
+
+function devDefaultRefusalMessage(nodeEnv, sourceEnv) {
+  if (isHostedDeployment(sourceEnv)) {
+    return 'Refusing to start: ADMIN_API_KEY must be a unique secret. The development default is disabled because this process looks like a hosted deployment. Store the key only in the hosting provider secret store.';
+  }
+  if (nodeEnv !== 'development' && nodeEnv !== 'test') {
+    return 'Refusing to start: ADMIN_API_KEY must be a unique secret. The development default is available only when NODE_ENV is development or test, ALLOW_DEV_ADMIN_KEY=true, and the process is not hosted.';
+  }
+  return 'Refusing to start: ADMIN_API_KEY must be a unique secret, or set ALLOW_DEV_ADMIN_KEY=true for local development or tests. The development default is disabled without that opt-in.';
+}
+
+function resolveAdminApiKey(nodeEnv, rawValue, sourceEnv = {}) {
+  const normalizedEnv = typeof nodeEnv === 'string' ? nodeEnv.trim() : '';
   const configured = typeof rawValue === 'string' ? rawValue.trim() : '';
 
   if (normalizedEnv === 'production') {
     if (!configured) {
       throw new Error(
-        'Refusing to start: ADMIN_API_KEY is missing. Set ADMIN_API_KEY to a unique secret of at least 32 characters. The development default is not allowed in production.'
+        'Refusing to start: ADMIN_API_KEY is missing. Set ADMIN_API_KEY to a unique secret of at least 32 characters from a cryptographically secure source. The development default is not allowed in production.'
       );
     }
     if (configured === DEV_ADMIN_API_KEY) {
       throw new Error(
-        'Refusing to start: ADMIN_API_KEY is set to the development default. Set ADMIN_API_KEY to a unique secret of at least 32 characters.'
+        'Refusing to start: ADMIN_API_KEY is set to the development default. Set ADMIN_API_KEY to a unique secret of at least 32 characters from a cryptographically secure source.'
       );
     }
     if (configured.length < MIN_PRODUCTION_ADMIN_API_KEY_LENGTH) {
       throw new Error(
-        'Refusing to start: ADMIN_API_KEY is too short. Set ADMIN_API_KEY to a unique secret of at least 32 characters.'
+        'Refusing to start: ADMIN_API_KEY is too short. Set ADMIN_API_KEY to a unique secret of at least 32 characters from a cryptographically secure source.'
+      );
+    }
+    if (isObviouslyWeakProductionKey(configured)) {
+      throw new Error(
+        'Refusing to start: ADMIN_API_KEY is an obvious placeholder or has too little character variety. Generate a new value from a cryptographically secure source. This check cannot prove that the key is truly random.'
       );
     }
     return configured;
   }
 
-  const resolved = configured || DEV_ADMIN_API_KEY;
-  if (normalizedEnv !== 'test' && resolved === DEV_ADMIN_API_KEY) {
-    console.warn(
-      '[startup] ADMIN_API_KEY is unset or still the development default. Local admin requests can continue. Production refuses to start unless ADMIN_API_KEY is a unique secret of at least 32 characters.'
-    );
+  const usingDevDefault = !configured || configured === DEV_ADMIN_API_KEY;
+  if (usingDevDefault) {
+    if (!devDefaultPermitted(normalizedEnv, sourceEnv)) {
+      throw new Error(devDefaultRefusalMessage(normalizedEnv, sourceEnv));
+    }
+    if (normalizedEnv === 'development') {
+      console.warn(
+        '[startup] ADMIN_API_KEY is unset or still the development default. Local loopback admin requests can continue because ALLOW_DEV_ADMIN_KEY is set. Production and hosted deployments refuse to start unless ADMIN_API_KEY is a unique secret of at least 32 characters. This process cannot prove that a key is truly random.'
+      );
+    }
+    return DEV_ADMIN_API_KEY;
   }
-  return resolved;
+
+  return configured;
 }
 
 const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: Number(process.env.PORT || 3000),
-  adminApiKey: resolveAdminApiKey(process.env.NODE_ENV, process.env.ADMIN_API_KEY),
+  adminApiKey: resolveAdminApiKey(process.env.NODE_ENV, process.env.ADMIN_API_KEY, process.env),
   telegram: {
     enabled: String(process.env.TELEGRAM_BOT_ENABLED || 'false').toLowerCase() === 'true',
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',
@@ -151,4 +229,4 @@ const env = {
   },
 };
 
-module.exports = { env };
+module.exports = { env, DEV_ADMIN_API_KEY };

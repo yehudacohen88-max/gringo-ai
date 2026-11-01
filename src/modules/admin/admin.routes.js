@@ -1,6 +1,6 @@
 const express = require('express');
 const { createHash, timingSafeEqual } = require('crypto');
-const { env } = require('../../config/env');
+const { env, DEV_ADMIN_API_KEY } = require('../../config/env');
 const adminController = require('./admin.controller');
 
 const router = express.Router();
@@ -45,9 +45,22 @@ function keysMatch(provided, expected) {
   return timingSafeEqual(leftHash, rightHash);
 }
 
+function isLoopbackAddress(address) {
+  if (typeof address !== 'string') return false;
+  const normalized = address.trim().toLowerCase();
+  return normalized === '127.0.0.1' || normalized === '::1' || normalized === '::ffff:127.0.0.1';
+}
+
+function remoteAddress(req) {
+  if (req.socket && typeof req.socket.remoteAddress === 'string') return req.socket.remoteAddress;
+  if (req.connection && typeof req.connection.remoteAddress === 'string') return req.connection.remoteAddress;
+  return '';
+}
+
 function requireAdminKey(req, res, next) {
   const headerOk = keysMatch(readHeaderValue(req, ADMIN_API_KEY_HEADER), env.adminApiKey);
-  if (carriesAdminKeyOutsideHeader(req) || !headerOk) {
+  const devDefaultFromRemoteClient = env.adminApiKey === DEV_ADMIN_API_KEY && !isLoopbackAddress(remoteAddress(req));
+  if (carriesAdminKeyOutsideHeader(req) || !headerOk || devDefaultFromRemoteClient) {
     res.status(401).json({ error: { message: 'Admin API key is required.' } });
     return;
   }

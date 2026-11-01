@@ -92,6 +92,62 @@ test('production server refuses to start when ADMIN_API_KEY is the development d
   ]);
 });
 
+test('production server rejects obvious placeholders and low-diversity keys without logging them', () => {
+  const repeatedCharacter = 'a'.repeat(32);
+  const lowVariety = 'abc'.repeat(11);
+  const placeholder = 'change-me'.repeat(4);
+  assertProductionStartupRefused({ ADMIN_API_KEY: repeatedCharacter }, [], /too little character variety/, [
+    repeatedCharacter,
+    DEV_ADMIN_API_KEY,
+  ]);
+  assertProductionStartupRefused({ ADMIN_API_KEY: lowVariety }, [], /too little character variety/, [
+    lowVariety,
+    'change-me',
+    DEV_ADMIN_API_KEY,
+  ]);
+  assertProductionStartupRefused({ ADMIN_API_KEY: placeholder }, [], /obvious placeholder/, [
+    placeholder,
+    'change-me',
+    DEV_ADMIN_API_KEY,
+  ]);
+});
+
+test('production accepts a long key with four distinct characters and does not treat that as randomness proof', () => {
+  const diverseEnough = 'abcd'.repeat(8);
+  const result = runNode(
+    ['-e', "require('./src/config/env'); process.stdout.write('config-loaded');"],
+    { NODE_ENV: 'production', ADMIN_API_KEY: diverseEnough }
+  );
+  const output = combinedOutput(result);
+
+  assert.equal(result.error ?? null, null);
+  assert.equal(result.status, 0, output);
+  assert.match(output, /config-loaded/);
+  assertNoKeyMaterial(output, [diverseEnough, DEV_ADMIN_API_KEY]);
+});
+
+test('production still rejects the development default when the local opt-in is set', () => {
+  assertProductionStartupRefused(
+    { ADMIN_API_KEY: DEV_ADMIN_API_KEY, ALLOW_DEV_ADMIN_KEY: 'true' },
+    [],
+    /development default/,
+    [DEV_ADMIN_API_KEY, TEST_ADMIN_API_KEY]
+  );
+});
+
+test('production with a hosting marker still loads a strong admin key', () => {
+  const result = runNode(
+    ['-e', "require('./src/config/env'); process.stdout.write('config-loaded');"],
+    { NODE_ENV: 'production', ADMIN_API_KEY: TEST_ADMIN_API_KEY, VERCEL: '1', RENDER: 'true' }
+  );
+  const output = combinedOutput(result);
+
+  assert.equal(result.error ?? null, null);
+  assert.equal(result.status, 0, output);
+  assert.match(output, /config-loaded/);
+  assertNoKeyMaterial(output, [TEST_ADMIN_API_KEY, DEV_ADMIN_API_KEY]);
+});
+
 test('production config loads when ADMIN_API_KEY is a strong unique secret', () => {
   const strongKey = keyOfLength(32);
   for (const adminApiKey of [strongKey, TEST_ADMIN_API_KEY]) {
@@ -109,17 +165,85 @@ test('production config loads when ADMIN_API_KEY is a strong unique secret', () 
   }
 });
 
-test('development without ADMIN_API_KEY keeps the local fallback and warns without printing it', () => {
+function assertStartupRefused(envOverrides, unsetKeys, expectedReason, secrets) {
+  const result = runNode(['src/server.js'], envOverrides, unsetKeys);
+  const output = combinedOutput(result);
+
+  assert.equal(result.error ?? null, null);
+  assert.equal(result.status, 1, output);
+  assert.match(output, /Refusing to start:/);
+  assert.match(output, expectedReason);
+  assert.equal(output.includes('Gringo Community API is running'), false);
+  assertNoKeyMaterial(output, secrets);
+}
+
+test('development without the local opt-in refuses to start and does not use the development key', () => {
+  assertStartupRefused({ NODE_ENV: 'development' }, ['ADMIN_API_KEY'], /disabled without that opt-in/, [
+    DEV_ADMIN_API_KEY,
+    TEST_ADMIN_API_KEY,
+  ]);
+  assertStartupRefused(
+    { NODE_ENV: 'development', ALLOW_DEV_ADMIN_KEY: 'false' },
+    ['ADMIN_API_KEY'],
+    /disabled without that opt-in/,
+    [DEV_ADMIN_API_KEY]
+  );
+});
+
+test('development on a hosted platform does not allow the development key', () => {
+  for (const marker of ['RENDER', 'VERCEL', 'RAILWAY_ENVIRONMENT', 'FLY_APP_NAME', 'K_SERVICE', 'DYNO', 'HEROKU_APP_NAME', 'AWS_EXECUTION_ENV']) {
+    assertStartupRefused(
+      { NODE_ENV: 'development', [marker]: '1', ALLOW_DEV_ADMIN_KEY: 'true' },
+      ['ADMIN_API_KEY'],
+      /hosted deployment/,
+      [DEV_ADMIN_API_KEY, TEST_ADMIN_API_KEY]
+    );
+  }
+  assertStartupRefused(
+    { NODE_ENV: 'development', RENDER: 'true', ADMIN_API_KEY: DEV_ADMIN_API_KEY, ALLOW_DEV_ADMIN_KEY: 'true' },
+    [],
+    /hosted deployment/,
+    [DEV_ADMIN_API_KEY]
+  );
+});
+
+test('unset NODE_ENV does not allow the development key', () => {
+  assertStartupRefused({}, ['NODE_ENV', 'ADMIN_API_KEY'], /NODE_ENV is development or test/, [
+    DEV_ADMIN_API_KEY,
+    TEST_ADMIN_API_KEY,
+  ]);
+  assertStartupRefused(
+    { ADMIN_API_KEY: DEV_ADMIN_API_KEY, ALLOW_DEV_ADMIN_KEY: 'true' },
+    ['NODE_ENV'],
+    /NODE_ENV is development or test/,
+    [DEV_ADMIN_API_KEY]
+  );
+});
+
+test('unset NODE_ENV still loads a configured strong admin key', () => {
+  const result = runNode(
+    ['-e', "require('./src/config/env'); process.stdout.write('config-loaded');"],
+    { ADMIN_API_KEY: TEST_ADMIN_API_KEY },
+    ['NODE_ENV']
+  );
+  const output = combinedOutput(result);
+
+  assert.equal(result.error ?? null, null);
+  assert.equal(result.status, 0, output);
+  assert.match(output, /config-loaded/);
+  assertNoKeyMaterial(output, [TEST_ADMIN_API_KEY, DEV_ADMIN_API_KEY]);
+});
+
+test('explicit local opt-in allows the development key and does not print it', () => {
   const result = runNode(
     [
       '-e',
       [
-        "const { env } = require('./src/config/env');",
-        "const fallback = env.adminApiKey === 'dev-admin-key';",
-        "process.stdout.write(fallback ? 'dev-fallback' : 'unexpected');",
+        "const { env, DEV_ADMIN_API_KEY } = require('./src/config/env');",
+        "process.stdout.write(env.adminApiKey === DEV_ADMIN_API_KEY ? 'dev-fallback' : 'unexpected');",
       ].join(' '),
     ],
-    { NODE_ENV: 'development' },
+    { NODE_ENV: 'development', ALLOW_DEV_ADMIN_KEY: 'true' },
     ['ADMIN_API_KEY']
   );
   const output = combinedOutput(result);
@@ -129,6 +253,7 @@ test('development without ADMIN_API_KEY keeps the local fallback and warns witho
   assert.match(result.stdout, /dev-fallback/);
   assert.match(result.stderr, /\[startup\] ADMIN_API_KEY is unset or still the development default/);
   assert.match(result.stderr, /at least 32 characters/);
+  assert.match(result.stderr, /cannot prove that a key is truly random/);
   assertNoKeyMaterial(output, [DEV_ADMIN_API_KEY, TEST_ADMIN_API_KEY]);
 });
 
@@ -153,16 +278,23 @@ test('development keeps an explicit non-default key and does not warn', () => {
   assertNoKeyMaterial(output, [localKey, DEV_ADMIN_API_KEY, TEST_ADMIN_API_KEY]);
 });
 
-test('test environment stays quiet and still allows the local fallback', () => {
+test('test environment without the local opt-in refuses the development key', () => {
+  assertStartupRefused({ NODE_ENV: 'test' }, ['ADMIN_API_KEY'], /disabled without that opt-in/, [
+    DEV_ADMIN_API_KEY,
+    TEST_ADMIN_API_KEY,
+  ]);
+});
+
+test('test environment with the local opt-in stays quiet and allows the development key', () => {
   const result = runNode(
     [
       '-e',
       [
-        "const { env } = require('./src/config/env');",
-        "process.stdout.write(env.adminApiKey === 'dev-admin-key' ? 'dev-fallback' : 'unexpected');",
+        "const { env, DEV_ADMIN_API_KEY } = require('./src/config/env');",
+        "process.stdout.write(env.adminApiKey === DEV_ADMIN_API_KEY ? 'dev-fallback' : 'unexpected');",
       ].join(' '),
     ],
-    { NODE_ENV: 'test' },
+    { NODE_ENV: 'test', ALLOW_DEV_ADMIN_KEY: 'true' },
     ['ADMIN_API_KEY']
   );
   const output = combinedOutput(result);
@@ -171,6 +303,45 @@ test('test environment stays quiet and still allows the local fallback', () => {
   assert.equal(result.status, 0, output);
   assert.match(result.stdout, /dev-fallback/);
   assert.equal((result.stderr || '').includes('[startup]'), false);
+  assertNoKeyMaterial(output, [DEV_ADMIN_API_KEY, TEST_ADMIN_API_KEY]);
+});
+
+test('development key is accepted from loopback and rejected from other addresses', () => {
+  const result = runNode(
+    [
+      '-e',
+      [
+        "const { env } = require('./src/config/env');",
+        "const adminRoutes = require('./src/modules/admin/admin.routes');",
+        'const results = [];',
+        'function run(remoteAddress) {',
+        '  let statusCode = 0;',
+        '  let nextCalled = false;',
+        '  const req = {',
+        "    get(name) { return String(name).toLowerCase() === 'x-admin-api-key' ? env.adminApiKey : ''; },",
+        '    headers: {}, query: {}, body: {},',
+        '    socket: { remoteAddress },',
+        '  };',
+        '  const res = { status(code) { statusCode = code; return this; }, json() { return this; } };',
+        '  adminRoutes.requireAdminKey(req, res, () => { nextCalled = true; });',
+        "  results.push(nextCalled ? 'allowed' : 'denied:' + statusCode);",
+        '}',
+        "run('127.0.0.1');",
+        "run('::1');",
+        "run('::ffff:127.0.0.1');",
+        "run('198.51.100.20');",
+        "run('');",
+        "process.stdout.write(results.join(','));",
+      ].join(' '),
+    ],
+    { NODE_ENV: 'development', ALLOW_DEV_ADMIN_KEY: 'true' },
+    ['ADMIN_API_KEY']
+  );
+  const output = combinedOutput(result);
+
+  assert.equal(result.error ?? null, null);
+  assert.equal(result.status, 0, output);
+  assert.equal(result.stdout, 'allowed,allowed,allowed,denied:401,denied:401');
   assertNoKeyMaterial(output, [DEV_ADMIN_API_KEY, TEST_ADMIN_API_KEY]);
 });
 

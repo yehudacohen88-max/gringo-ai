@@ -14,6 +14,8 @@ Object.assign(process.env, {
 // Unit tests use local repositories and explicit provider mocks, never live credentials.
 Object.assign(process.env, {
   NODE_ENV: 'test',
+  // Local test runner only. Hosted deployments cannot use the development admin key.
+  ALLOW_DEV_ADMIN_KEY: 'true',
   GOOGLE_SHEETS_SPREADSHEET_ID: '',
   GOOGLE_SHEETS_CLIENT_EMAIL: '',
   GOOGLE_SHEETS_PRIVATE_KEY: '',
