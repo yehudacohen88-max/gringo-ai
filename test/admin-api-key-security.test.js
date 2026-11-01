@@ -346,12 +346,19 @@ test('development key is accepted from loopback and rejected from other addresse
 });
 
 test('admin key check uses timingSafeEqual and does not accept query or body keys', () => {
-  const source = fs.readFileSync(path.join(root, 'src/modules/admin/admin.routes.js'), 'utf8');
+  const source = fs.readFileSync(path.join(root, 'src/shared/requireAdminKey.js'), 'utf8');
   assert.match(source, /timingSafeEqual/);
   assert.match(source, /createHash\('sha256'\)/);
   assert.doesNotMatch(source, /req\.query\.adminApiKey/);
   assert.doesNotMatch(source, /!==\s*env\.adminApiKey/);
   assert.doesNotMatch(source, /===\s*env\.adminApiKey/);
+
+  const adminRoutesSource = fs.readFileSync(path.join(root, 'src/modules/admin/admin.routes.js'), 'utf8');
+  assert.match(adminRoutesSource, /router\.use\(requireAdminKey\)/);
+  assert.match(adminRoutesSource, /module\.exports\.requireAdminKey = requireAdminKey/);
+  assert.doesNotMatch(adminRoutesSource, /req\.query\.adminApiKey/);
+  assert.doesNotMatch(adminRoutesSource, /!==\s*env\.adminApiKey/);
+  assert.doesNotMatch(adminRoutesSource, /===\s*env\.adminApiKey/);
 });
 
 let app;

@@ -5,6 +5,14 @@ const saveWorkerButton = document.querySelector('#saveWorkerButton');
 const workerLoading = document.querySelector('#workerFormLoading');
 
 createWorkerFormFields(workerFormFields);
+bindAdminApiKeyInput(document.querySelector('#adminApiKey'));
+
+const loadWorkerButton = document.querySelector('#loadWorkerButton');
+if (loadWorkerButton) {
+  loadWorkerButton.addEventListener('click', () => {
+    loadWorkerForEdit();
+  });
+}
 
 function showWorkerAlert(message, type = 'error') {
   workerAlert.textContent = message;
@@ -37,11 +45,13 @@ function fillWorkerForm(worker) {
 }
 
 async function requestWorkerJson(url, options = {}) {
-  const response = await fetch(url, options);
+  const response = await fetch(url, {
+    ...options,
+    headers: adminApiKeyHeaders(options.headers || {}),
+  });
   const body = await response.json();
   if (!response.ok) {
-    const details = body.error?.details?.length ? ` ${body.error.details.join(' ')}` : '';
-    throw new Error(`${body.error?.message || 'Request failed.'}${details}`);
+    throw new Error(adminRequestErrorMessage(response, body));
   }
   return body.data;
 }

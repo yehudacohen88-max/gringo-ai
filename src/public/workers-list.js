@@ -8,6 +8,8 @@ const workerFiltersForm = document.querySelector('#workerFiltersForm');
 const refreshWorkersButton = document.querySelector('#refreshWorkersButton');
 const clearWorkerFiltersButton = document.querySelector('#clearWorkerFiltersButton');
 
+bindAdminApiKeyInput(document.querySelector('#adminApiKey'));
+
 function showWorkersAlert(message, type = 'error') {
   workersAlert.textContent = message;
   workersAlert.className = `alert alert-${type}`;
@@ -33,9 +35,12 @@ function getWorkerFilters() {
 }
 
 async function requestWorkersJson(url, options = {}) {
-  const response = await fetch(url, options);
+  const response = await fetch(url, {
+    ...options,
+    headers: adminApiKeyHeaders(options.headers || {}),
+  });
   const body = await response.json();
-  if (!response.ok) throw new Error(body.error?.message || 'Request failed.');
+  if (!response.ok) throw new Error(adminRequestErrorMessage(response, body));
   return body.data;
 }
 

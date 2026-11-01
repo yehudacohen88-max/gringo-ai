@@ -14,6 +14,8 @@ const saveEditButton = document.querySelector('#saveEditButton');
 
 let currentContacts = [];
 
+bindAdminApiKeyInput(document.querySelector('#adminApiKey'));
+
 function showAlert(message, type = 'error') {
   alertBox.textContent = message;
   alertBox.className = `alert alert-${type}`;
@@ -135,12 +137,14 @@ function setLoading(isLoading) {
 }
 
 async function requestJson(url, options = {}) {
-  const response = await fetch(url, options);
+  const response = await fetch(url, {
+    ...options,
+    headers: adminApiKeyHeaders(options.headers || {}),
+  });
   const body = await response.json();
 
   if (!response.ok) {
-    const details = body.error?.details?.length ? ` ${body.error.details.join(' ')}` : '';
-    throw new Error(`${body.error?.message || 'Request failed.'}${details}`);
+    throw new Error(adminRequestErrorMessage(response, body));
   }
 
   return body.data;

@@ -2,6 +2,8 @@ const form = document.querySelector('#contactForm');
 const alertBox = document.querySelector('#formAlert');
 const submitButton = document.querySelector('#submitButton');
 
+bindAdminApiKeyInput(document.querySelector('#adminApiKey'));
+
 function showAlert(message, type) {
   alertBox.textContent = message;
   alertBox.className = `alert alert-${type}`;
@@ -30,17 +32,16 @@ function formToContact(formData) {
 async function createContact(contact) {
   const response = await fetch('/api/contacts', {
     method: 'POST',
-    headers: {
+    headers: adminApiKeyHeaders({
       'content-type': 'application/json',
-    },
+    }),
     body: JSON.stringify(contact),
   });
 
   const body = await response.json();
 
   if (!response.ok) {
-    const details = body.error?.details?.length ? ` ${body.error.details.join(' ')}` : '';
-    throw new Error(`${body.error?.message || 'Could not save contact.'}${details}`);
+    throw new Error(adminRequestErrorMessage(response, body));
   }
 
   return body.data;

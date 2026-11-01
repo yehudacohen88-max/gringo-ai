@@ -27,6 +27,12 @@
           <button id="refreshButton" class="button button-secondary" type="button">Refresh</button>
         </div>
 
+        <label class="admin-key-field">
+          <span>Admin API key</span>
+          <input id="adminApiKey" type="password" autocomplete="off" spellcheck="false" placeholder="Type the key for this page">
+        </label>
+        <p class="muted">This key stays on this page only. It is not saved in the browser and is not put in the address bar.</p>
+
         <div id="listAlert" class="alert" role="status" hidden></div>
         <form id="filtersForm" class="filters-form" aria-label="Contact filters">
           <label>
@@ -218,6 +224,7 @@
       </section>
     </div>
 
+    <script src="/admin-key-memory.js"></script>
     <script src="/contacts-list.js"></script>
   </body>
 </html>

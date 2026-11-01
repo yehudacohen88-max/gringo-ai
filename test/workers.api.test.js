@@ -1,6 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+const TEST_ADMIN_API_KEY = 'test-only-admin-key-0123456789abcdef';
+process.env.ADMIN_API_KEY = TEST_ADMIN_API_KEY;
+
 const workerRepository = require('../src/modules/workers/worker.repository');
 
 let app;
@@ -8,6 +11,13 @@ let app;
 function createUrl(server, path) {
   const address = server.address();
   return `http://127.0.0.1:${address.port}${path}`;
+}
+
+function adminHeaders(headers = {}) {
+  return {
+    'x-admin-api-key': TEST_ADMIN_API_KEY,
+    ...headers,
+  };
 }
 
 function mockWorkerRepository(overrides = {}) {
@@ -53,7 +63,7 @@ test('POST /api/workers creates a worker and history record', async () => {
   await withServer(async (server) => {
     const response = await fetch(createUrl(server, '/api/workers'), {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: adminHeaders({ 'content-type': 'application/json' }),
       body: JSON.stringify({
         first_name: 'Juan',
         nationality: 'Mexico',
@@ -76,7 +86,7 @@ test('POST /api/workers returns validation errors', async () => {
   await withServer(async (server) => {
     const response = await fetch(createUrl(server, '/api/workers'), {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: adminHeaders({ 'content-type': 'application/json' }),
       body: JSON.stringify({ first_name: 'Juan' }),
     });
     const body = await response.json();
@@ -115,7 +125,8 @@ test('GET /api/workers filters workers', async () => {
 
   await withServer(async (server) => {
     const response = await fetch(
-      createUrl(server, '/api/workers?search=cook&status=ready&nationality=mexico&current_city=tel%20aviv')
+      createUrl(server, '/api/workers?search=cook&status=ready&nationality=mexico&current_city=tel%20aviv'),
+      { headers: adminHeaders() }
     );
     const body = await response.json();
 
@@ -152,7 +163,7 @@ test('PUT /api/workers/:workerId updates a worker and history record', async () 
   await withServer(async (server) => {
     const response = await fetch(createUrl(server, '/api/workers/wrk_1'), {
       method: 'PUT',
-      headers: { 'content-type': 'application/json' },
+      headers: adminHeaders({ 'content-type': 'application/json' }),
       body: JSON.stringify({
         first_name: 'Juan',
         nationality: 'Mexico',
@@ -195,6 +206,7 @@ test('POST /api/workers/:workerId/archive archives a worker and history record',
   await withServer(async (server) => {
     const response = await fetch(createUrl(server, '/api/workers/wrk_1/archive'), {
       method: 'POST',
+      headers: adminHeaders(),
     });
     const body = await response.json();
 

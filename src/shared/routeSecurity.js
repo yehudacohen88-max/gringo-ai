@@ -1,0 +1,115 @@
+// Explicit security classification for every Express route.
+// Telegram has no rich-menu HTTP route (the bot uses polling). LINE rich-menu routes are classified below.
+// Add a row when a route is registered. test/route-security-inventory.test.js fails when this map drifts.
+
+const ADMIN_REASON = 'Requires the x-admin-api-key header. Query, URL, and body keys are rejected.';
+
+function route(method, path, classification, reason) {
+  return { method, path, classification, reason };
+}
+
+const ADMIN_ROUTES = [
+  ['GET', '/api/admin/dashboard'],
+  ['GET', '/api/admin/translation'],
+  ['PUT', '/api/admin/translation/settings'],
+  ['POST', '/api/admin/reports/daily'],
+  ['POST', '/api/admin/reports/weekly'],
+  ['POST', '/api/admin/reports/:reportId/notes'],
+  ['POST', '/api/admin/follow-ups/:followUpId/answer'],
+  ['POST', '/api/admin/follow-ups/:followUpId/knowledge-draft'],
+  ['POST', '/api/admin/follow-ups/:followUpId/content-draft'],
+  ['POST', '/api/admin/missing-knowledge/:eventId'],
+  ['PUT', '/api/admin/content-drafts/:draftId'],
+  ['POST', '/api/admin/content-drafts/:draftId/publish'],
+  ['POST', '/api/admin/comments/:commentId/moderate'],
+  ['PUT', '/api/admin/recommendations/:recommendationId'],
+  ['PUT', '/api/admin/documents/:documentId'],
+  ['POST', '/api/admin/notifications'],
+  ['POST', '/api/admin/notifications/:notificationId/cancel'],
+  ['POST', '/api/admin/whatsapp/notifications'],
+  ['POST', '/api/admin/whatsapp/deliveries/:deliveryId/retry'],
+  ['POST', '/api/admin/whatsapp/deliveries/:deliveryId/cancel'],
+  ['GET', '/api/admin/whatsapp/deliveries/:deliveryId/failure'],
+  ['POST', '/api/admin/tasks'],
+  ['PUT', '/api/admin/tasks/:taskId'],
+  ['GET', '/api/contacts'],
+  ['POST', '/api/contacts'],
+  ['PUT', '/api/contacts/:contactId'],
+  ['POST', '/api/contacts/:contactId/archive'],
+  ['GET', '/api/workers'],
+  ['POST', '/api/workers'],
+  ['GET', '/api/workers/:workerId'],
+  ['PUT', '/api/workers/:workerId'],
+  ['POST', '/api/workers/:workerId/archive'],
+  ['GET', '/api/telegram/link-history'],
+  ['GET', '/api/line/link-history'],
+  ['GET', '/api/line/rich-menu/default'],
+  ['POST', '/api/line/rich-menu/default'],
+  ['POST', '/api/line/rich-menu/default/set'],
+].map(([method, path]) => route(method, path, 'admin', ADMIN_REASON));
+
+const ROUTE_SECURITY = [
+  route('GET', '/health', 'public', 'Liveness check with no personal data.'),
+  route('GET', '/api/jobs', 'public', 'Public job catalog. A per-IP rate limit is deferred to PR2c.'),
+  route('GET', '/api/jobs/matches', 'pending-PR3a', 'Personalized matches use client-supplied channel and channelUserId. Worker web identity is PR3a.'),
+  route('GET', '/api/housing', 'public', 'Public housing catalog. A per-IP rate limit is deferred to PR2c.'),
+  route('GET', '/api/housing/matches', 'pending-PR3a', 'Personalized matches use client-supplied channel and channelUserId. Worker web identity is PR3a.'),
+  route('GET', '/api/money/defaults', 'pending-PR3a', 'Reads money defaults for a client-supplied identity. Worker web identity is PR3a.'),
+  route('GET', '/api/money/rate', 'public', 'Public reference rate. A per-IP rate limit is deferred to PR2c.'),
+  route('GET', '/api/money/compare', 'public', 'Public transfer comparison. A per-IP rate limit is deferred to PR2c.'),
+  route('GET', '/api/community', 'public', 'Published community posts. A per-IP rate limit is deferred to PR2c.'),
+  route('GET', '/api/community/relevant', 'pending-PR3a', 'Relevance uses a client-supplied profile. Worker web identity is PR3a.'),
+  route('GET', '/api/community/:postId', 'public', 'One published community post. A per-IP rate limit is deferred to PR2c.'),
+  route('POST', '/api/community/:postId/comments', 'pending-PR3a', 'Comment author comes from client-supplied channel and channelUserId. Worker web identity is PR3a.'),
+  route('POST', '/api/community/comments/:commentId/flag', 'pending-PR3a', 'Flagging is unauthenticated. Worker web identity is PR3a.'),
+  route('GET', '/api/services', 'public', 'Public service catalog. A per-IP rate limit is deferred to PR2c.'),
+  route('GET', '/api/services/matches', 'pending-PR3a', 'Personalized matches use client-supplied channel and channelUserId. Worker web identity is PR3a.'),
+  route('GET', '/api/services/:id', 'public', 'One public service record. A per-IP rate limit is deferred to PR2c.'),
+  route('GET', '/api/documents', 'pending-PR3a', 'Document list uses client-supplied channel and channelUserId. Worker web identity is PR3a.'),
+  route('GET', '/api/documents/alerts', 'pending-PR3a', 'Document alerts use client-supplied identity. Worker web identity is PR3a.'),
+  route('GET', '/api/documents/history', 'pending-PR3a', 'Document history uses client-supplied identity. Worker web identity is PR3a.'),
+  route('POST', '/api/documents', 'pending-PR3a', 'Creates a document for a client-supplied identity. Worker web identity is PR3a.'),
+  route('GET', '/api/documents/:documentId/history', 'pending-PR3a', 'History is loaded by document id without an ownership check. Identity is PR3a and ownership is PR3b.'),
+  route('PUT', '/api/documents/:documentId', 'pending-PR3a', 'Update uses the document id without an ownership check. Identity is PR3a and ownership is PR3b.'),
+  route('POST', '/api/documents/:documentId/renew', 'pending-PR3a', 'Renew uses the document id without an ownership check. Identity is PR3a and ownership is PR3b.'),
+  route('POST', '/api/documents/:documentId/archive', 'pending-PR3a', 'Archive uses the document id without an ownership check. Identity is PR3a and ownership is PR3b.'),
+  route('GET', '/api/notifications', 'pending-PR3a', 'Notification list uses client-supplied identity. Worker web identity is PR3a.'),
+  route('GET', '/api/notifications/summary', 'pending-PR3a', 'Notification summary uses client-supplied identity. Worker web identity is PR3a.'),
+  route('POST', '/api/notifications/:notificationId/read', 'pending-PR3a', 'Marked read by notification id only. Identity is PR3a and ownership is PR3b.'),
+  route('POST', '/api/notifications/:notificationId/dismiss', 'pending-PR3a', 'Dismissed by notification id only. Identity is PR3a and ownership is PR3b.'),
+  route('POST', '/api/notifications/:notificationId/complete', 'pending-PR3a', 'Completed by notification id only. Identity is PR3a and ownership is PR3b.'),
+  route('POST', '/api/notifications/:notificationId/remind', 'pending-PR3a', 'Reminded by notification id only. Identity is PR3a and ownership is PR3b.'),
+  route('GET', '/api/tasks', 'pending-PR3a', 'Task list uses client-supplied identity. Worker web identity is PR3a.'),
+  route('GET', '/api/tasks/alerts', 'pending-PR3a', 'Task alerts use client-supplied identity. Worker web identity is PR3a.'),
+  route('GET', '/api/tasks/schedule', 'pending-PR3a', 'Task schedule uses client-supplied identity. Worker web identity is PR3a.'),
+  route('GET', '/api/tasks/history', 'pending-PR3a', 'Task history uses client-supplied identity. Worker web identity is PR3a.'),
+  route('POST', '/api/tasks', 'pending-PR3a', 'Creates a task for a client-supplied identity. Worker web identity is PR3a.'),
+  route('GET', '/api/tasks/:taskId', 'pending-PR3a', 'Loaded by task id without an ownership check. Identity is PR3a and ownership is PR3b.'),
+  route('GET', '/api/tasks/:taskId/history', 'pending-PR3a', 'History is loaded by task id without an ownership check. Identity is PR3a and ownership is PR3b.'),
+  route('PUT', '/api/tasks/:taskId', 'pending-PR3a', 'Update uses the task id without an ownership check. Identity is PR3a and ownership is PR3b.'),
+  route('POST', '/api/tasks/:taskId/remind', 'pending-PR3a', 'Remind uses the task id without an ownership check. Identity is PR3a and ownership is PR3b.'),
+  route('POST', '/api/tasks/:taskId/reschedule', 'pending-PR3a', 'Reschedule uses the task id without an ownership check. Identity is PR3a and ownership is PR3b.'),
+  route('POST', '/api/tasks/:taskId/:action', 'pending-PR3a', 'Complete and cancel use the task id without an ownership check. Identity is PR3a and ownership is PR3b.'),
+  route('GET', '/api/chat/onboarding-status', 'pending-PR3a', 'Reads or creates a profile from client-supplied channel and channelUserId. Worker web identity is PR3a.'),
+  route('GET', '/api/chat/profile', 'pending-PR3a', 'Profile read uses client-supplied channel and channelUserId. Worker web identity is PR3a.'),
+  route('GET', '/api/chat/startup-summary', 'pending-PR3a', 'Startup summary uses client-supplied identity. Worker web identity is PR3a.'),
+  route('PUT', '/api/chat/profile', 'pending-PR3a', 'Profile write, including channel preferences, uses client-supplied identity. Worker web identity is PR3a.'),
+  route('POST', '/api/chat/message', 'pending-PR3a', 'Sends a message for a client-supplied identity and can call the model. Worker web identity is PR3a. A chat rate limit is PR2c.'),
+  route('POST', '/api/telegram/link-code', 'pending-PR3a', 'Chat UI linking button. Creates a code for a client-supplied identity. Worker web identity is PR3a, not an admin key.'),
+  route('POST', '/api/telegram/disconnect', 'pending-PR3a', 'Chat UI disconnect button. Uses client-supplied identity. Worker web identity is PR3a, not an admin key.'),
+  route('POST', '/api/whatsapp/webhook', 'pending-PR2b', 'Inbound WhatsApp events have no X-Hub-Signature-256 check. Signature verification is PR2b.'),
+  route('GET', '/api/whatsapp/webhook', 'pending-PR2b', 'Meta subscription check compares the verify token with ===. A timing-safe compare is PR2b.'),
+  route('POST', '/api/line/webhook', 'webhook-signed', 'Validates x-line-signature with HMAC-SHA256 and timingSafeEqual when the LINE connector is enabled.'),
+  route('POST', '/api/line/link-code', 'pending-PR3a', 'Chat UI linking button. Creates a code for a client-supplied identity. Worker web identity is PR3a, not an admin key.'),
+  route('POST', '/api/line/disconnect', 'pending-PR3a', 'Chat UI disconnect button. Uses client-supplied identity. Worker web identity is PR3a, not an admin key.'),
+  ...ADMIN_ROUTES,
+];
+
+function routeKey(method, path) {
+  return `${String(method || '').toUpperCase()} ${path}`;
+}
+
+module.exports = {
+  ROUTE_SECURITY,
+  routeKey,
+};
