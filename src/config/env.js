@@ -8,10 +8,45 @@ function normalizePrivateKey(value) {
   return value ? value.replace(/\\n/g, '\n') : '';
 }
 
+const DEV_ADMIN_API_KEY = 'dev-admin-key';
+const MIN_PRODUCTION_ADMIN_API_KEY_LENGTH = 32;
+
+function resolveAdminApiKey(nodeEnv, rawValue) {
+  const normalizedEnv = nodeEnv || 'development';
+  const configured = typeof rawValue === 'string' ? rawValue.trim() : '';
+
+  if (normalizedEnv === 'production') {
+    if (!configured) {
+      throw new Error(
+        'Refusing to start: ADMIN_API_KEY is missing. Set ADMIN_API_KEY to a unique secret of at least 32 characters. The development default is not allowed in production.'
+      );
+    }
+    if (configured === DEV_ADMIN_API_KEY) {
+      throw new Error(
+        'Refusing to start: ADMIN_API_KEY is set to the development default. Set ADMIN_API_KEY to a unique secret of at least 32 characters.'
+      );
+    }
+    if (configured.length < MIN_PRODUCTION_ADMIN_API_KEY_LENGTH) {
+      throw new Error(
+        'Refusing to start: ADMIN_API_KEY is too short. Set ADMIN_API_KEY to a unique secret of at least 32 characters.'
+      );
+    }
+    return configured;
+  }
+
+  const resolved = configured || DEV_ADMIN_API_KEY;
+  if (normalizedEnv !== 'test' && resolved === DEV_ADMIN_API_KEY) {
+    console.warn(
+      '[startup] ADMIN_API_KEY is unset or still the development default. Local admin requests can continue. Production refuses to start unless ADMIN_API_KEY is a unique secret of at least 32 characters.'
+    );
+  }
+  return resolved;
+}
+
 const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: Number(process.env.PORT || 3000),
-  adminApiKey: process.env.ADMIN_API_KEY || 'dev-admin-key',
+  adminApiKey: resolveAdminApiKey(process.env.NODE_ENV, process.env.ADMIN_API_KEY),
   telegram: {
     enabled: String(process.env.TELEGRAM_BOT_ENABLED || 'false').toLowerCase() === 'true',
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',

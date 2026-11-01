@@ -21,7 +21,7 @@ Runtime is Node.js CommonJS. The package entry point is `src/server.js`. Schedul
 - Backend technology: Node.js with Express. Confirmed dependency versions are listed in `package.json`: `express`, `dotenv`, and `googleapis`.
 - Database: Google Sheets is the configured persistence layer. Internal knowledge-base JSON files are also present under `src/modules/knowledge-agent/knowledge-base`.
 - Database access method: `src/config/googleSheets.js` creates a Google Sheets client with `googleapis` and exports sheet read, append, and update helpers.
-- Authentication tools: Admin API access uses an environment-configured admin API key in `src/config/env.js` and admin frontend requests send an `x-admin-api-key` header. WhatsApp webhook verification token, LINE channel signature validation, Telegram/LINE linking codes, and Google Sheets service-account credentials are configured through environment variables. Full user login is Not Confirmed.
+- Authentication tools: Admin API access uses an environment-configured admin API key in `src/config/env.js`. Admin frontend requests send only an `x-admin-api-key` header. Production refuses to start when that key is missing, shorter than 32 characters, or the development default. WhatsApp webhook verification token, LINE channel signature validation, Telegram/LINE linking codes, and Google Sheets service-account credentials are configured through environment variables. Full user login is Not Confirmed.
 - Testing tools: Node's built-in test runner is configured by the `test` script in `package.json` as `node --test`. Test files exist under `test`.
 - Schedulers: Local `setInterval` schedulers process scheduled notifications and pending Telegram, WhatsApp, and LINE deliveries.
 - Build tools: Not Confirmed. No build script is defined in `package.json`.
@@ -921,7 +921,7 @@ User and public module APIs:
 
 Admin and reports:
 
-All `/api/admin` routes use `requireAdminKey` in `src/modules/admin/admin.routes.js`. The key is read from `x-admin-api-key` or `adminApiKey` query parameter and compared with `env.adminApiKey`.
+All `/api/admin` routes use `requireAdminKey` in `src/modules/admin/admin.routes.js`. The key is read only from the `x-admin-api-key` header and compared with `env.adminApiKey` using `crypto.timingSafeEqual` on SHA-256 digests. Query string, URL, and body keys are rejected.
 
 | Method | Path | Purpose | Authentication | Handler | Main service |
 | --- | --- | --- | --- | --- | --- |
@@ -1004,7 +1004,7 @@ Login:
 
 Sessions or tokens:
 
-- Admin API uses `ADMIN_API_KEY` through the `x-admin-api-key` header or `adminApiKey` query parameter.
+- Admin API uses `ADMIN_API_KEY` only through the `x-admin-api-key` header. Query string and request-body keys are rejected. Production startup fails closed when the key is missing, shorter than 32 characters, or the development default.
 - Provider secrets are read from environment variables and are not exposed as route responses in confirmed code.
 
 Roles and permissions:
@@ -1511,7 +1511,7 @@ Database and persistence:
 
 Authentication and security:
 
-- `ADMIN_API_KEY`: used by Admin API middleware and Admin frontend requests.
+- `ADMIN_API_KEY`: used by Admin API middleware and Admin frontend requests. Required in production, where it must be a unique secret of at least 32 characters and must not be the development default. Outside production, a local development fallback is used when this variable is unset.
 - `WHATSAPP_VERIFY_TOKEN`: used for WhatsApp webhook verification.
 - `LINE_CHANNEL_SECRET`: used for LINE webhook signature validation.
 
