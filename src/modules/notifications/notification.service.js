@@ -8,6 +8,8 @@ const telegramDeliveryService = require('../telegram/telegram-delivery.service')
 const whatsappDeliveryService = require('../whatsapp/whatsapp-delivery.service');
 const lineDeliveryService = require('../line/line-delivery.service');
 const notificationRepository = require('./notification.repository');
+const { isOwnedBy, requireOwnerUserId, stripOwnerFields } = require('../../shared/recordOwner');
+const { withRecordLock } = require('../../shared/recordWriteLock');
 const {
   NOTIFICATION_PRIORITIES,
   NOTIFICATION_STATUSES,
@@ -145,8 +147,9 @@ function isDuplicate(existing = [], notification = {}) {
   );
 }
 
-async function createNotification(input = {}) {
-  const notification = buildNotification(input);
+async function createNotification(input = {}, options = {}) {
+  const ownerUserId = requireOwnerUserId(options.ownerUserId);
+  const notification = buildNotification({ ...stripOwnerFields(input), userId: ownerUserId });
   const errors = validateNotification(notification);
   if (errors.length) throw validationError(errors);
   const existing = await readNotificationsWithFallback();
@@ -183,7 +186,7 @@ function notificationPassesFilters(notification, filters = {}) {
 }
 
 async function getUserNotifications(userId, filters = {}) {
-  await expireOldNotifications();
+  await expireOldNotifications(userId);
   const notifications = await readNotificationsWithFallback();
   const now = new Date();
   return notifications
@@ -202,56 +205,80 @@ async function getUnreadCount(userId) {
   return notifications.length;
 }
 
-async function updateNotificationStatus(notificationId, status, extra = {}) {
+async function getNotificationById(notificationId) {
   const notifications = await readNotificationsWithFallback();
   const existing = notifications.find((notification) => notification.notificationId === notificationId);
-  if (!existing) return null;
-  const now = new Date().toISOString();
-  const updated = {
-    ...existing,
-    ...extra,
-    status,
-    readAt: status === 'Read' ? now : existing.readAt,
-    dismissedAt: status === 'Dismissed' ? now : existing.dismissedAt,
-  };
-
-  try {
-    const saved = (await notificationRepository.updateNotification(notificationId, updated)) || updated;
-    await recordNotificationEvent(saved, status.toLowerCase());
-    return saved;
-  } catch (error) {
-    const index = memoryNotifications.findIndex((notification) => notification.notificationId === notificationId);
-    if (index >= 0) memoryNotifications[index] = updated;
-    else memoryNotifications.push(updated);
-    await recordNotificationEvent(updated, status.toLowerCase());
-    return updated;
-  }
+  return existing ? { ...existing } : null;
 }
 
-async function markAsRead(notificationId) {
-  return updateNotificationStatus(notificationId, 'Read');
+async function updateNotificationStatus(notificationId, status, extra = {}, options = {}) {
+  const ownerUserId = requireOwnerUserId(options.ownerUserId);
+  return withRecordLock(`notification:${notificationId}`, async () => {
+    const notifications = await readNotificationsWithFallback();
+    const existing = notifications.find((notification) => notification.notificationId === notificationId);
+    if (!isOwnedBy(existing, ownerUserId)) return null;
+    const now = new Date().toISOString();
+    const safeExtra = stripOwnerFields(extra);
+    const updated = {
+      ...existing,
+      ...safeExtra,
+      notificationId: existing.notificationId,
+      userId: existing.userId,
+      status,
+      readAt: status === 'Read' ? now : existing.readAt,
+      dismissedAt: status === 'Dismissed' ? now : existing.dismissedAt,
+    };
+    if (updated.userId !== ownerUserId) return null;
+
+    try {
+      const saved = await notificationRepository.updateNotification(notificationId, updated, ownerUserId);
+      if (!saved) return null;
+      await recordNotificationEvent(saved, status.toLowerCase());
+      return saved;
+    } catch (error) {
+      if (error && error.code === 'OWNER_REQUIRED') throw error;
+      const index = memoryNotifications.findIndex(
+        (notification) => notification.notificationId === notificationId && notification.userId === ownerUserId
+      );
+      if (index < 0) return null;
+      memoryNotifications[index] = updated;
+      await recordNotificationEvent(updated, status.toLowerCase());
+      return updated;
+    }
+  });
 }
 
-async function dismissNotification(notificationId) {
-  return updateNotificationStatus(notificationId, 'Dismissed');
+async function markAsRead(notificationId, options = {}) {
+  const ownerUserId = requireOwnerUserId(options.ownerUserId);
+  return updateNotificationStatus(notificationId, 'Read', {}, { ownerUserId });
 }
 
-async function completeNotification(notificationId) {
-  return updateNotificationStatus(notificationId, 'Completed');
+async function dismissNotification(notificationId, options = {}) {
+  const ownerUserId = requireOwnerUserId(options.ownerUserId);
+  return updateNotificationStatus(notificationId, 'Dismissed', {}, { ownerUserId });
 }
 
-async function expireOldNotifications() {
+async function completeNotification(notificationId, options = {}) {
+  const ownerUserId = requireOwnerUserId(options.ownerUserId);
+  return updateNotificationStatus(notificationId, 'Completed', {}, { ownerUserId });
+}
+
+async function expireOldNotifications(userId) {
   const notifications = await readNotificationsWithFallback();
   const now = new Date();
   const expired = [];
   for (const notification of notifications) {
+    if (userId && notification.userId !== userId) continue;
     if (
       notification.expiresAt &&
       notification.status !== 'Expired' &&
       notification.status !== 'Dismissed' &&
       new Date(notification.expiresAt) < now
     ) {
-      expired.push(await updateNotificationStatus(notification.notificationId, 'Expired'));
+      if (!notification.userId) continue;
+      expired.push(
+        await updateNotificationStatus(notification.notificationId, 'Expired', {}, { ownerUserId: notification.userId })
+      );
     }
   }
   return expired.filter(Boolean);
@@ -270,31 +297,34 @@ async function processScheduledNotifications() {
   return due;
 }
 
-async function rescheduleNotification(notificationId, days = 1) {
-  const notifications = await readNotificationsWithFallback();
-  const existing = notifications.find((notification) => notification.notificationId === notificationId);
-  if (!existing) return null;
+async function rescheduleNotification(notificationId, days = 1, options = {}) {
+  const ownerUserId = requireOwnerUserId(options.ownerUserId);
+  const current = await updateNotificationStatus(notificationId, 'Completed', {}, { ownerUserId });
+  if (!current) return null;
   const scheduledDate = new Date();
   scheduledDate.setUTCDate(scheduledDate.getUTCDate() + Number(days || 1));
   const scheduledAt = scheduledDate.toISOString();
-  const reminder = await createNotification({
-    ...existing,
-    notificationId: generateId('notif_reminder'),
-    title: `Reminder: ${existing.title}`,
-    scheduledAt,
-    createdAt: new Date().toISOString(),
-    readAt: '',
-    dismissedAt: '',
-    status: 'New',
-    sourceRecordId: `${existing.sourceRecordId || existing.notificationId}_reminder_${scheduledAt.slice(0, 10)}`,
-  });
-  const current = await updateNotificationStatus(notificationId, 'Completed');
+  const reminder = await createNotification(
+    {
+      ...stripOwnerFields(current),
+      notificationId: '',
+      title: `Reminder: ${current.title}`,
+      scheduledAt,
+      createdAt: new Date().toISOString(),
+      readAt: '',
+      dismissedAt: '',
+      status: 'New',
+      sourceRecordId: `${current.sourceRecordId || current.notificationId}_reminder_${scheduledAt.slice(0, 10)}`,
+    },
+    { ownerUserId }
+  );
   await recordNotificationEvent(reminder, 'rescheduled');
   return { current, reminder };
 }
 
-async function cancelScheduledNotification(notificationId) {
-  return updateNotificationStatus(notificationId, 'Dismissed');
+async function cancelScheduledNotification(notificationId, options = {}) {
+  const ownerUserId = requireOwnerUserId(options.ownerUserId);
+  return updateNotificationStatus(notificationId, 'Dismissed', {}, { ownerUserId });
 }
 
 async function createNotificationsFromExistingModules(userId, userProfile = {}) {
@@ -314,7 +344,7 @@ async function createNotificationsFromExistingModules(userId, userProfile = {}) 
           priority: 'High',
           actionLabel: 'View Jobs',
           actionUrl: '#jobs',
-        })
+        }, { ownerUserId: userId })
       );
     }
   }
@@ -333,7 +363,7 @@ async function createNotificationsFromExistingModules(userId, userProfile = {}) 
           priority: 'High',
           actionLabel: 'View Housing',
           actionUrl: '#housing',
-        })
+        }, { ownerUserId: userId })
       );
     }
   }
@@ -353,7 +383,7 @@ async function createNotificationsFromExistingModules(userId, userProfile = {}) 
           priority: alert.type === 'Expired' ? 'Urgent' : 'High',
           actionLabel: alert.documentId ? 'View Document' : 'Add Document',
           actionUrl: '#documents',
-        })
+        }, { ownerUserId: userId })
       );
     }
   }
@@ -372,7 +402,7 @@ async function createNotificationsFromExistingModules(userId, userProfile = {}) 
           priority: 'Normal',
           actionLabel: 'View Money',
           actionUrl: '#money',
-        })
+        }, { ownerUserId: userId })
       );
     }
   }
@@ -391,7 +421,7 @@ async function createNotificationsFromExistingModules(userId, userProfile = {}) 
           priority: 'Normal',
           actionLabel: 'Open Community',
           actionUrl: '#community',
-        })
+        }, { ownerUserId: userId })
       );
     }
   }
@@ -504,7 +534,7 @@ async function createManualNotifications(profiles = [], input = {}) {
         actionUrl: input.actionUrl,
         scheduledAt: input.scheduledAt,
         expiresAt: input.expiresAt,
-      })
+      }, { ownerUserId: profile.userId })
     );
   }
   return created.filter(Boolean);
@@ -519,6 +549,7 @@ module.exports = {
   dismissNotification,
   expireOldNotifications,
   getAllNotifications,
+  getNotificationById,
   getUnreadCount,
   getUserNotifications,
   markAsRead,

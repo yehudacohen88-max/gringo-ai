@@ -1,10 +1,12 @@
 const express = require('express');
 const documentController = require('./document.controller');
-const { blockPersonalDataRoute } = require('../../shared/blockPersonalDataRoute');
+const { attachWebIdentity } = require('../../shared/webIdentity');
+const { requireSameOrigin } = require('../../shared/requireSameOrigin');
 
 const router = express.Router();
 
-router.use(blockPersonalDataRoute);
+router.use(requireSameOrigin);
+router.use(attachWebIdentity);
 
 router.get('/', documentController.listDocuments);
 router.get('/alerts', documentController.listAlerts);

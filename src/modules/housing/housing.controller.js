@@ -1,5 +1,5 @@
 const { coreAgentService } = require('../core-agent');
-const { refusePersonalDataChannelUserId } = require('../../shared/blockPersonalDataRoute');
+const { loadWebProfile } = require('../../shared/webPersonalData');
 const housingService = require('./housing.service');
 
 function splitList(value) {
@@ -29,36 +29,31 @@ async function getActiveHousingListings(req, res, next) {
 
 async function getMatchingHousing(req, res, next) {
   try {
-    const onboardingStatus = await coreAgentService.getOnboardingStatus({
-      channel: req.query.channel || 'web',
-      channelUserId: refusePersonalDataChannelUserId(),
-    });
-    const profile = onboardingStatus.profile || {};
+    const { context, profile, userId } = await loadWebProfile(req);
+    if (!userId) {
+      res.status(200).json({
+        listings: [],
+        lookingForHousing: false,
+        safetyNotice: housingService.HOUSING_SAFETY_NOTICE,
+      });
+      return;
+    }
     const hasActiveHousingGoal = splitList(profile.activeGoals).includes('Find Housing');
     const matchingListings =
-      profile.lookingForHousing === 'Yes' && hasActiveHousingGoal
-        ? await housingService.findMatchingHousing(profile)
-        : [];
+      profile.lookingForHousing === 'Yes' && hasActiveHousingGoal ? await housingService.findMatchingHousing(profile) : [];
     const listings = preferUnseen(matchingListings, 'housingId', profile.lastRecommendedHousingIds);
     if (listings.length) {
-      await coreAgentService.updateUserProfile(
-        {
-          channel: req.query.channel || 'web',
-          channelUserId: refusePersonalDataChannelUserId(),
-        },
-        {
-          lastRecommendedHousingIds: listings
-            .slice(0, 5)
-            .map((listing) => listing.housingId)
-            .join(', '),
-        }
-      );
+      await coreAgentService.updateUserProfile(context, {
+        lastRecommendedHousingIds: listings
+          .slice(0, 5)
+          .map((listing) => listing.housingId)
+          .join(', '),
+      });
     }
 
     res.status(200).json({
       listings,
-      profile,
-      lookingForHousing: profile?.lookingForHousing === 'Yes',
+      lookingForHousing: profile.lookingForHousing === 'Yes',
       safetyNotice: housingService.HOUSING_SAFETY_NOTICE,
     });
   } catch (error) {

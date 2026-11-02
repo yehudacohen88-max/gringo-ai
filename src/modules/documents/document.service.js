@@ -1,4 +1,6 @@
 const documentRepository = require('./document.repository');
+const { isOwnedBy, requireOwnerUserId, stripOwnerFields } = require('../../shared/recordOwner');
+const { withRecordLock } = require('../../shared/recordWriteLock');
 const {
   ALLOWED_FILE_EXTENSIONS,
   DOCUMENT_CHANGE_TYPES,
@@ -157,8 +159,9 @@ async function recordHistory(existing, updated, changeType) {
   }
 }
 
-async function createDocument(input = {}) {
-  const document = buildDocument(input);
+async function createDocument(input = {}, options = {}) {
+  const ownerUserId = requireOwnerUserId(options.ownerUserId);
+  const document = buildDocument({ ...stripOwnerFields(input), userId: ownerUserId });
   const errors = validateDocument(document);
   if (errors.length) throw validationError(errors);
 
@@ -173,30 +176,37 @@ async function createDocument(input = {}) {
   }
 }
 
-async function updateDocument(documentId, updates = {}) {
-  const existing = await getDocumentById(documentId);
-  if (!existing) return null;
-  const changeType = cleanText(updates.changeType) || inferChangeType(existing, updates);
-  const updated = buildDocument({
-    ...existing,
-    ...updates,
-    documentId: existing.documentId,
-    userId: existing.userId,
-    createdAt: existing.createdAt,
-    updatedAt: new Date().toISOString(),
-  });
+async function updateDocument(documentId, updates = {}, options = {}) {
+  const ownerUserId = requireOwnerUserId(options.ownerUserId);
+  return withRecordLock(`document:${documentId}`, async () => {
+    const existing = await getDocumentById(documentId);
+    if (!isOwnedBy(existing, ownerUserId)) return null;
+    const safeUpdates = stripOwnerFields(updates);
+    const changeType = cleanText(safeUpdates.changeType) || inferChangeType(existing, safeUpdates);
+    const updated = buildDocument({
+      ...existing,
+      ...safeUpdates,
+      documentId: existing.documentId,
+      userId: existing.userId,
+      createdAt: existing.createdAt,
+      updatedAt: new Date().toISOString(),
+    });
+    if (updated.userId !== ownerUserId) return null;
 
-  try {
-    const saved = (await documentRepository.updateDocument(documentId, updated)) || updated;
-    await recordHistory(existing, saved, changeType);
-    return saved;
-  } catch (error) {
-    const memoryIndex = memoryDocuments.findIndex((document) => document.documentId === documentId);
-    if (memoryIndex >= 0) memoryDocuments[memoryIndex] = updated;
-    else memoryDocuments.push(updated);
-    await recordHistory(existing, updated, changeType);
-    return updated;
-  }
+    try {
+      const saved = await documentRepository.updateDocument(documentId, updated, ownerUserId);
+      if (!saved) return null;
+      await recordHistory(existing, saved, changeType);
+      return saved;
+    } catch (error) {
+      if (error && error.code === 'OWNER_REQUIRED') throw error;
+      const memoryIndex = memoryDocuments.findIndex((document) => document.documentId === documentId && document.userId === ownerUserId);
+      if (memoryIndex < 0) return null;
+      memoryDocuments[memoryIndex] = updated;
+      await recordHistory(existing, updated, changeType);
+      return updated;
+    }
+  });
 }
 
 function inferChangeType(existing, updates = {}) {
@@ -232,15 +242,21 @@ async function getExpiringDocuments(userId, daysAhead = 30) {
   });
 }
 
-async function archiveDocument(documentId) {
-  return updateDocument(documentId, { status: 'Archived', changeType: 'Archived' });
+async function archiveDocument(documentId, options = {}) {
+  const ownerUserId = requireOwnerUserId(options.ownerUserId);
+  return updateDocument(documentId, { status: 'Archived', changeType: 'Archived' }, { ownerUserId });
 }
 
-async function renewDocument(documentId, newExpiryDate) {
-  return updateDocument(documentId, {
-    expiryDate: cleanText(newExpiryDate),
-    changeType: 'Renewed',
-  });
+async function renewDocument(documentId, newExpiryDate, options = {}) {
+  const ownerUserId = requireOwnerUserId(options.ownerUserId);
+  return updateDocument(
+    documentId,
+    {
+      expiryDate: cleanText(newExpiryDate),
+      changeType: 'Renewed',
+    },
+    { ownerUserId }
+  );
 }
 
 function getRequiredDocuments(workSector) {

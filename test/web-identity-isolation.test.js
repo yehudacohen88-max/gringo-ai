@@ -141,7 +141,10 @@ test('personal-data routes are blocked before data-store access', async () => {
   const server = listen();
   try {
     const blocked = ROUTE_SECURITY.filter((entry) => entry.classification === 'blocked-until-PR3a-2');
-    assert.ok(blocked.length >= 30);
+    assert.deepEqual(
+      blocked.map((entry) => `${entry.method} ${entry.path}`),
+      ['POST /api/community/comments/:commentId/flag']
+    );
     for (const entry of blocked) {
       const path = entry.path.replace(/:([A-Za-z0-9_]+)/g, 'probe');
       const response = await fetch(`${server.base}${path}?channel=whatsapp&channelUserId=15550001111`, {

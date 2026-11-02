@@ -1,5 +1,5 @@
 const { coreAgentService } = require('../core-agent');
-const { refusePersonalDataChannelUserId } = require('../../shared/blockPersonalDataRoute');
+const { loadWebProfile } = require('../../shared/webPersonalData');
 const jobService = require('./job.service');
 
 function splitList(value) {
@@ -26,34 +26,27 @@ async function getActiveJobs(req, res, next) {
 
 async function getMatchingJobs(req, res, next) {
   try {
-    const onboardingStatus = await coreAgentService.getOnboardingStatus({
-      channel: req.query.channel || 'web',
-      channelUserId: refusePersonalDataChannelUserId(),
-    });
-    const profile = onboardingStatus.profile || {};
+    const { context, profile, userId } = await loadWebProfile(req);
+    if (!userId) {
+      res.status(200).json({ jobs: [], wantsJobAlerts: false });
+      return;
+    }
     const hasActiveJobGoal = splitList(profile.activeGoals).includes('Find Job');
     const matchingJobs =
       profile.lookingForJob === 'Yes' && hasActiveJobGoal ? await jobService.findMatchingJobs(profile) : [];
     const jobs = preferUnseen(matchingJobs, 'jobId', profile.lastRecommendedJobIds);
     if (jobs.length) {
-      await coreAgentService.updateUserProfile(
-        {
-          channel: req.query.channel || 'web',
-          channelUserId: refusePersonalDataChannelUserId(),
-        },
-        {
-          lastRecommendedJobIds: jobs
-            .slice(0, 5)
-            .map((job) => job.jobId)
-            .join(', '),
-        }
-      );
+      await coreAgentService.updateUserProfile(context, {
+        lastRecommendedJobIds: jobs
+          .slice(0, 5)
+          .map((job) => job.jobId)
+          .join(', '),
+      });
     }
 
     res.status(200).json({
       jobs,
-      profile,
-      wantsJobAlerts: profile?.wantsJobAlerts === 'Yes',
+      wantsJobAlerts: profile.wantsJobAlerts === 'Yes',
     });
   } catch (error) {
     next(error);

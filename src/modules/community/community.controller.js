@@ -1,5 +1,6 @@
 const { coreAgentService } = require('../core-agent');
 const { refusePersonalDataChannelUserId } = require('../../shared/blockPersonalDataRoute');
+const { loadWebProfile, stripClientIdentity } = require('../../shared/webPersonalData');
 const communityService = require('./community.service');
 
 function splitList(value) {
@@ -29,31 +30,24 @@ async function getPublishedPosts(req, res, next) {
 
 async function getRelevantPosts(req, res, next) {
   try {
-    const onboardingStatus = await coreAgentService.getOnboardingStatus({
-      channel: req.query.channel || 'web',
-      channelUserId: refusePersonalDataChannelUserId(),
-    });
-    const profile = onboardingStatus.profile || {};
+    const { context, profile, userId } = await loadWebProfile(req);
+    if (!userId) {
+      res.status(200).json({ posts: [], safetyNotice: communityService.COMMUNITY_SAFETY_NOTICE });
+      return;
+    }
     const matchingPosts = await communityService.getRelevantPosts(profile);
     const posts = preferUnseen(matchingPosts, 'postId', profile.lastRelevantPostIds);
     if (posts.length) {
-      await coreAgentService.updateUserProfile(
-        {
-          channel: req.query.channel || 'web',
-          channelUserId: refusePersonalDataChannelUserId(),
-        },
-        {
-          lastRelevantPostIds: posts
-            .slice(0, 5)
-            .map((post) => post.postId)
-            .join(', '),
-        }
-      );
+      await coreAgentService.updateUserProfile(context, {
+        lastRelevantPostIds: posts
+          .slice(0, 5)
+          .map((post) => post.postId)
+          .join(', '),
+      });
     }
 
     res.status(200).json({
       posts,
-      profile,
       safetyNotice: communityService.COMMUNITY_SAFETY_NOTICE,
     });
   } catch (error) {
@@ -82,16 +76,18 @@ async function getPost(req, res, next) {
 
 async function addComment(req, res, next) {
   try {
-    const onboardingStatus = await coreAgentService.getOnboardingStatus({
-      channel: req.body.channel || 'web',
-      channelUserId: refusePersonalDataChannelUserId(),
-    });
-    const profile = onboardingStatus.profile || {};
+    const { profile, userId } = await loadWebProfile(req, { create: true });
+    const post = await communityService.getPostById(req.params.postId);
+    if (!post || post.status !== 'Published') {
+      res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Not found.', details: [] } });
+      return;
+    }
+    const body = stripClientIdentity(req.body, ['commentId', 'postId', 'userName', 'status']);
     const comment = await communityService.addComment({
-      postId: req.params.postId,
-      userId: onboardingStatus.user?.userId || refusePersonalDataChannelUserId(),
+      postId: post.postId,
+      userId,
       userName: profile.fullName || 'Community member',
-      body: req.body.body,
+      body: body.body,
       language: profile.preferredLanguage || profile.language || 'English',
     });
 

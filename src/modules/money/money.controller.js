@@ -1,5 +1,4 @@
-const { coreAgentService } = require('../core-agent');
-const { refusePersonalDataChannelUserId } = require('../../shared/blockPersonalDataRoute');
+const { loadWebProfile } = require('../../shared/webPersonalData');
 const moneyService = require('./money.service');
 
 async function getRate(req, res, next) {
@@ -42,18 +41,13 @@ async function compareTransfers(req, res, next) {
 
 async function getProfileMoneyDefaults(req, res, next) {
   try {
-    const status = await coreAgentService.getOnboardingStatus({
-      channel: req.query.channel || 'web',
-      channelUserId: refusePersonalDataChannelUserId(),
-    });
-    const profile = status.profile || {};
-
+    const { profile, userId } = await loadWebProfile(req);
+    const source = userId && profile ? profile : {};
     res.status(200).json({
-      country: profile.lastMoneyTransferCountry || profile.moneyTransferCountry || profile.country || '',
-      targetCurrency: profile.preferredCurrency || '',
+      country: source.lastMoneyTransferCountry || source.moneyTransferCountry || source.country || '',
+      targetCurrency: source.preferredCurrency || '',
       sourceCurrency: 'ILS',
-      amount: profile.lastMoneyTransferAmount || '',
-      profile,
+      amount: source.lastMoneyTransferAmount || '',
     });
   } catch (error) {
     next(error);

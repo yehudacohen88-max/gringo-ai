@@ -73,15 +73,15 @@ const returnToChatFromMoneyButton = document.querySelector('#returnToChatFromMon
 let currentCommunityPostId = '';
 let uiLanguage = 'en';
 
-const PERSONAL_DATA_UNAVAILABLE_COPY = {
-  en: 'This part of Gringo is paused for now. Chat still works. Tasks, documents, notifications, and personal matches will come back in a later update.',
-  he: 'החלק הזה של גרינגו מושהה כרגע. הצ׳אט עדיין עובד. משימות, מסמכים, התראות והתאמות אישיות יחזרו בעדכון הבא.',
-  ar: 'هذا الجزء من Gringo متوقف مؤقتًا. الدردشة ما زالت تعمل. ستعود المهام والمستندات والتنبيهات والمطابقات الشخصية في تحديث لاحق.',
-  th: 'ส่วนนี้ของ Gringo ปิดชั่วคราว แชทยังใช้ได้ งาน เอกสาร การแจ้งเตือน และการจับคู่ส่วนตัวจะกลับมาในอัปเดตถัดไป',
-  si: 'Gringo හි මෙම කොටස දැනට නවතා ඇත. කතාබස් තවමත් ක්‍රියා කරයි. කාර්ය, ලේඛන, දැනුම්දීම් සහ පෞද්ගලික ගැලපීම් පසු යාවත්කාලීනයකින් නැවත එයි.',
-  hi: 'Gringo का यह हिस्सा अभी रोका गया है। चैट अभी भी चलती है। काम, दस्तावेज़, सूचनाएँ और व्यक्तिगत मिलान बाद के अपडेट में वापस आएँगे।',
-  ru: 'Этот раздел Gringo пока на паузе. Чат по-прежнему работает. Задачи, документы, уведомления и личные подборки вернутся в следующем обновлении.',
-  tl: 'Pansamantalang nakahinto ang bahaging ito ng Gringo. Gumagana pa rin ang chat. Babalik ang mga gawain, dokumento, abiso, at personal na tugma sa susunod na update.',
+const COMMENT_REPORT_PAUSED_COPY = {
+  en: 'Reporting a comment is paused for now. Reading posts and writing your own comment still work.',
+  he: 'דיווח על תגובה מושהה כרגע. קריאת פוסטים וכתיבת תגובה משלך עדיין עובדות.',
+  ar: 'الإبلاغ عن تعليق متوقف مؤقتًا. قراءة المنشورات وكتابة تعليقك ما زالت تعمل.',
+  th: 'การรายงานความคิดเห็นปิดชั่วคราว การอ่านโพสต์และการเขียนความคิดเห็นของคุณยังใช้ได้',
+  si: 'අදහසක් වාර්තා කිරීම දැනට නවතා ඇත. සටහන් කියවීම සහ ඔබේම අදහස ලිවීම තවමත් ක්‍රියා කරයි.',
+  hi: 'टिप्पणी की रिपोर्ट अभी रोकी गई है। पोस्ट पढ़ना और अपनी टिप्पणी लिखना अभी भी चलता है।',
+  ru: 'Жалоба на комментарий пока на паузе. Читать записи и писать свой комментарий по-прежнему можно.',
+  tl: 'Pansamantalang nakahinto ang pag-uulat ng komento. Gumagana pa rin ang pagbabasa ng mga post at pagsulat ng sarili mong komento.',
 };
 
 function showError(message) {
@@ -120,12 +120,12 @@ function rememberLanguage(profile) {
   if (code) uiLanguage = code;
 }
 
-function unavailableCopy() {
-  return PERSONAL_DATA_UNAVAILABLE_COPY[uiLanguage] || PERSONAL_DATA_UNAVAILABLE_COPY.en;
+function commentReportPausedCopy() {
+  return COMMENT_REPORT_PAUSED_COPY[uiLanguage] || COMMENT_REPORT_PAUSED_COPY.en;
 }
 
-function isPersonalDataUnavailable(error) {
-  return Boolean(error) && (error.code === 'PERSONAL_DATA_TEMPORARILY_UNAVAILABLE' || /PERSONAL_DATA_TEMPORARILY_UNAVAILABLE/.test(String(error.message || '')));
+function isCommentReportPaused(error) {
+  return Boolean(error) && error.code === 'PERSONAL_DATA_TEMPORARILY_UNAVAILABLE';
 }
 
 async function readJson(response) {
@@ -133,7 +133,7 @@ async function readJson(response) {
 
   if (!response.ok) {
     const code = body.error?.code || '';
-    const error = new Error(code === 'PERSONAL_DATA_TEMPORARILY_UNAVAILABLE' ? unavailableCopy() : (body.error?.message || 'Request failed.'));
+    const error = new Error(body.error?.message || 'Request failed.');
     error.code = code;
     throw error;
   }
@@ -783,7 +783,6 @@ async function showServices() {
     const result = await loadServices();
     renderServices(result.services || []);
   } catch (error) {
-    if (!isPersonalDataUnavailable(error)) throw error;
     servicesList.innerHTML = `<p class="empty-state">${escapeHtml(error.message)}</p>`;
     showError(error.message);
   }
@@ -961,7 +960,6 @@ async function showDocuments(filters = {}) {
     renderDocumentsChecklist(result.summary?.checklist || []);
     renderDocuments(result.documents || [], filters);
   } catch (error) {
-    if (!isPersonalDataUnavailable(error)) throw error;
     documentsChecklist.innerHTML = `<p class="empty-state">${escapeHtml(error.message)}</p>`;
     documentsList.innerHTML = '';
     showError(error.message);
@@ -1041,7 +1039,6 @@ async function showTasks(view = 'Today') {
     const result = await loadTasks(view);
     renderTasks(result.tasks || [], result.summary || {});
   } catch (error) {
-    if (!isPersonalDataUnavailable(error)) throw error;
     tasksSummary.innerHTML = '';
     tasksList.innerHTML = `<p class="empty-state">${escapeHtml(error.message)}</p>`;
     showError(error.message);
@@ -1065,7 +1062,6 @@ async function showTaskSchedule(view = 'Today') {
     const result = await loadTaskSchedule(view);
     renderTasks(result.tasks || [], result.summary || {});
   } catch (error) {
-    if (!isPersonalDataUnavailable(error)) throw error;
     tasksSummary.innerHTML = '';
     tasksList.innerHTML = `<p class="empty-state">${escapeHtml(error.message)}</p>`;
     showError(error.message);
@@ -1145,7 +1141,6 @@ async function showNotifications(filter = 'All') {
   try {
     result = await loadNotifications(filter === 'Unread' ? 'Unread' : 'All');
   } catch (error) {
-    if (!isPersonalDataUnavailable(error)) throw error;
     notificationsList.innerHTML = `<p class="empty-state">${escapeHtml(error.message)}</p>`;
     showError(error.message);
     chatView.hidden = true;
@@ -1697,7 +1692,7 @@ communityComments.addEventListener('click', async (event) => {
     await flagCommunityComment(button.dataset.flagComment);
     await showCommunityPost(currentCommunityPostId);
   } catch (error) {
-    showError(error.message);
+    showError(isCommentReportPaused(error) ? commentReportPausedCopy() : error.message);
   }
 });
 
@@ -1970,10 +1965,8 @@ async function startChat() {
       renderDocumentAlerts(),
       renderTaskAlerts(),
     ]);
-    const blocked = personalPanels.some((result) => result.status === 'rejected' && isPersonalDataUnavailable(result.reason));
-    const unexpected = personalPanels.find((result) => result.status === 'rejected' && !isPersonalDataUnavailable(result.reason));
+    const unexpected = personalPanels.find((result) => result.status === 'rejected');
     if (unexpected) throw unexpected.reason;
-    if (blocked) addMessage('Gringo', unavailableCopy());
   } catch (error) {
     showError(error.message);
   }

@@ -1,25 +1,25 @@
-const { crmAgentService } = require('../crm-agent');
-const { refusePersonalDataChannelUserId } = require('../../shared/blockPersonalDataRoute');
+const { loadWebProfile, sameOwner, sendNotFound, stripClientIdentity } = require('../../shared/webPersonalData');
 const notificationService = require('./notification.service');
 
-async function getUser(req) {
-  const user = await crmAgentService.findOrCreateUser({
-    channel: req.query.channel || req.body.channel || 'web',
-    channelUserId: refusePersonalDataChannelUserId(),
-  });
-  const profile = (await crmAgentService.getUserMemory(user.userId)) || user;
-  return { user, profile };
+async function ownedNotification(userId, notificationId) {
+  if (!userId) return null;
+  const notification = await notificationService.getNotificationById(notificationId);
+  return sameOwner(notification, userId) ? notification : null;
 }
 
 async function listNotifications(req, res, next) {
   try {
-    const { user, profile } = await getUser(req);
-    await notificationService.createNotificationsFromExistingModules(user.userId, profile);
-    const notifications = await notificationService.getUserNotifications(user.userId, {
+    const { profile, userId } = await loadWebProfile(req);
+    if (!userId) {
+      res.status(200).json({ notifications: [], unreadCount: 0 });
+      return;
+    }
+    await notificationService.createNotificationsFromExistingModules(userId, profile);
+    const notifications = (await notificationService.getUserNotifications(userId, {
       unread: req.query.filter === 'Unread',
       type: req.query.type || '',
-    });
-    const unreadCount = await notificationService.getUnreadCount(user.userId);
+    })).filter((notification) => sameOwner(notification, userId));
+    const unreadCount = notifications.filter((notification) => notification.status === 'New').length;
     res.status(200).json({ notifications, unreadCount });
   } catch (error) {
     next(error);
@@ -28,9 +28,15 @@ async function listNotifications(req, res, next) {
 
 async function getSummary(req, res, next) {
   try {
-    const { user, profile } = await getUser(req);
-    await notificationService.createNotificationsFromExistingModules(user.userId, profile);
-    const notifications = await notificationService.getUserNotifications(user.userId, { unread: true });
+    const { profile, userId } = await loadWebProfile(req);
+    if (!userId) {
+      res.status(200).json({ unreadCount: 0, summary: [], notifications: [] });
+      return;
+    }
+    await notificationService.createNotificationsFromExistingModules(userId, profile);
+    const notifications = (await notificationService.getUserNotifications(userId, { unread: true })).filter((notification) =>
+      sameOwner(notification, userId)
+    );
     res.status(200).json({
       unreadCount: notifications.length,
       summary: notificationService.summarizeUnread(notifications),
@@ -43,8 +49,18 @@ async function getSummary(req, res, next) {
 
 async function markAsRead(req, res, next) {
   try {
-    refusePersonalDataChannelUserId();
-    res.status(200).json({ notification: await notificationService.markAsRead(req.params.notificationId) });
+    const { userId } = await loadWebProfile(req);
+    const existing = await ownedNotification(userId, req.params.notificationId);
+    if (!existing) {
+      sendNotFound(res);
+      return;
+    }
+    const notification = await notificationService.markAsRead(req.params.notificationId, { ownerUserId: userId });
+    if (!sameOwner(notification, userId)) {
+      sendNotFound(res);
+      return;
+    }
+    res.status(200).json({ notification });
   } catch (error) {
     next(error);
   }
@@ -52,8 +68,18 @@ async function markAsRead(req, res, next) {
 
 async function dismissNotification(req, res, next) {
   try {
-    refusePersonalDataChannelUserId();
-    res.status(200).json({ notification: await notificationService.dismissNotification(req.params.notificationId) });
+    const { userId } = await loadWebProfile(req);
+    const existing = await ownedNotification(userId, req.params.notificationId);
+    if (!existing) {
+      sendNotFound(res);
+      return;
+    }
+    const notification = await notificationService.dismissNotification(req.params.notificationId, { ownerUserId: userId });
+    if (!sameOwner(notification, userId)) {
+      sendNotFound(res);
+      return;
+    }
+    res.status(200).json({ notification });
   } catch (error) {
     next(error);
   }
@@ -61,8 +87,18 @@ async function dismissNotification(req, res, next) {
 
 async function completeNotification(req, res, next) {
   try {
-    refusePersonalDataChannelUserId();
-    res.status(200).json({ notification: await notificationService.completeNotification(req.params.notificationId) });
+    const { userId } = await loadWebProfile(req);
+    const existing = await ownedNotification(userId, req.params.notificationId);
+    if (!existing) {
+      sendNotFound(res);
+      return;
+    }
+    const notification = await notificationService.completeNotification(req.params.notificationId, { ownerUserId: userId });
+    if (!sameOwner(notification, userId)) {
+      sendNotFound(res);
+      return;
+    }
+    res.status(200).json({ notification });
   } catch (error) {
     next(error);
   }
@@ -70,8 +106,19 @@ async function completeNotification(req, res, next) {
 
 async function remindNotification(req, res, next) {
   try {
-    refusePersonalDataChannelUserId();
-    res.status(201).json(await notificationService.rescheduleNotification(req.params.notificationId, req.body.days));
+    const { userId } = await loadWebProfile(req);
+    const existing = await ownedNotification(userId, req.params.notificationId);
+    if (!existing) {
+      sendNotFound(res);
+      return;
+    }
+    const body = stripClientIdentity(req.body);
+    const result = await notificationService.rescheduleNotification(req.params.notificationId, body.days, { ownerUserId: userId });
+    if (!result || !sameOwner(result.current, userId) || !sameOwner(result.reminder, userId)) {
+      sendNotFound(res);
+      return;
+    }
+    res.status(201).json(result);
   } catch (error) {
     next(error);
   }

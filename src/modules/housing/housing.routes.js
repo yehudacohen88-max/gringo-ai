@@ -1,10 +1,11 @@
 const express = require('express');
 const housingController = require('./housing.controller');
-const { blockPersonalDataRoute } = require('../../shared/blockPersonalDataRoute');
+const { attachWebIdentity } = require('../../shared/webIdentity');
+const { requireSameOrigin } = require('../../shared/requireSameOrigin');
 
 const router = express.Router();
 
 router.get('/', housingController.getActiveHousingListings);
-router.get('/matches', blockPersonalDataRoute, housingController.getMatchingHousing);
+router.get('/matches', requireSameOrigin, attachWebIdentity, housingController.getMatchingHousing);
 
 module.exports = router;

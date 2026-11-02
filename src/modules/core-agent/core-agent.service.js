@@ -2109,17 +2109,23 @@ async function processWebMessage(messageContext = {}) {
       } else {
         const existing = documentService.findDocumentByType(documents, documentType);
         const savedDocument = existing
-          ? await documentService.updateDocument(existing.documentId, {
-              expiryDate: expiryDate || existing.expiryDate,
-              notes: 'Updated from chat',
-            })
-          : await documentService.createDocument({
-              userId,
-              documentType,
-              expiryDate,
-              status: expiryDate ? '' : 'Valid',
-              notes: 'Added from chat',
-            });
+          ? await documentService.updateDocument(
+              existing.documentId,
+              {
+                expiryDate: expiryDate || existing.expiryDate,
+                notes: 'Updated from chat',
+              },
+              { ownerUserId: userId }
+            )
+          : await documentService.createDocument(
+              {
+                documentType,
+                expiryDate,
+                status: expiryDate ? '' : 'Valid',
+                notes: 'Added from chat',
+              },
+              { ownerUserId: userId }
+            );
         documents = await documentService.getUserDocuments(userId);
         summary = documentService.summarizeDocuments(userProfile || {}, documents);
         reply = `Saved your ${savedDocument.documentType}. Status: ${savedDocument.status}${
