@@ -82,11 +82,13 @@ async function getSchedule(req, res, next) {
 async function createTask(req, res, next) {
   try {
     const { context, profile, userId } = await loadWebProfile(req, { create: true });
-    const task = await taskService.createTask({
-      ...stripClientIdentity(req.body, ['taskId']),
-      userId,
-      defaultReminderTime: profile.defaultReminderTime,
-    });
+    const task = await taskService.createTask(
+      {
+        ...stripClientIdentity(req.body, ['taskId']),
+        defaultReminderTime: profile.defaultReminderTime,
+      },
+      { ownerUserId: userId }
+    );
     if (!sameOwner(task, userId)) {
       sendNotFound(res);
       return;

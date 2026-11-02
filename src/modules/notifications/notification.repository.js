@@ -27,9 +27,15 @@ async function createNotification(notification) {
   return notification;
 }
 
-async function updateNotification(notificationId, notification) {
+async function updateNotification(notificationId, notification, ownerUserId) {
+  const owner = String(ownerUserId || '');
+  if (!owner || String(notification.userId || '') !== owner) {
+    const error = new Error('A verified owner is required.');
+    error.code = 'OWNER_REQUIRED';
+    throw error;
+  }
   const rows = await readSheetRows(env.googleSheets.sheets.userNotifications);
-  const rowIndex = rows.findIndex((row, index) => index > 0 && row[0] === notificationId);
+  const rowIndex = rows.findIndex((row, index) => index > 0 && row[0] === notificationId && String(row[1] || '') === owner);
   if (rowIndex < 1) return null;
   await updateSheetRow(env.googleSheets.sheets.userNotifications, rowIndex + 1, notificationToRow(notification));
   return notification;

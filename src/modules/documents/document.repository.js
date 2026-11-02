@@ -38,9 +38,15 @@ async function createDocument(document) {
   return document;
 }
 
-async function updateDocument(documentId, document) {
+async function updateDocument(documentId, document, ownerUserId) {
+  const owner = String(ownerUserId || '');
+  if (!owner || String(document.userId || '') !== owner) {
+    const error = new Error('A verified owner is required.');
+    error.code = 'OWNER_REQUIRED';
+    throw error;
+  }
   const rows = await readSheetRows(env.googleSheets.sheets.userDocuments);
-  const rowIndex = rows.findIndex((row, index) => index > 0 && row[0] === documentId);
+  const rowIndex = rows.findIndex((row, index) => index > 0 && row[0] === documentId && String(row[1] || '') === owner);
   if (rowIndex < 1) return null;
   await updateSheetRow(env.googleSheets.sheets.userDocuments, rowIndex + 1, documentToRow(document));
   return document;

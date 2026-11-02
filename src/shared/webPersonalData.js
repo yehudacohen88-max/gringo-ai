@@ -2,7 +2,7 @@ const { crmAgentService } = require('../modules/crm-agent');
 const { resolveWebUserContext } = require('./requireWebIdentity');
 const { isOwnedBy } = require('./recordOwner');
 
-const CLIENT_IDENTITY_FIELDS = ['userId', 'channelUserId', 'channel', 'ownerKey', 'webId', 'webIdentityBoundAt'];
+const CLIENT_IDENTITY_FIELDS = ['userId', 'ownerUserId', 'channelUserId', 'channel', 'ownerKey', 'webId', 'webIdentityBoundAt'];
 
 function sendNotFound(res) {
   res.status(404).json({

@@ -744,7 +744,14 @@ async function updateTranslationSettings(updates = {}) {
   return buildTranslationOverview().settings;
 }
 
+async function ownerOptionsFor(record) {
+  if (!record || !String(record.userId || '').trim()) return null;
+  return { ownerUserId: record.userId };
+}
+
 async function updateDocumentFromAdmin(documentId, updates = {}) {
+  const options = await ownerOptionsFor(await documentService.getDocumentById(documentId));
+  if (!options) return null;
   const allowedUpdates = {};
   if (cleanText(updates.expiryDate)) allowedUpdates.expiryDate = cleanText(updates.expiryDate);
   if (cleanText(updates.status)) allowedUpdates.status = cleanText(updates.status);
@@ -759,10 +766,10 @@ async function updateDocumentFromAdmin(documentId, updates = {}) {
     allowedUpdates.status = 'Under Review';
     allowedUpdates.changeType = 'Status Changed';
   } else if (updates.action === 'archive') {
-    return documentService.archiveDocument(documentId);
+    return documentService.archiveDocument(documentId, options);
   }
 
-  return documentService.updateDocument(documentId, allowedUpdates);
+  return documentService.updateDocument(documentId, allowedUpdates, options);
 }
 
 async function generateDailyReport() {
@@ -908,17 +915,19 @@ async function saveHumanAnswer(followUpId, answer, status = 'Answered') {
     const saved = await adminRepository.updateHumanFollowUp(followUpId, updated);
     const finalSaved = saved || (await adminRepository.saveHumanFollowUp(updated));
     if (status === 'Answered' && notificationService.respectsPreference(userProfile, 'Human Response')) {
-      await notificationService.createNotification({
-        userId: finalSaved.userId,
-        type: 'Human Response',
-        title: 'Gringo has an answer for you',
-        message: 'A human answer is ready in Gringo. Delivery is inside Gringo only.',
-        sourceModule: 'Admin',
-        sourceRecordId: finalSaved.followUpId,
-        priority: 'High',
-        actionLabel: 'Open response',
-        actionUrl: '#notifications',
-      });
+      await notificationService.createNotification(
+        {
+          type: 'Human Response',
+          title: 'Gringo has an answer for you',
+          message: 'A human answer is ready in Gringo. Delivery is inside Gringo only.',
+          sourceModule: 'Admin',
+          sourceRecordId: finalSaved.followUpId,
+          priority: 'High',
+          actionLabel: 'Open response',
+          actionUrl: '#notifications',
+        },
+        { ownerUserId: finalSaved.userId }
+      );
     }
     return finalSaved;
   } catch (error) {
@@ -926,17 +935,19 @@ async function saveHumanAnswer(followUpId, answer, status = 'Answered') {
     if (index >= 0) memory.followUps[index] = updated;
     else memory.followUps.push(updated);
     if (status === 'Answered' && notificationService.respectsPreference(userProfile, 'Human Response')) {
-      await notificationService.createNotification({
-        userId: updated.userId,
-        type: 'Human Response',
-        title: 'Gringo has an answer for you',
-        message: 'A human answer is ready in Gringo. Delivery is inside Gringo only.',
-        sourceModule: 'Admin',
-        sourceRecordId: updated.followUpId,
-        priority: 'High',
-        actionLabel: 'Open response',
-        actionUrl: '#notifications',
-      });
+      await notificationService.createNotification(
+        {
+          type: 'Human Response',
+          title: 'Gringo has an answer for you',
+          message: 'A human answer is ready in Gringo. Delivery is inside Gringo only.',
+          sourceModule: 'Admin',
+          sourceRecordId: updated.followUpId,
+          priority: 'High',
+          actionLabel: 'Open response',
+          actionUrl: '#notifications',
+        },
+        { ownerUserId: updated.userId }
+      );
     }
     return updated;
   }
@@ -975,7 +986,9 @@ async function createWhatsAppManualNotification(input = {}) {
 }
 
 async function cancelScheduledNotification(notificationId) {
-  return notificationService.cancelScheduledNotification(notificationId);
+  const options = await ownerOptionsFor(await notificationService.getNotificationById(notificationId));
+  if (!options) return null;
+  return notificationService.cancelScheduledNotification(notificationId, options);
 }
 
 async function retryWhatsAppDelivery(deliveryId) {
@@ -1028,27 +1041,37 @@ async function assignTask(input = {}) {
 }
 
 async function updateTaskFromAdmin(taskId, updates = {}) {
-  if (updates.action === 'complete') return taskService.completeTask(taskId);
-  if (updates.action === 'archive') return taskService.archiveTask(taskId);
-  if (updates.action === 'dismiss') return taskService.dismissTask(taskId);
+  const options = await ownerOptionsFor(await taskService.getTaskById(taskId));
+  if (!options) return null;
+  if (updates.action === 'complete') return taskService.completeTask(taskId, options);
+  if (updates.action === 'archive') return taskService.archiveTask(taskId, options);
+  if (updates.action === 'dismiss') return taskService.dismissTask(taskId, options);
   if (updates.action === 'reschedule') {
-    return taskService.rescheduleTask(taskId, {
-      dueDate: updates.dueDate,
-      dueTime: updates.dueTime,
-      reminderAt: updates.reminderAt,
-    });
+    return taskService.rescheduleTask(
+      taskId,
+      {
+        dueDate: updates.dueDate,
+        dueTime: updates.dueTime,
+        reminderAt: updates.reminderAt,
+      },
+      options
+    );
   }
-  return taskService.updateTask(taskId, {
-    title: cleanText(updates.title),
-    description: cleanText(updates.description),
-    category: cleanText(updates.category),
-    priority: cleanText(updates.priority),
-    dueDate: cleanText(updates.dueDate),
-    dueTime: cleanText(updates.dueTime),
-    reminderAt: cleanText(updates.reminderAt),
-    relatedModule: cleanText(updates.relatedModule),
-    relatedRecordId: cleanText(updates.relatedRecordId),
-  });
+  return taskService.updateTask(
+    taskId,
+    {
+      title: cleanText(updates.title),
+      description: cleanText(updates.description),
+      category: cleanText(updates.category),
+      priority: cleanText(updates.priority),
+      dueDate: cleanText(updates.dueDate),
+      dueTime: cleanText(updates.dueTime),
+      reminderAt: cleanText(updates.reminderAt),
+      relatedModule: cleanText(updates.relatedModule),
+      relatedRecordId: cleanText(updates.relatedRecordId),
+    },
+    options
+  );
 }
 
 async function createKnowledgeDraftFromFollowUp(followUpId) {

@@ -69,10 +69,12 @@ async function listAlerts(req, res, next) {
 async function createDocument(req, res, next) {
   try {
     const { context, profile, userId } = await loadWebProfile(req, { create: true });
-    const document = await documentService.createDocument({
-      ...stripClientIdentity(req.body, ['documentId']),
-      userId,
-    });
+    const document = await documentService.createDocument(
+      {
+        ...stripClientIdentity(req.body, ['documentId']),
+      },
+      { ownerUserId: userId }
+    );
     if (!sameOwner(document, userId)) {
       sendNotFound(res);
       return;

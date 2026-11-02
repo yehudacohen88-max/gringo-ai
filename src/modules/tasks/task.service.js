@@ -1,6 +1,7 @@
 const { crmAgentService } = require('../crm-agent');
 const notificationService = require('../notifications/notification.service');
-const { isOwnedBy } = require('../../shared/recordOwner');
+const { isOwnedBy, requireOwnerUserId, stripOwnerFields } = require('../../shared/recordOwner');
+const { withRecordLock } = require('../../shared/recordWriteLock');
 const taskRepository = require('./task.repository');
 const {
   TASK_CATEGORIES,
@@ -236,8 +237,9 @@ async function readTasksWithFallback() {
   }
 }
 
-async function createTask(input = {}) {
-  const task = buildTask(input);
+async function createTask(input = {}, options = {}) {
+  const ownerUserId = requireOwnerUserId(options.ownerUserId);
+  const task = buildTask({ ...stripOwnerFields(input), userId: ownerUserId });
   const errors = validateTask(task);
   if (errors.length) throw validationError(errors);
   try {
@@ -251,36 +253,37 @@ async function createTask(input = {}) {
   }
 }
 
-function ownerUserIdFrom(options) {
-  if (!options || !Object.prototype.hasOwnProperty.call(options, 'ownerUserId')) return undefined;
-  return options.ownerUserId;
-}
-
 async function updateTask(taskId, updates = {}, options = {}) {
-  const existing = await getTaskById(taskId);
-  if (!isOwnedBy(existing, ownerUserIdFrom(options))) return null;
-  const eventType = TASK_HISTORY_EVENT_TYPES.includes(cleanText(updates.eventType)) ? cleanText(updates.eventType) : 'Updated';
-  const cleanUpdates = { ...updates };
-  delete cleanUpdates.eventType;
-  const updated = buildTask({
-    ...existing,
-    ...cleanUpdates,
-    taskId: existing.taskId,
-    userId: existing.userId,
-    createdAt: existing.createdAt,
-    updatedAt: new Date().toISOString(),
+  const ownerUserId = requireOwnerUserId(options.ownerUserId);
+  return withRecordLock(`task:${taskId}`, async () => {
+    const existing = await getTaskById(taskId);
+    if (!isOwnedBy(existing, ownerUserId)) return null;
+    const eventType = TASK_HISTORY_EVENT_TYPES.includes(cleanText(updates.eventType)) ? cleanText(updates.eventType) : 'Updated';
+    const cleanUpdates = stripOwnerFields(updates);
+    delete cleanUpdates.eventType;
+    const updated = buildTask({
+      ...existing,
+      ...cleanUpdates,
+      taskId: existing.taskId,
+      userId: existing.userId,
+      createdAt: existing.createdAt,
+      updatedAt: new Date().toISOString(),
+    });
+    if (updated.userId !== ownerUserId) return null;
+    try {
+      const saved = await taskRepository.updateTask(taskId, updated, ownerUserId);
+      if (!saved) return null;
+      await recordTaskEvent(existing, saved, eventType);
+      return saved;
+    } catch (error) {
+      if (error && error.code === 'OWNER_REQUIRED') throw error;
+      const index = memoryTasks.findIndex((task) => task.taskId === taskId && task.userId === ownerUserId);
+      if (index < 0) return null;
+      memoryTasks[index] = updated;
+      await recordTaskEvent(existing, updated, eventType);
+      return updated;
+    }
   });
-  try {
-    const saved = (await taskRepository.updateTask(taskId, updated)) || updated;
-    await recordTaskEvent(existing, saved, eventType);
-    return saved;
-  } catch (error) {
-    const index = memoryTasks.findIndex((task) => task.taskId === taskId);
-    if (index >= 0) memoryTasks[index] = updated;
-    else memoryTasks.push(updated);
-    await recordTaskEvent(existing, updated, eventType);
-    return updated;
-  }
 }
 
 async function getTaskById(taskId) {
@@ -416,18 +419,21 @@ async function recordTaskEvent(previousTask, newTask, eventType) {
 async function createNextRecurringTask(task) {
   const nextDate = calculateNextOccurrence(task);
   if (!nextDate) return null;
-  const nextTask = await createTask({
-    ...task,
-    taskId: '',
-    status: 'New',
-    dueDate: nextDate,
-    reminderAt: calculateReminderAt(nextDate, task.dueTime, '09:00'),
-    parentTaskId: task.parentTaskId || task.taskId,
-    completedAt: '',
-    createdAt: '',
-    updatedAt: '',
-    createdBy: 'System',
-  });
+  const nextTask = await createTask(
+    {
+      ...task,
+      taskId: '',
+      status: 'New',
+      dueDate: nextDate,
+      reminderAt: calculateReminderAt(nextDate, task.dueTime, '09:00'),
+      parentTaskId: task.parentTaskId || task.taskId,
+      completedAt: '',
+      createdAt: '',
+      updatedAt: '',
+      createdBy: 'System',
+    },
+    { ownerUserId: task.userId }
+  );
   return nextTask;
 }
 
@@ -481,9 +487,10 @@ function reminderAtForOption(option, customDate) {
 }
 
 async function remindTaskLater(taskId, option = 'tomorrow', customDate = '', options = {}) {
+  const ownerUserId = requireOwnerUserId(options.ownerUserId);
   const reminderAt = reminderAtForOption(option, customDate);
   if (!reminderAt) return null;
-  return updateTask(taskId, { reminderAt, eventType: 'Rescheduled' }, options);
+  return updateTask(taskId, { reminderAt, eventType: 'Rescheduled' }, { ownerUserId });
 }
 
 async function processTaskReminders(userId, profile = {}) {
@@ -497,17 +504,20 @@ async function processTaskReminders(userId, profile = {}) {
   if (profile.taskRemindersEnabled === 'No') return created;
   for (const task of dueReminders) {
     created.push(
-      await notificationService.createNotification({
-        userId,
-        type: 'Task Reminder',
-        title: task.title,
-        message: `${task.title}${task.dueTime ? ` at ${task.dueTime}` : ''}.`,
-        sourceModule: 'Tasks',
-        sourceRecordId: task.taskId,
-        priority: task.priority,
-        actionLabel: 'Open Task',
-        actionUrl: '#tasks',
-      })
+      await notificationService.createNotification(
+        {
+          userId,
+          type: 'Task Reminder',
+          title: task.title,
+          message: `${task.title}${task.dueTime ? ` at ${task.dueTime}` : ''}.`,
+          sourceModule: 'Tasks',
+          sourceRecordId: task.taskId,
+          priority: task.priority,
+          actionLabel: 'Open Task',
+          actionUrl: '#tasks',
+        },
+        { ownerUserId: userId }
+      )
     );
     await recordTaskEvent(task, task, 'Reminder Sent');
   }
@@ -588,11 +598,13 @@ async function handleTaskChat(message, user, profile = {}, channel = 'web') {
     };
   }
 
-  const task = await createTask({
-    ...parsed,
-    userId: user.userId,
-    defaultReminderTime: profile.defaultReminderTime,
-  });
+  const task = await createTask(
+    {
+      ...parsed,
+      defaultReminderTime: profile.defaultReminderTime,
+    },
+    { ownerUserId: user.userId }
+  );
   const reply = `Done. I created this task: ${task.title}, due ${task.dueDate}${task.dueTime ? ` at ${task.dueTime}` : ''}.`;
   await saveChatConversation(user.userId, channel, message, reply, 'TASK_CREATED');
   return { reply, category: 'Tasks', status: 'TASK_CREATED', task };
@@ -685,14 +697,16 @@ async function createTasksForAudience(profiles = [], input = {}) {
   const created = [];
   for (const profile of targets) {
     created.push(
-      await createTask({
-        ...input,
-        userId: profile.userId,
-        createdBy: 'Admin',
-        description: [cleanText(input.description), cleanText(input.internalNote) ? `Admin note: ${cleanText(input.internalNote)}` : '']
-          .filter(Boolean)
-          .join('\n'),
-      })
+      await createTask(
+        {
+          ...input,
+          createdBy: 'Admin',
+          description: [cleanText(input.description), cleanText(input.internalNote) ? `Admin note: ${cleanText(input.internalNote)}` : '']
+            .filter(Boolean)
+            .join('\n'),
+        },
+        { ownerUserId: profile.userId }
+      )
     );
   }
   return created.filter(Boolean);

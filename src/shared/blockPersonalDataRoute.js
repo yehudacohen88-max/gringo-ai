@@ -60,6 +60,7 @@ function isBlockedPersonalDataPath(path) {
     path === '/api/community/relevant' ||
     path.startsWith('/api/community/relevant/') ||
     /^\/api\/community\/[^/]+\/comments$/.test(path) ||
+    path === '/api/community/comments/flag' ||
     /^\/api\/community\/comments\/[^/]+\/flag$/.test(path)
   );
 }
