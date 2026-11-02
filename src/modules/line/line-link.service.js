@@ -137,7 +137,6 @@ async function createLinkCode(userId) {
 }
 
 async function linkLineToProfile(code, lineIdentity = {}) {
-  await expireOldCodes();
   const lineUserId = cleanText(lineIdentity.lineUserId || lineIdentity.channelUserId);
   if (!lineUserId) return { error: 'This link request is not valid.' };
   const attempt = linkCode.beginRedeemAttempt('line', lineUserId, code);
@@ -145,10 +144,15 @@ async function linkLineToProfile(code, lineIdentity = {}) {
     await saveHistory('', lineUserId, 'Link Failed', { reason: attempt.reason });
     return { error: 'Too many link attempts. Please wait and try again.' };
   }
+  if (!linkCode.claimSingleUse('line', attempt.codeKey)) {
+    return { error: 'This link code is no longer active.' };
+  }
 
+  await expireOldCodes();
   const records = await readCodeRecords();
   const record = records.find((item) => linkCode.hashesEqual(item.code.codeHash, attempt.codeKey));
   if (!record) {
+    linkCode.releaseSingleUse('line', attempt.codeKey);
     linkCode.recordRedeemFailure(attempt.codeKey);
     await saveHistory('', lineUserId, 'Link Failed', { reason: 'not_found' });
     return { error: 'This link code is not valid.' };

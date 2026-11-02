@@ -55,6 +55,7 @@ async function session(base, fullName) {
     headers: {
       'content-type': 'application/json',
       cookie: `${COOKIE_NAME}=${encodeURIComponent(cookie)}`,
+      origin: base,
     },
     body: JSON.stringify({ fullName }),
   });

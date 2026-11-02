@@ -175,6 +175,7 @@ test('disconnect requires confirmation and the owning web session', async () => 
       headers: {
         'content-type': 'application/json',
         cookie: `${COOKIE_NAME}=${encodeURIComponent(ownerCookie)}`,
+        origin: server.base,
       },
       body: JSON.stringify({ fullName: 'Channel Owner' }),
     });
@@ -195,6 +196,7 @@ test('disconnect requires confirmation and the owning web session', async () => 
       headers: {
         'content-type': 'application/json',
         cookie: `${COOKIE_NAME}=${encodeURIComponent(ownerCookie)}`,
+        origin: server.base,
       },
       body: JSON.stringify({ channelUserId: ownerId }),
     });
@@ -210,6 +212,7 @@ test('disconnect requires confirmation and the owning web session', async () => 
       headers: {
         'content-type': 'application/json',
         cookie: `${COOKIE_NAME}=${encodeURIComponent(intruderCookie)}`,
+        origin: server.base,
       },
       body: JSON.stringify({ confirm: true, channel: 'telegram', channelUserId: 'tg-victim' }),
     });
@@ -221,6 +224,7 @@ test('disconnect requires confirmation and the owning web session', async () => 
       headers: {
         'content-type': 'application/json',
         cookie: `${COOKIE_NAME}=${encodeURIComponent(intruderCookie)}`,
+        origin: server.base,
       },
       body: JSON.stringify({ confirm: true, channel: 'web', channelUserId: ownerId }),
     });
@@ -237,6 +241,7 @@ test('disconnect requires confirmation and the owning web session', async () => 
       headers: {
         'content-type': 'application/json',
         cookie: `${COOKIE_NAME}=${encodeURIComponent(ownerCookie)}`,
+        origin: server.base,
       },
       body: JSON.stringify({ confirm: true }),
     });
@@ -247,6 +252,47 @@ test('disconnect requires confirmation and the owning web session', async () => 
     assert.equal(after.profile.lineUserId, 'U-victim');
   } finally {
     await server.close();
+    linkCode.resetLinkCodeSecurityForTests();
+  }
+});
+
+test('concurrent redeems of one code succeed only once inside this process', async () => {
+  linkCode.resetLinkCodeSecurityForTests();
+  try {
+    const owner = await crmAgentService.findOrCreateUser({
+      channel: 'web',
+      channelUserId: `race-owner-${crypto.randomBytes(3).toString('hex')}`,
+      fullName: 'Race Owner',
+    });
+    const lineCode = await lineLinkService.createLinkCode(owner.userId);
+    const lineResults = await Promise.all([
+      lineLinkService.linkLineToProfile(lineCode.code, { lineUserId: 'U-race-1' }),
+      lineLinkService.linkLineToProfile(lineCode.code, { lineUserId: 'U-race-2' }),
+    ]);
+    assert.equal(lineResults.filter((result) => !result.error).length, 1);
+    assert.equal(lineResults.filter((result) => result.error).length, 1);
+    const lineProfile = await crmAgentRepository.findUserProfileRecordByUserId(owner.userId);
+    assert.ok(['U-race-1', 'U-race-2'].includes(lineProfile.profile.lineUserId));
+
+    const telegramCode = await telegramLinkService.createLinkCode(owner.userId);
+    const lookups = await Promise.all([
+      telegramLinkService.findValidCode(telegramCode.code, 'tg-race-1'),
+      telegramLinkService.findValidCode(telegramCode.code, 'tg-race-2'),
+    ]);
+    const winners = lookups.filter((result) => !result.error);
+    assert.equal(winners.length, 1);
+    const confirms = await Promise.all([
+      telegramLinkService.linkTelegramToProfile(winners[0].code.linkCodeId, {
+        telegramUserId: winners[0].code.telegramUserId,
+        telegramChatId: 'chat-race',
+      }),
+      telegramLinkService.linkTelegramToProfile(winners[0].code.linkCodeId, {
+        telegramUserId: winners[0].code.telegramUserId,
+        telegramChatId: 'chat-race-2',
+      }),
+    ]);
+    assert.equal(confirms.filter((result) => !result.error).length, 1);
+  } finally {
     linkCode.resetLinkCodeSecurityForTests();
   }
 });
@@ -268,6 +314,7 @@ test('a link code is bound to the signed session, not a client-supplied user id'
       headers: {
         'content-type': 'application/json',
         cookie: `${COOKIE_NAME}=${encodeURIComponent(cookie)}`,
+        origin: server.base,
       },
       body: JSON.stringify({ channel: 'web', channelUserId: victim.channelUserId }),
     });

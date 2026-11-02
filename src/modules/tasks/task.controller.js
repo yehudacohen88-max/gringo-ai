@@ -48,6 +48,7 @@ async function listTasks(req, res, next) {
 
 async function getTask(req, res, next) {
   try {
+    refusePersonalDataChannelUserId();
     res.status(200).json({ task: await taskService.getTaskById(req.params.taskId) });
   } catch (error) {
     next(error);

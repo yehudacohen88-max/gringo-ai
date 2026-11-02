@@ -71,6 +71,18 @@ const returnToChatFromHousingButton = document.querySelector('#returnToChatFromH
 const returnToChatFromMoneyButton = document.querySelector('#returnToChatFromMoneyButton');
 
 let currentCommunityPostId = '';
+let uiLanguage = 'en';
+
+const PERSONAL_DATA_UNAVAILABLE_COPY = {
+  en: 'This part of Gringo is paused for now. Chat still works. Tasks, documents, notifications, and personal matches will come back in a later update.',
+  he: 'החלק הזה של גרינגו מושהה כרגע. הצ׳אט עדיין עובד. משימות, מסמכים, התראות והתאמות אישיות יחזרו בעדכון הבא.',
+  ar: 'هذا الجزء من Gringo متوقف مؤقتًا. الدردشة ما زالت تعمل. ستعود المهام والمستندات والتنبيهات والمطابقات الشخصية في تحديث لاحق.',
+  th: 'ส่วนนี้ของ Gringo ปิดชั่วคราว แชทยังใช้ได้ งาน เอกสาร การแจ้งเตือน และการจับคู่ส่วนตัวจะกลับมาในอัปเดตถัดไป',
+  si: 'Gringo හි මෙම කොටස දැනට නවතා ඇත. කතාබස් තවමත් ක්‍රියා කරයි. කාර්ය, ලේඛන, දැනුම්දීම් සහ පෞද්ගලික ගැලපීම් පසු යාවත්කාලීනයකින් නැවත එයි.',
+  hi: 'Gringo का यह हिस्सा अभी रोका गया है। चैट अभी भी चलती है। काम, दस्तावेज़, सूचनाएँ और व्यक्तिगत मिलान बाद के अपडेट में वापस आएँगे।',
+  ru: 'Этот раздел Gringo пока на паузе. Чат по-прежнему работает. Задачи, документы, уведомления и личные подборки вернутся в следующем обновлении.',
+  tl: 'Pansamantalang nakahinto ang bahaging ito ng Gringo. Gumagana pa rin ang chat. Babalik ang mga gawain, dokumento, abiso, at personal na tugma sa susunod na update.',
+};
 
 function showError(message) {
   chatAlert.textContent = message;
@@ -103,13 +115,30 @@ function apiFetch(url, options = {}) {
   return fetch(url, { credentials: 'same-origin', ...options });
 }
 
+function rememberLanguage(profile) {
+  const code = normalizeLanguageValue(profile && profile.preferredLanguage);
+  if (code) uiLanguage = code;
+}
+
+function unavailableCopy() {
+  return PERSONAL_DATA_UNAVAILABLE_COPY[uiLanguage] || PERSONAL_DATA_UNAVAILABLE_COPY.en;
+}
+
+function isPersonalDataUnavailable(error) {
+  return Boolean(error) && (error.code === 'PERSONAL_DATA_TEMPORARILY_UNAVAILABLE' || /PERSONAL_DATA_TEMPORARILY_UNAVAILABLE/.test(String(error.message || '')));
+}
+
 async function readJson(response) {
-  const body = await response.json();
+  const body = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(body.error?.message || 'Request failed.');
+    const code = body.error?.code || '';
+    const error = new Error(code === 'PERSONAL_DATA_TEMPORARILY_UNAVAILABLE' ? unavailableCopy() : (body.error?.message || 'Request failed.'));
+    error.code = code;
+    throw error;
   }
 
+  if (body && body.profile) rememberLanguage(body.profile);
   return body;
 }
 
@@ -507,6 +536,8 @@ async function addCommunityComment(postId, body) {
 async function flagCommunityComment(commentId) {
   const response = await apiFetch(`/api/community/comments/${encodeURIComponent(commentId)}/flag`, {
     method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({}),
   });
   return readJson(response);
 }
@@ -748,8 +779,14 @@ function renderServices(services = []) {
 
 async function showServices() {
   hideError();
-  const result = await loadServices();
-  renderServices(result.services || []);
+  try {
+    const result = await loadServices();
+    renderServices(result.services || []);
+  } catch (error) {
+    if (!isPersonalDataUnavailable(error)) throw error;
+    servicesList.innerHTML = `<p class="empty-state">${escapeHtml(error.message)}</p>`;
+    showError(error.message);
+  }
   chatView.hidden = true;
   communityView.hidden = true;
   communityPostView.hidden = true;
@@ -919,9 +956,16 @@ function fillDocumentForm(document = {}) {
 
 async function showDocuments(filters = {}) {
   hideError();
-  const result = await loadDocuments();
-  renderDocumentsChecklist(result.summary?.checklist || []);
-  renderDocuments(result.documents || [], filters);
+  try {
+    const result = await loadDocuments();
+    renderDocumentsChecklist(result.summary?.checklist || []);
+    renderDocuments(result.documents || [], filters);
+  } catch (error) {
+    if (!isPersonalDataUnavailable(error)) throw error;
+    documentsChecklist.innerHTML = `<p class="empty-state">${escapeHtml(error.message)}</p>`;
+    documentsList.innerHTML = '';
+    showError(error.message);
+  }
   chatView.hidden = true;
   communityView.hidden = true;
   communityPostView.hidden = true;
@@ -993,8 +1037,15 @@ function clearTaskForm() {
 
 async function showTasks(view = 'Today') {
   hideError();
-  const result = await loadTasks(view);
-  renderTasks(result.tasks || [], result.summary || {});
+  try {
+    const result = await loadTasks(view);
+    renderTasks(result.tasks || [], result.summary || {});
+  } catch (error) {
+    if (!isPersonalDataUnavailable(error)) throw error;
+    tasksSummary.innerHTML = '';
+    tasksList.innerHTML = `<p class="empty-state">${escapeHtml(error.message)}</p>`;
+    showError(error.message);
+  }
   chatView.hidden = true;
   communityView.hidden = true;
   communityPostView.hidden = true;
@@ -1010,8 +1061,15 @@ async function showTasks(view = 'Today') {
 
 async function showTaskSchedule(view = 'Today') {
   hideError();
-  const result = await loadTaskSchedule(view);
-  renderTasks(result.tasks || [], result.summary || {});
+  try {
+    const result = await loadTaskSchedule(view);
+    renderTasks(result.tasks || [], result.summary || {});
+  } catch (error) {
+    if (!isPersonalDataUnavailable(error)) throw error;
+    tasksSummary.innerHTML = '';
+    tasksList.innerHTML = `<p class="empty-state">${escapeHtml(error.message)}</p>`;
+    showError(error.message);
+  }
   chatView.hidden = true;
   communityView.hidden = true;
   communityPostView.hidden = true;
@@ -1083,7 +1141,26 @@ async function showNotificationStartupSummary() {
 async function showNotifications(filter = 'All') {
   hideError();
   const type = typeForFilter(filter);
-  const result = await loadNotifications(filter === 'Unread' ? 'Unread' : 'All');
+  let result = { notifications: [], unreadCount: 0 };
+  try {
+    result = await loadNotifications(filter === 'Unread' ? 'Unread' : 'All');
+  } catch (error) {
+    if (!isPersonalDataUnavailable(error)) throw error;
+    notificationsList.innerHTML = `<p class="empty-state">${escapeHtml(error.message)}</p>`;
+    showError(error.message);
+    chatView.hidden = true;
+    communityView.hidden = true;
+    communityPostView.hidden = true;
+    profileView.hidden = true;
+    jobsView.hidden = true;
+    servicesView.hidden = true;
+    housingView.hidden = true;
+    moneyView.hidden = true;
+    documentsView.hidden = true;
+    tasksView.hidden = true;
+    notificationsView.hidden = false;
+    return;
+  }
   const notifications = type ? (result.notifications || []).filter((notification) => notification.type === type || (filter === 'Documents' && notification.type === 'Missing Document')) : result.notifications || [];
   renderNotifications(notifications);
   notificationsBadge.textContent = result.unreadCount;
@@ -1879,6 +1956,7 @@ profileForm.addEventListener('submit', async (event) => {
 async function startChat() {
   try {
     const status = await loadOnboardingStatus();
+    rememberLanguage(status.profile);
 
     if (!status.complete && status.prompt) {
       addMessage('Gringo', status.prompt);
@@ -1892,10 +1970,10 @@ async function startChat() {
       renderDocumentAlerts(),
       renderTaskAlerts(),
     ]);
-    const blocked = personalPanels.some((result) => result.status === 'rejected' && /temporarily unavailable/i.test(result.reason?.message || ''));
-    const unexpected = personalPanels.find((result) => result.status === 'rejected' && !/temporarily unavailable/i.test(result.reason?.message || ''));
+    const blocked = personalPanels.some((result) => result.status === 'rejected' && isPersonalDataUnavailable(result.reason));
+    const unexpected = personalPanels.find((result) => result.status === 'rejected' && !isPersonalDataUnavailable(result.reason));
     if (unexpected) throw unexpected.reason;
-    if (blocked) addMessage('Gringo', 'Tasks, documents, and notifications are temporarily unavailable.');
+    if (blocked) addMessage('Gringo', unavailableCopy());
   } catch (error) {
     showError(error.message);
   }

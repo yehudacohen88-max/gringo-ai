@@ -16,8 +16,12 @@ const { telegramRoutes } = require('./modules/telegram');
 const { whatsappRoutes } = require('./modules/whatsapp');
 const { lineRoutes } = require('./modules/line');
 const { errorHandler } = require('./shared/errorHandler');
+const { blockPersonalDataVariants } = require('./shared/blockPersonalDataRoute');
 
 const app = express();
+
+// Before body parsing and routers, so URL variants cannot reach a data store.
+app.use(blockPersonalDataVariants);
 
 app.use(
   express.json({

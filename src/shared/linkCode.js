@@ -17,6 +17,9 @@ const accountAttempts = new Map();
 const codeFailures = new Map();
 const globalFailures = [];
 const createAttempts = new Map();
+// In-process single-use claims. Check and add happen with no await between them.
+// Two processes can still redeem the same code before Sheets records Used.
+const singleUseClaims = new Set();
 
 function cleanCode(code) {
   return String(code || '').trim().toUpperCase();
@@ -97,6 +100,22 @@ function recordRedeemFailure(codeKey) {
   globalFailures.push(now);
 }
 
+function claimKey(channel, codeKey) {
+  return `${channel}:${codeKey}`;
+}
+
+function claimSingleUse(channel, codeKey) {
+  const key = claimKey(channel, codeKey);
+  if (!key || key.endsWith(':')) return false;
+  if (singleUseClaims.has(key)) return false;
+  singleUseClaims.add(key);
+  return true;
+}
+
+function releaseSingleUse(channel, codeKey) {
+  singleUseClaims.delete(claimKey(channel, codeKey));
+}
+
 function assertCanCreate(ownerId) {
   const key = String(ownerId || '').trim();
   if (!key) {
@@ -123,6 +142,7 @@ function resetLinkCodeSecurityForTests() {
   codeFailures.clear();
   globalFailures.length = 0;
   createAttempts.clear();
+  singleUseClaims.clear();
 }
 
 module.exports = {
@@ -135,10 +155,12 @@ module.exports = {
   GLOBAL_FAILURE_LIMIT,
   assertCanCreate,
   beginRedeemAttempt,
+  claimSingleUse,
   codeExpiresAt,
   generatePlainCode,
   hashCode,
   hashesEqual,
   recordRedeemFailure,
+  releaseSingleUse,
   resetLinkCodeSecurityForTests,
 };

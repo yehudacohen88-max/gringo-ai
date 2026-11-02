@@ -136,6 +136,7 @@ test('missing cookie is HttpOnly and SameSite=Lax, and a tampered cookie does no
       headers: {
         'content-type': 'application/json',
         cookie: `${COOKIE_NAME}=${encodeURIComponent(cookie)}`,
+        origin: server.base,
       },
       body: JSON.stringify({ fullName: 'Session Owner' }),
     });
@@ -208,8 +209,21 @@ test('cross-site state changes are rejected and do not change the profile', asyn
       },
       body: 'fullName=Form',
     });
-    assert.equal(form.status, 415);
-    await readBody(form);
+    const formBody = await readBody(form);
+    assert.equal(form.status, 403);
+    assert.equal(formBody.error.code, 'CROSS_SITE_REQUEST_REJECTED');
+
+    const sameOriginForm = await fetch(`${server.base}/api/chat/profile`, {
+      method: 'PUT',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: `${COOKIE_NAME}=${encodeURIComponent(cookie)}`,
+        origin: server.base,
+      },
+      body: 'fullName=Form',
+    });
+    assert.equal(sameOriginForm.status, 415);
+    await readBody(sameOriginForm);
 
     const current = await fetch(`${server.base}/api/chat/profile`, {
       headers: { cookie: `${COOKIE_NAME}=${encodeURIComponent(cookie)}` },
