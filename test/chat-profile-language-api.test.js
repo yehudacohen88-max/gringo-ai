@@ -19,6 +19,7 @@ const coreAgentService = {
 };
 
 const crmAgentService = {
+  findUserByChannel: async () => profile,
   getUserLanguage: async (user = {}) => ({
     preferredLanguage: normalizeLanguage(user.preferredLanguage),
     detectedLanguage: normalizeLanguage(user.detectedLanguage),
@@ -126,6 +127,7 @@ async function invoke(handler, req = {}) {
     {
       query: {},
       body: {},
+      identity: { kind: 'web', webId: 'profile-language-api-user', isNew: false },
       ...req,
     },
     res,

@@ -61,7 +61,15 @@ function cleanText(value) {
 }
 
 function getStateKey(userContext = {}) {
-  return `${userContext.channel || 'web'}:${userContext.channelUserId || 'local-web-user'}`;
+  const channelUserId = userContext.channelUserId === undefined || userContext.channelUserId === null
+    ? ''
+    : String(userContext.channelUserId).trim();
+  if (!channelUserId) {
+    const error = new Error('A channel user id is required.');
+    error.statusCode = 400;
+    throw error;
+  }
+  return `${userContext.channel || 'web'}:${channelUserId}`;
 }
 
 function normalizeBooleanAnswer(value) {

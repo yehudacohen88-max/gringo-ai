@@ -1,5 +1,6 @@
 const { coreAgentService } = require('../core-agent');
 const { crmAgentService } = require('../crm-agent');
+const { resolveWebUserContext } = require('../../shared/requireWebIdentity');
 
 function splitGoals(value) {
   return String(value || '')
@@ -128,10 +129,11 @@ async function sendMessage(req, res, next) {
       return;
     }
 
+    const userContext = resolveWebUserContext(req);
     const result = await coreAgentService.processWebMessage({
       message,
-      channel: req.body.channel || 'web',
-      channelUserId: req.body.channelUserId || 'local-web-user',
+      channel: userContext.channel,
+      channelUserId: userContext.channelUserId,
     });
 
     res.status(200).json({
@@ -145,13 +147,25 @@ async function sendMessage(req, res, next) {
   }
 }
 
+function emptyOnboardingStatus() {
+  return {
+    complete: false,
+    profile: { channel: 'web' },
+    prompt: '',
+    progress: { completed: 0, total: 0 },
+    summary: '',
+  };
+}
+
 async function getOnboardingStatus(req, res, next) {
   try {
-    const result = await coreAgentService.getOnboardingStatus({
-      channel: req.query.channel || 'web',
-      channelUserId: req.query.channelUserId || 'local-web-user',
-    });
-
+    const userContext = resolveWebUserContext(req);
+    const existing = await crmAgentService.findUserByChannel(userContext.channel, userContext.channelUserId);
+    if (!existing) {
+      res.status(200).json(emptyOnboardingStatus());
+      return;
+    }
+    const result = await coreAgentService.getOnboardingStatus(userContext);
     res.status(200).json(result);
   } catch (error) {
     next(error);
@@ -160,10 +174,17 @@ async function getOnboardingStatus(req, res, next) {
 
 async function getProfile(req, res, next) {
   try {
-    const result = await coreAgentService.getOnboardingStatus({
-      channel: req.query.channel || 'web',
-      channelUserId: req.query.channelUserId || 'local-web-user',
-    });
+    const userContext = resolveWebUserContext(req);
+    const existing = await crmAgentService.findUserByChannel(userContext.channel, userContext.channelUserId);
+    if (!existing) {
+      res.status(200).json({
+        profile: await withLanguageFields({ channel: 'web' }),
+        complete: false,
+        summary: '',
+      });
+      return;
+    }
+    const result = await coreAgentService.getOnboardingStatus(userContext);
 
     res.status(200).json({
       profile: await withLanguageFields(result.profile),
@@ -177,10 +198,17 @@ async function getProfile(req, res, next) {
 
 async function getStartupSummary(req, res, next) {
   try {
-    const result = await coreAgentService.getPersonalizedStartup({
-      channel: req.query.channel || 'web',
-      channelUserId: req.query.channelUserId || 'local-web-user',
-    });
+    const userContext = resolveWebUserContext(req);
+    const existing = await crmAgentService.findUserByChannel(userContext.channel, userContext.channelUserId);
+    if (!existing) {
+      res.status(200).json({
+        message: 'Hello there. I am ready to help.',
+        items: [],
+        profile: { channel: 'web' },
+      });
+      return;
+    }
+    const result = await coreAgentService.getPersonalizedStartup(userContext);
 
     res.status(200).json(result);
   } catch (error) {
@@ -191,10 +219,7 @@ async function getStartupSummary(req, res, next) {
 async function updateProfile(req, res, next) {
   try {
     const body = req.body || {};
-    const userContext = {
-      channel: body.channel || 'web',
-      channelUserId: body.channelUserId || 'local-web-user',
-    };
+    const userContext = resolveWebUserContext(req);
     const existingStatus = await coreAgentService.getOnboardingStatus(userContext);
     const existingProfile = existingStatus.profile || {};
     const updateFields = [

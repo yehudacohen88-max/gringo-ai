@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { env } = require('../../config/env');
+const linkCode = require('../../shared/linkCode');
 const crmAgentRepository = require('../crm-agent/crm-agent.repository');
 const { crmAgentService } = require('../crm-agent');
 const linkRepository = require('./line-link.repository');
@@ -8,7 +8,6 @@ const { safeLineWarning } = require('./line-errors');
 
 const memoryCodes = [];
 const memoryHistory = [];
-const linkAttempts = new Map();
 const pendingUnlinks = new Map();
 
 function cleanText(value) {
@@ -26,21 +25,11 @@ function generateId(prefix) {
 }
 
 function hashCode(code) {
-  return crypto.createHash('sha256').update(cleanText(code).toUpperCase()).digest('hex');
-}
-
-function generatePlainCode() {
-  let code = '';
-  while (code.length < 8) {
-    code += crypto.randomBytes(6).toString('base64url').replace(/[^A-Z0-9]/gi, '').toUpperCase();
-  }
-  return code.slice(0, 8);
+  return linkCode.hashCode(code);
 }
 
 function expiresAt() {
-  const date = new Date();
-  date.setMinutes(date.getMinutes() + Number(env.telegram?.linkCodeTtlMinutes || 10));
-  return date.toISOString();
+  return linkCode.codeExpiresAt();
 }
 
 async function readCodeRecords() {
@@ -116,9 +105,10 @@ async function setProfileLineStatus(userId, lineLinkStatus) {
 }
 
 async function createLinkCode(userId) {
+  linkCode.assertCanCreate(userId);
   await expireOldCodes();
   await cancelActiveCodesForUser(userId);
-  const plainCode = generatePlainCode();
+  const plainCode = linkCode.generatePlainCode();
   const code = {
     linkCodeId: generateId('lncode'),
     userId,
@@ -146,27 +136,20 @@ async function createLinkCode(userId) {
   };
 }
 
-function isRateLimited(lineUserId) {
-  const key = cleanText(lineUserId);
-  const now = Date.now();
-  const attempts = (linkAttempts.get(key) || []).filter((time) => now - time < 10 * 60 * 1000);
-  attempts.push(now);
-  linkAttempts.set(key, attempts);
-  return attempts.length > 5;
-}
-
 async function linkLineToProfile(code, lineIdentity = {}) {
   await expireOldCodes();
   const lineUserId = cleanText(lineIdentity.lineUserId || lineIdentity.channelUserId);
   if (!lineUserId) return { error: 'This link request is not valid.' };
-  if (isRateLimited(lineUserId)) {
-    await saveHistory('', lineUserId, 'Link Failed', { reason: 'rate_limited' });
+  const attempt = linkCode.beginRedeemAttempt('line', lineUserId, code);
+  if (!attempt.allowed) {
+    await saveHistory('', lineUserId, 'Link Failed', { reason: attempt.reason });
     return { error: 'Too many link attempts. Please wait and try again.' };
   }
 
   const records = await readCodeRecords();
-  const record = records.find((item) => item.code.codeHash === hashCode(code));
+  const record = records.find((item) => linkCode.hashesEqual(item.code.codeHash, attempt.codeKey));
   if (!record) {
+    linkCode.recordRedeemFailure(attempt.codeKey);
     await saveHistory('', lineUserId, 'Link Failed', { reason: 'not_found' });
     return { error: 'This link code is not valid.' };
   }

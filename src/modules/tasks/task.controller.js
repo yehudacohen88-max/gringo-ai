@@ -1,10 +1,11 @@
 const { coreAgentService } = require('../core-agent');
+const { refusePersonalDataChannelUserId } = require('../../shared/blockPersonalDataRoute');
 const taskService = require('./task.service');
 
 async function getUserContext(req) {
   const onboardingStatus = await coreAgentService.getOnboardingStatus({
     channel: req.query.channel || req.body.channel || 'web',
-    channelUserId: req.query.channelUserId || req.body.channelUserId || 'local-web-user',
+    channelUserId: refusePersonalDataChannelUserId(),
   });
   return {
     user: onboardingStatus.user,
@@ -17,7 +18,7 @@ async function updateProfileSummary(req, userContext, tasks) {
   await coreAgentService.updateUserProfile(
     {
       channel: req.query.channel || req.body.channel || 'web',
-      channelUserId: req.query.channelUserId || req.body.channelUserId || 'local-web-user',
+      channelUserId: refusePersonalDataChannelUserId(),
     },
     summary
   );

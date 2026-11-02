@@ -1,7 +1,10 @@
 const express = require('express');
 const documentController = require('./document.controller');
+const { blockPersonalDataRoute } = require('../../shared/blockPersonalDataRoute');
 
 const router = express.Router();
+
+router.use(blockPersonalDataRoute);
 
 router.get('/', documentController.listDocuments);
 router.get('/alerts', documentController.listAlerts);

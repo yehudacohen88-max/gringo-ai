@@ -335,6 +335,7 @@ test('public API response schema is unchanged', async () => {
     },
   });
   const req = {
+    identity: { kind: 'web', webId: 'schema-user', isNew: false },
     body: {
       message: 'hello',
       channel: 'web',

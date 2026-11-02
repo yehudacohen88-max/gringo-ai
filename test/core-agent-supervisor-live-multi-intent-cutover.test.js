@@ -688,6 +688,7 @@ test('public API response schema remains unchanged', async () => {
     },
   });
   const req = {
+    identity: { kind: 'web', webId: 'live-multi-schema', isNew: false },
     body: {
       message: 'salary and money',
       channel: 'web',

@@ -1,7 +1,10 @@
 const express = require('express');
 const notificationController = require('./notification.controller');
+const { blockPersonalDataRoute } = require('../../shared/blockPersonalDataRoute');
 
 const router = express.Router();
+
+router.use(blockPersonalDataRoute);
 
 router.get('/', notificationController.listNotifications);
 router.get('/summary', notificationController.getSummary);

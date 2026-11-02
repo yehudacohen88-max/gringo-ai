@@ -1,10 +1,11 @@
 const { crmAgentService } = require('../crm-agent');
+const { refusePersonalDataChannelUserId } = require('../../shared/blockPersonalDataRoute');
 const notificationService = require('./notification.service');
 
 async function getUser(req) {
   const user = await crmAgentService.findOrCreateUser({
     channel: req.query.channel || req.body.channel || 'web',
-    channelUserId: req.query.channelUserId || req.body.channelUserId || 'local-web-user',
+    channelUserId: refusePersonalDataChannelUserId(),
   });
   const profile = (await crmAgentService.getUserMemory(user.userId)) || user;
   return { user, profile };
