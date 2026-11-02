@@ -21,6 +21,8 @@ const app = express();
 
 app.use(
   express.json({
+    // Preserve the original bytes. WhatsApp and LINE signatures are HMACs over
+    // this buffer; JSON.stringify(req.body) is not the signed payload.
     verify: (req, res, buffer) => {
       req.rawBody = buffer;
     },

@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const express = require('express');
 const { env } = require('../../config/env');
 const whatsappDeliveryService = require('./whatsapp-delivery.service');
@@ -41,17 +42,68 @@ async function wasPersistedMessageProcessed(messageId) {
   }
 }
 
-function verifyWebhook(req, res) {
-  const mode = cleanText(req.query['hub.mode']);
-  const token = cleanText(req.query['hub.verify_token']);
-  const challenge = cleanText(req.query['hub.challenge']);
+function configuredSecret(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
 
-  if (mode === 'subscribe' && token && token === env.whatsapp?.verifyToken) {
-    res.status(200).send(challenge);
+function queryString(req, name) {
+  const value = req.query ? req.query[name] : undefined;
+  if (typeof value !== 'string') return '';
+  return value.trim();
+}
+
+function timingSafeEqual(left, right) {
+  if (!Buffer.isBuffer(left) || !Buffer.isBuffer(right) || left.length !== right.length) return false;
+  return crypto.timingSafeEqual(left, right);
+}
+
+function timingSafeTokenEqual(provided, expected) {
+  const providedDigest = crypto.createHash('sha256').update(provided, 'utf8').digest();
+  const expectedDigest = crypto.createHash('sha256').update(expected, 'utf8').digest();
+  return timingSafeEqual(providedDigest, expectedDigest);
+}
+
+// Meta's handshake. The challenge is echoed as text only after hub.mode is
+// subscribe and the verify token matches. Nothing else from the query is returned.
+function verifyWebhook(req, res) {
+  const mode = queryString(req, 'hub.mode');
+  const token = queryString(req, 'hub.verify_token');
+  const challenge = queryString(req, 'hub.challenge');
+  const expected = configuredSecret(env.whatsapp && env.whatsapp.verifyToken);
+
+  if (!expected) {
+    safeWhatsAppWarning('WhatsApp verify token is not configured. Rejecting the webhook handshake.');
+    res.status(403).json({ error: { message: 'WhatsApp webhook verification failed.' } });
+    return;
+  }
+
+  if (mode === 'subscribe' && token && timingSafeTokenEqual(token, expected)) {
+    res.status(200).type('text/plain').send(challenge);
     return;
   }
 
   res.status(403).json({ error: { message: 'WhatsApp webhook verification failed.' } });
+}
+
+// X-Hub-Signature-256: sha256=<hex> is HMAC-SHA256 over req.rawBody, not a
+// re-serialized JSON object. 401 means the signature is missing or invalid.
+// 503 means WHATSAPP_APP_SECRET is not configured (fail closed).
+function verifyHubSignature(req) {
+  const secret = configuredSecret(env.whatsapp && env.whatsapp.appSecret);
+  if (!secret) return { ok: false, status: 503 };
+
+  const header = req.headers && req.headers['x-hub-signature-256'];
+  if (typeof header !== 'string') return { ok: false, status: 401 };
+
+  const match = /^sha256=([0-9a-fA-F]{64})$/.exec(header);
+  if (!match) return { ok: false, status: 401 };
+
+  if (!Buffer.isBuffer(req.rawBody)) return { ok: false, status: 401 };
+
+  const provided = Buffer.from(match[1], 'hex');
+  const expected = crypto.createHmac('sha256', secret).update(req.rawBody).digest();
+  if (!timingSafeEqual(provided, expected)) return { ok: false, status: 401 };
+  return { ok: true };
 }
 
 async function processMappedMessage(message = {}, handler) {
@@ -90,6 +142,18 @@ async function processMappedMessage(message = {}, handler) {
 
 async function receiveWebhook(req, res, next) {
   try {
+    const verdict = verifyHubSignature(req);
+    if (!verdict.ok) {
+      webhookHealth.lastWebhookStatus = 'Rejected';
+      if (verdict.status === 503) {
+        safeWhatsAppWarning('WhatsApp app secret is not configured. Rejecting the webhook before processing.');
+        res.status(503).json({ error: { message: 'WhatsApp webhook is not configured.' } });
+        return;
+      }
+      res.status(401).json({ error: { message: 'WhatsApp webhook signature is invalid.' } });
+      return;
+    }
+
     webhookHealth.lastWebhookReceivedAt = new Date().toISOString();
     webhookHealth.lastWebhookStatus = 'Received';
     if (env.whatsapp?.enabled !== true) {
