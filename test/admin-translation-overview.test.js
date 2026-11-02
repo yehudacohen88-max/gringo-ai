@@ -34,7 +34,9 @@ Module._load = function loadStub(request, parent, isMain) {
       }),
     };
   }
-  if (request === '../../config/env') return { env: { adminApiKey: 'test-admin-key' } };
+  if (request === '../../config/env' || request === '../config/env') {
+    return { env: { adminApiKey: 'test-admin-key' }, DEV_ADMIN_API_KEY: 'dev-admin-key' };
+  }
   if (request === './admin.repository') return {};
   if (request === '../content-agent/content-agent.repository') return {};
   if (request === '../community/community.service') {

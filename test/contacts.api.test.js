@@ -1,6 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+const TEST_ADMIN_API_KEY = 'test-only-admin-key-0123456789abcdef';
+process.env.ADMIN_API_KEY = TEST_ADMIN_API_KEY;
+
 const contactRepository = require('../src/modules/contacts/contact.repository');
 
 let app;
@@ -19,6 +22,13 @@ function createUrl(server, path) {
   const address = server.address();
 
   return `http://127.0.0.1:${address.port}${path}`;
+}
+
+function adminHeaders(headers = {}) {
+  return {
+    'x-admin-api-key': TEST_ADMIN_API_KEY,
+    ...headers,
+  };
 }
 
 async function withServer(callback) {
@@ -50,7 +60,9 @@ test('GET /api/contacts returns contacts from the repository', async () => {
   });
 
   await withServer(async (server) => {
-    const response = await fetch(createUrl(server, '/api/contacts'));
+    const response = await fetch(createUrl(server, '/api/contacts'), {
+      headers: adminHeaders(),
+    });
     const body = await response.json();
 
     assert.equal(response.status, 200);
@@ -84,7 +96,9 @@ test('GET /api/contacts filters by search, status, source, and country', async (
   });
 
   await withServer(async (server) => {
-    const response = await fetch(createUrl(server, '/api/contacts?search=daniel&status=new&source=manual&country=israel'));
+    const response = await fetch(createUrl(server, '/api/contacts?search=daniel&status=new&source=manual&country=israel'), {
+      headers: adminHeaders(),
+    });
     const body = await response.json();
 
     assert.equal(response.status, 200);
@@ -113,6 +127,7 @@ test('POST /api/contacts creates a valid contact', async () => {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        'x-admin-api-key': TEST_ADMIN_API_KEY,
       },
       body: JSON.stringify({
         first_name: ' Daniel ',
@@ -140,6 +155,7 @@ test('POST /api/contacts returns validation errors', async () => {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        'x-admin-api-key': TEST_ADMIN_API_KEY,
       },
       body: JSON.stringify({
         first_name: '',
@@ -161,6 +177,7 @@ test('POST /api/contacts returns a clear error for invalid JSON', async () => {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        'x-admin-api-key': TEST_ADMIN_API_KEY,
       },
       body: '{"first_name":',
     });
@@ -210,6 +227,7 @@ test('PUT /api/contacts/:contactId updates an existing contact and creates histo
       method: 'PUT',
       headers: {
         'content-type': 'application/json',
+        'x-admin-api-key': TEST_ADMIN_API_KEY,
       },
       body: JSON.stringify({
         first_name: 'Daniel',
@@ -259,6 +277,7 @@ test('POST /api/contacts/:contactId/archive archives an existing contact and cre
   await withServer(async (server) => {
     const response = await fetch(createUrl(server, '/api/contacts/con_test_001/archive'), {
       method: 'POST',
+      headers: adminHeaders(),
     });
     const body = await response.json();
 

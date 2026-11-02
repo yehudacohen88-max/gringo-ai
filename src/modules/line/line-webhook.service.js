@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const express = require('express');
 const { env } = require('../../config/env');
+const { requireAdminKey } = require('../../shared/requireAdminKey');
 const managerRepository = require('../manager-agent/manager-agent.repository');
 const { coreAgentService } = require('../core-agent');
 const lineMessageMapper = require('./line-message.mapper');
@@ -94,15 +95,6 @@ async function processMappedMessage(message = {}, handler) {
   return { processed: true, messageId: message.messageId };
 }
 
-function requireAdmin(req, res) {
-  const provided = cleanText(req.headers['x-admin-api-key'] || req.query.adminApiKey);
-  if (!provided || provided !== env.adminApiKey) {
-    res.status(401).json({ error: { message: 'Admin key is required.' } });
-    return false;
-  }
-  return true;
-}
-
 async function getUserContext(req) {
   const onboardingStatus = await coreAgentService.getOnboardingStatus({
     channel: req.query.channel || req.body.channel || 'web',
@@ -148,7 +140,6 @@ async function history(req, res, next) {
 
 async function createDefaultRichMenu(req, res, next) {
   try {
-    if (!requireAdmin(req, res)) return;
     if (env.line?.enabled !== true) {
       res.status(200).json({
         ok: true,
@@ -170,7 +161,6 @@ async function createDefaultRichMenu(req, res, next) {
 
 async function setDefaultRichMenu(req, res, next) {
   try {
-    if (!requireAdmin(req, res)) return;
     const richMenuId = cleanText(req.body?.richMenuId);
     if (!richMenuId) {
       res.status(400).json({ error: { message: 'richMenuId is required.' } });
@@ -238,12 +228,12 @@ function createRoutes() {
   router.post('/webhook', receiveWebhook);
   router.post('/link-code', createLinkCode);
   router.post('/disconnect', disconnect);
-  router.get('/link-history', history);
-  router.get('/rich-menu/default', (req, res) => {
+  router.get('/link-history', requireAdminKey, history);
+  router.get('/rich-menu/default', requireAdminKey, (req, res) => {
     res.status(200).json({ ok: true, richMenu: lineClient.buildDefaultRichMenu() });
   });
-  router.post('/rich-menu/default', createDefaultRichMenu);
-  router.post('/rich-menu/default/set', setDefaultRichMenu);
+  router.post('/rich-menu/default', requireAdminKey, createDefaultRichMenu);
+  router.post('/rich-menu/default/set', requireAdminKey, setDefaultRichMenu);
   return router;
 }
 

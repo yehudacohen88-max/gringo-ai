@@ -21,7 +21,7 @@ Runtime is Node.js CommonJS. The package entry point is `src/server.js`. Schedul
 - Backend technology: Node.js with Express. Confirmed dependency versions are listed in `package.json`: `express`, `dotenv`, and `googleapis`.
 - Database: Google Sheets is the configured persistence layer. Internal knowledge-base JSON files are also present under `src/modules/knowledge-agent/knowledge-base`.
 - Database access method: `src/config/googleSheets.js` creates a Google Sheets client with `googleapis` and exports sheet read, append, and update helpers.
-- Authentication tools: Admin API access uses an environment-configured admin API key in `src/config/env.js`. Admin frontend requests send only an `x-admin-api-key` header. Production refuses to start when that key is missing, shorter than 32 characters, the development default, an obvious placeholder, or a very low-diversity value. That check does not prove the key is random; generate it with a cryptographically secure source and store it only in the host secret manager. The development key works only for local `development` or `test` with `ALLOW_DEV_ADMIN_KEY=true`, and only from loopback, and never when a hosting marker is present or `NODE_ENV` is unset. WhatsApp webhook verification token, LINE channel signature validation, Telegram/LINE linking codes, and Google Sheets service-account credentials are configured through environment variables. Full user login is Not Confirmed.
+- Authentication tools: Admin API access uses an environment-configured admin API key in `src/config/env.js`. Admin, contacts, and workers frontend requests send only an `x-admin-api-key` header. The operator types that key into a password field; the page keeps it in memory and does not store it in the browser. Production refuses to start when that key is missing, shorter than 32 characters, the development default, an obvious placeholder, or a very low-diversity value. That check does not prove the key is random; generate it with a cryptographically secure source and store it only in the host secret manager. The development key works only for local `development` or `test` with `ALLOW_DEV_ADMIN_KEY=true`, and only from loopback, and never when a hosting marker is present or `NODE_ENV` is unset. WhatsApp webhook verification token, LINE channel signature validation, Telegram/LINE linking codes, and Google Sheets service-account credentials are configured through environment variables. Full user login is Not Confirmed.
 - Testing tools: Node's built-in test runner is configured by the `test` script in `package.json` as `node --test`. Test files exist under `test`.
 - Schedulers: Local `setInterval` schedulers process scheduled notifications and pending Telegram, WhatsApp, and LINE deliveries.
 - Build tools: Not Confirmed. No build script is defined in `package.json`.
@@ -909,19 +909,19 @@ User and public module APIs:
 | POST | `/api/tasks/:taskId/remind` | Update task reminder | `channel` and `channelUserId`; no login confirmed | `taskController.remind` | `coreAgentService`, `taskService` |
 | POST | `/api/tasks/:taskId/reschedule` | Reschedule task | `channel` and `channelUserId`; no login confirmed | `taskController.reschedule` | `coreAgentService`, `taskService` |
 | POST | `/api/tasks/:taskId/:action` | Run task action | `channel` and `channelUserId`; no login confirmed | `taskController.action` | `coreAgentService`, `taskService` |
-| GET | `/api/contacts/` | List contacts | None confirmed | `contactController.getContacts` | `contactService` |
-| POST | `/api/contacts/` | Create contact | None confirmed | `contactController.createContact` | `contactService` |
-| PUT | `/api/contacts/:contactId` | Update contact | None confirmed | `contactController.updateContact` | `contactService` |
-| POST | `/api/contacts/:contactId/archive` | Archive contact | None confirmed | `contactController.archiveContact` | `contactService` |
-| GET | `/api/workers/` | List workers | None confirmed | `workerController.getWorkers` | `workerService` |
-| POST | `/api/workers/` | Create worker | None confirmed | `workerController.createWorker` | `workerService` |
-| GET | `/api/workers/:workerId` | Get worker | None confirmed | `workerController.getWorker` | `workerService` |
-| PUT | `/api/workers/:workerId` | Update worker | None confirmed | `workerController.updateWorker` | `workerService` |
-| POST | `/api/workers/:workerId/archive` | Archive worker | None confirmed | `workerController.archiveWorker` | `workerService` |
+| GET | `/api/contacts/` | List contacts | Admin API key (`x-admin-api-key` header) | `contactController.getContacts` | `contactService` |
+| POST | `/api/contacts/` | Create contact | Admin API key (`x-admin-api-key` header) | `contactController.createContact` | `contactService` |
+| PUT | `/api/contacts/:contactId` | Update contact | Admin API key (`x-admin-api-key` header) | `contactController.updateContact` | `contactService` |
+| POST | `/api/contacts/:contactId/archive` | Archive contact | Admin API key (`x-admin-api-key` header) | `contactController.archiveContact` | `contactService` |
+| GET | `/api/workers/` | List workers | Admin API key (`x-admin-api-key` header) | `workerController.getWorkers` | `workerService` |
+| POST | `/api/workers/` | Create worker | Admin API key (`x-admin-api-key` header) | `workerController.createWorker` | `workerService` |
+| GET | `/api/workers/:workerId` | Get worker | Admin API key (`x-admin-api-key` header) | `workerController.getWorker` | `workerService` |
+| PUT | `/api/workers/:workerId` | Update worker | Admin API key (`x-admin-api-key` header) | `workerController.updateWorker` | `workerService` |
+| POST | `/api/workers/:workerId/archive` | Archive worker | Admin API key (`x-admin-api-key` header) | `workerController.archiveWorker` | `workerService` |
 
 Admin and reports:
 
-All `/api/admin` routes use `requireAdminKey` in `src/modules/admin/admin.routes.js`. The key is read only from the `x-admin-api-key` header and compared with `env.adminApiKey` using `crypto.timingSafeEqual` on SHA-256 digests. Query string, URL, and body keys are rejected. When the active key is the development default, the socket remote address must be loopback (`127.0.0.1`, `::1`, or `::ffff:127.0.0.1`). `X-Forwarded-For` is not trusted for that check.
+`requireAdminKey` lives in `src/shared/requireAdminKey.js` and is applied to every `/api/admin`, `/api/contacts`, and `/api/workers` route, plus Telegram and LINE link-history and the LINE rich-menu routes. The key is read only from the `x-admin-api-key` header and compared with `env.adminApiKey` using `crypto.timingSafeEqual` on SHA-256 digests. Query string, URL, and body keys are rejected. When the active key is the development default, the socket remote address must be loopback (`127.0.0.1`, `::1`, or `::ffff:127.0.0.1`). `X-Forwarded-For` is not trusted for that check. Telegram and LINE link-code and disconnect routes are not under this gate.
 
 | Method | Path | Purpose | Authentication | Handler | Main service |
 | --- | --- | --- | --- | --- | --- |
@@ -953,7 +953,7 @@ Telegram:
 | --- | --- | --- | --- | --- | --- |
 | POST | `/api/telegram/link-code` | Create Telegram linking code for current web user | `channel` and `channelUserId`; no login confirmed | `telegramController.createLinkCode` | `telegramLinkService`, `coreAgentService` |
 | POST | `/api/telegram/disconnect` | Disconnect Telegram from current web user | `channel` and `channelUserId`; no login confirmed | `telegramController.disconnect` | `telegramLinkService`, `coreAgentService` |
-| GET | `/api/telegram/link-history` | Get Telegram link history for current web user | `channel` and `channelUserId`; no login confirmed | `telegramController.history` | `telegramLinkService`, `coreAgentService` |
+| GET | `/api/telegram/link-history` | Get Telegram link history for current web user | Admin API key (`x-admin-api-key` header) | `telegramController.history` | `telegramLinkService`, `coreAgentService` |
 
 WhatsApp:
 
@@ -969,10 +969,10 @@ LINE:
 | POST | `/api/line/webhook` | Receive LINE text/postback/unsupported events | LINE signature validation | `receiveWebhook` in `lineWebhookService` | `lineMessageService`, `communicationService` |
 | POST | `/api/line/link-code` | Create LINE linking code for current web user | `channel` and `channelUserId`; no login confirmed | `createLinkCode` in `lineWebhookService` | `lineLinkService`, `coreAgentService` |
 | POST | `/api/line/disconnect` | Disconnect LINE from current web user | `channel` and `channelUserId`; no login confirmed | `disconnect` in `lineWebhookService` | `lineLinkService`, `coreAgentService` |
-| GET | `/api/line/link-history` | Get LINE link history for current web user | `channel` and `channelUserId`; no login confirmed | `history` in `lineWebhookService` | `lineLinkService`, `coreAgentService` |
-| GET | `/api/line/rich-menu/default` | Preview default Rich Menu payload | None confirmed | inline handler in `lineWebhookService` | `lineClient` |
-| POST | `/api/line/rich-menu/default` | Create default Rich Menu | Admin API key checked inside handler | `createDefaultRichMenu` | `lineClient` |
-| POST | `/api/line/rich-menu/default/set` | Set default Rich Menu | Admin API key checked inside handler | `setDefaultRichMenu` | `lineClient` |
+| GET | `/api/line/link-history` | Get LINE link history for current web user | Admin API key (`x-admin-api-key` header) | `history` in `lineWebhookService` | `lineLinkService`, `coreAgentService` |
+| GET | `/api/line/rich-menu/default` | Preview default Rich Menu payload | Admin API key (`x-admin-api-key` header) | inline handler in `lineWebhookService` | `lineClient` |
+| POST | `/api/line/rich-menu/default` | Create default Rich Menu | Admin API key (`x-admin-api-key` header) | `createDefaultRichMenu` | `lineClient` |
+| POST | `/api/line/rich-menu/default/set` | Set default Rich Menu | Admin API key (`x-admin-api-key` header) | `setDefaultRichMenu` | `lineClient` |
 
 Internal:
 
@@ -1004,19 +1004,19 @@ Login:
 
 Sessions or tokens:
 
-- Admin API uses `ADMIN_API_KEY` only through the `x-admin-api-key` header. Query string and request-body keys are rejected. Production startup fails closed when the key is missing, shorter than 32 characters, the development default, an obvious placeholder, or a value with fewer than 4 distinct characters. The process cannot prove the key was generated randomly. The development default is not used when `NODE_ENV` is unset, when a hosting marker is set, or unless `ALLOW_DEV_ADMIN_KEY=true` for local `development` or `test`.
+- Admin API uses `ADMIN_API_KEY` only through the `x-admin-api-key` header. The same middleware protects contacts, workers, Telegram and LINE link-history, and LINE rich-menu routes. Query string and request-body keys are rejected. Contacts and workers pages ask the operator to type the key into a password field and keep it in page memory only. Production startup fails closed when the key is missing, shorter than 32 characters, the development default, an obvious placeholder, or a value with fewer than 4 distinct characters. The process cannot prove the key was generated randomly. The development default is not used when `NODE_ENV` is unset, when a hosting marker is set, or unless `ALLOW_DEV_ADMIN_KEY=true` for local `development` or `test`.
 - Provider secrets are read from environment variables and are not exposed as route responses in confirmed code.
 
 Roles and permissions:
 
 - Role model: Not Confirmed.
 - Fine-grained permission model: Not Confirmed.
-- Admin permission is a single API-key gate for `/api/admin` routes.
+- Admin permission is a single API-key gate for `/api/admin`, `/api/contacts`, `/api/workers`, link-history, and LINE rich-menu routes. Chat, documents, tasks, notifications, community writes, link-code, and disconnect are not covered by that gate.
 
 Confirmed authorization and safety controls:
 
-1. Admin API-key gate on every `/api/admin` route through `router.use(requireAdminKey)`.
-2. LINE Rich Menu create/set routes check the admin key inside `lineWebhookService`.
+1. Admin API-key gate through `requireAdminKey` on every `/api/admin`, `/api/contacts`, and `/api/workers` route, plus Telegram and LINE link-history and every LINE rich-menu route.
+2. LINE rich-menu routes use that shared middleware. Link-code and disconnect do not.
 3. WhatsApp webhook verification uses `WHATSAPP_VERIFY_TOKEN` for the verification handshake.
 4. LINE webhook validates `x-line-signature` with `LINE_CHANNEL_SECRET`.
 5. User-scoped web API operations resolve a current profile from `channel` and `channelUserId`.
@@ -1363,7 +1363,7 @@ LINE:
 
 - LINE Admin section is confirmed in `admin.html` and `admin.js`.
 - LINE dashboard health reads from LINE client and webhook services.
-- LINE Rich Menu admin routes exist under `/api/line`, with admin-key checks for create/set.
+- LINE rich-menu admin routes exist under `/api/line`. Preview, create, and set all require the admin key header.
 - LINE dashboard delivery retry/cancel controls were Not Confirmed in Admin UI.
 
 Connector health:
@@ -1380,9 +1380,9 @@ Delivery tools:
 
 Access control:
 
-- `/api/admin` routes are protected by `ADMIN_API_KEY`.
-- Admin UI file is statically served; API requests require the key.
-- LINE Rich Menu create/set routes independently check Admin API key.
+- `/api/admin`, `/api/contacts`, `/api/workers`, Telegram and LINE link-history, and LINE rich-menu routes are protected by `ADMIN_API_KEY`.
+- Admin, contacts, and workers UI files are statically served. API requests require the key from a password field kept in page memory.
+- The route classification map is `src/shared/routeSecurity.js`.
 
 Confirmed Admin section count: 12.
 
@@ -1511,7 +1511,7 @@ Database and persistence:
 
 Authentication and security:
 
-- `ADMIN_API_KEY`: used by Admin API middleware and Admin frontend requests. Required in production. Generate it with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` or `openssl rand -hex 32`, and store it only in the hosting provider secret store. The server rejects missing, short, placeholder, and low-diversity values, but it cannot verify true randomness. The development placeholder is allowed only for local `NODE_ENV=development` or `NODE_ENV=test` when `ALLOW_DEV_ADMIN_KEY=true` and no hosting marker is present (`VERCEL`, `RENDER`, `RAILWAY_ENVIRONMENT`, `FLY_APP_NAME`, `K_SERVICE`, `DYNO`, `HEROKU_APP_NAME`, `AWS_EXECUTION_ENV`). An unset `NODE_ENV` does not enable it.
+- `ADMIN_API_KEY`: used by the shared admin middleware and by the admin, contacts, and workers pages. Required in production. Generate it with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` or `openssl rand -hex 32`, and store it only in the hosting provider secret store. The server rejects missing, short, placeholder, and low-diversity values, but it cannot verify true randomness. The development placeholder is allowed only for local `NODE_ENV=development` or `NODE_ENV=test` when `ALLOW_DEV_ADMIN_KEY=true` and no hosting marker is present (`VERCEL`, `RENDER`, `RAILWAY_ENVIRONMENT`, `FLY_APP_NAME`, `K_SERVICE`, `DYNO`, `HEROKU_APP_NAME`, `AWS_EXECUTION_ENV`). An unset `NODE_ENV` does not enable it.
 - `ALLOW_DEV_ADMIN_KEY`: local opt-in for the development admin key. Set to `true` only on a developer machine or in the test runner. Ignored in production and ignored when a hosting marker is present.
 - `WHATSAPP_VERIFY_TOKEN`: used for WhatsApp webhook verification.
 - `LINE_CHANNEL_SECRET`: used for LINE webhook signature validation.
