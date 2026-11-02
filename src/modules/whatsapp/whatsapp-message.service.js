@@ -395,10 +395,10 @@ async function processAction(message = {}) {
     if (!task || task.userId !== user.userId) reply = 'I cannot update that task.';
     else if (task.status === 'Completed' && action === 'complete') reply = 'This task is already completed.';
     else if (action === 'complete') {
-      await taskService.completeTask(recordId);
+      await taskService.completeTask(recordId, { ownerUserId: user.userId });
       reply = 'Task completed.';
     } else if (action === 'later') {
-      await taskService.remindTaskLater(recordId, 'tomorrow');
+      await taskService.remindTaskLater(recordId, 'tomorrow', '', { ownerUserId: user.userId });
       reply = 'Done. I will remind you later inside Gringo.';
     }
   } else if (moduleName === 'notifications') {
@@ -407,13 +407,13 @@ async function processAction(message = {}) {
     if (!notification) reply = 'I cannot update that notification.';
     else if (['Read', 'Dismissed', 'Completed'].includes(notification.status)) reply = 'This notification was already handled.';
     else if (action === 'read') {
-      await notificationService.markAsRead(recordId);
+      await notificationService.markAsRead(recordId, { ownerUserId: user.userId });
       reply = 'Done. I marked the notification as read.';
     } else if (action === 'dismiss') {
-      await notificationService.dismissNotification(recordId);
+      await notificationService.dismissNotification(recordId, { ownerUserId: user.userId });
       reply = 'Done. I dismissed the notification.';
     } else if (action === 'later') {
-      await notificationService.rescheduleNotification(recordId, 1);
+      await notificationService.rescheduleNotification(recordId, 1, { ownerUserId: user.userId });
       reply = 'Done. I will remind you tomorrow inside Gringo.';
     } else if (action === 'view') reply = `${notification.title}\n${notification.message}`;
   } else if (moduleName === 'documents') {

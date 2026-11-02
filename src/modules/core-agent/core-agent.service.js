@@ -2109,10 +2109,14 @@ async function processWebMessage(messageContext = {}) {
       } else {
         const existing = documentService.findDocumentByType(documents, documentType);
         const savedDocument = existing
-          ? await documentService.updateDocument(existing.documentId, {
-              expiryDate: expiryDate || existing.expiryDate,
-              notes: 'Updated from chat',
-            })
+          ? await documentService.updateDocument(
+              existing.documentId,
+              {
+                expiryDate: expiryDate || existing.expiryDate,
+                notes: 'Updated from chat',
+              },
+              { ownerUserId: userId }
+            )
           : await documentService.createDocument({
               userId,
               documentType,

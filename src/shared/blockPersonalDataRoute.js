@@ -1,5 +1,27 @@
+const { ROUTE_SECURITY } = require('./routeSecurity');
+
 const PERSONAL_DATA_BLOCK_CODE = 'PERSONAL_DATA_TEMPORARILY_UNAVAILABLE';
 const PERSONAL_DATA_BLOCK_MESSAGE = 'This personal-data route is temporarily unavailable until verified worker identity is applied.';
+
+function routeTemplateToRegExp(path) {
+  const pattern = String(path)
+    .split('/')
+    .map((part) => (part.startsWith(':') ? '[^/]+' : part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+    .join('/');
+  return new RegExp(`^${pattern}$`);
+}
+
+// web-identity rows that sit inside the personal-data family are the only
+// requests allowed past the path-variant gate. Everything else in that family
+// still fails closed before a data store is touched.
+const restoredPersonalMatchers = ROUTE_SECURITY.filter((entry) => entry.classification === 'web-identity').map((entry) => ({
+  method: entry.method,
+  regex: routeTemplateToRegExp(entry.path),
+}));
+
+function isRestoredPersonalRequest(method, path) {
+  return restoredPersonalMatchers.some((entry) => entry.method === method && entry.regex.test(path));
+}
 
 function personalDataUnavailableError() {
   const error = new Error(PERSONAL_DATA_BLOCK_MESSAGE);
@@ -42,8 +64,13 @@ function isBlockedPersonalDataPath(path) {
   );
 }
 
+function requestPath(req) {
+  return String(req.originalUrl || req.url || '').split('?')[0].split('#')[0];
+}
+
 function blockPersonalDataVariants(req, res, next) {
-  const normalized = normalizeRequestPath(req.originalUrl || req.url || '');
+  const raw = requestPath(req);
+  const normalized = normalizeRequestPath(raw);
   if (normalized.malformed) {
     res.status(400).json({
       error: {
@@ -54,11 +81,18 @@ function blockPersonalDataVariants(req, res, next) {
     });
     return;
   }
-  if (isBlockedPersonalDataPath(normalized.path)) {
-    blockPersonalDataRoute(req, res);
+  if (!isBlockedPersonalDataPath(normalized.path)) {
+    next();
     return;
   }
-  next();
+  const method = String(req.method || '').toUpperCase();
+  // Case, encoding, extra slashes, and unsupported methods stay blocked.
+  // The live handler sees the original path only when it is already canonical.
+  if (raw === normalized.path && isRestoredPersonalRequest(method, normalized.path)) {
+    next();
+    return;
+  }
+  blockPersonalDataRoute(req, res);
 }
 
 function blockPersonalDataRoute(req, res) {
@@ -83,6 +117,7 @@ module.exports = {
   blockPersonalDataRoute,
   blockPersonalDataVariants,
   isBlockedPersonalDataPath,
+  isRestoredPersonalRequest,
   normalizeRequestPath,
   personalDataUnavailableError,
   refusePersonalDataChannelUserId,

@@ -1,5 +1,6 @@
 const { crmAgentService } = require('../crm-agent');
 const notificationService = require('../notifications/notification.service');
+const { isOwnedBy } = require('../../shared/recordOwner');
 const taskRepository = require('./task.repository');
 const {
   TASK_CATEGORIES,
@@ -250,9 +251,14 @@ async function createTask(input = {}) {
   }
 }
 
-async function updateTask(taskId, updates = {}) {
+function ownerUserIdFrom(options) {
+  if (!options || !Object.prototype.hasOwnProperty.call(options, 'ownerUserId')) return undefined;
+  return options.ownerUserId;
+}
+
+async function updateTask(taskId, updates = {}, options = {}) {
   const existing = await getTaskById(taskId);
-  if (!existing) return null;
+  if (!isOwnedBy(existing, ownerUserIdFrom(options))) return null;
   const eventType = TASK_HISTORY_EVENT_TYPES.includes(cleanText(updates.eventType)) ? cleanText(updates.eventType) : 'Updated';
   const cleanUpdates = { ...updates };
   delete cleanUpdates.eventType;
@@ -337,22 +343,22 @@ async function getSchedule(userId, view = 'Today') {
     });
 }
 
-async function markTaskInProgress(taskId) {
-  return updateTask(taskId, { status: 'In Progress', eventType: 'Started' });
+async function markTaskInProgress(taskId, options = {}) {
+  return updateTask(taskId, { status: 'In Progress', eventType: 'Started' }, options);
 }
 
-async function completeTask(taskId) {
-  const completed = await updateTask(taskId, { status: 'Completed', completedAt: new Date().toISOString(), eventType: 'Completed' });
+async function completeTask(taskId, options = {}) {
+  const completed = await updateTask(taskId, { status: 'Completed', completedAt: new Date().toISOString(), eventType: 'Completed' }, options);
   if (completed) await createNextRecurringTask(completed);
   return completed;
 }
 
-async function dismissTask(taskId) {
-  return updateTask(taskId, { status: 'Dismissed', eventType: 'Dismissed' });
+async function dismissTask(taskId, options = {}) {
+  return updateTask(taskId, { status: 'Dismissed', eventType: 'Dismissed' }, options);
 }
 
-async function archiveTask(taskId) {
-  return updateTask(taskId, { status: 'Archived', eventType: 'Archived' });
+async function archiveTask(taskId, options = {}) {
+  return updateTask(taskId, { status: 'Archived', eventType: 'Archived' }, options);
 }
 
 async function getDueTasks(userId, date = todayKey()) {
@@ -369,7 +375,7 @@ async function markOverdueTasks(userId) {
   const tasks = await readTasksWithFallback();
   const overdue = tasks.filter((task) => task.userId === userId && calculateTaskStatus(task) === 'Overdue' && task.status !== 'Overdue');
   for (const task of overdue) {
-    await updateTask(task.taskId, { status: 'Overdue', eventType: 'Updated' });
+    await updateTask(task.taskId, { status: 'Overdue', eventType: 'Updated' }, { ownerUserId: userId });
   }
   return overdue;
 }
@@ -451,13 +457,17 @@ async function getUserTaskHistory(userId) {
   }
 }
 
-async function rescheduleTask(taskId, updates = {}) {
-  return updateTask(taskId, {
-    dueDate: cleanText(updates.dueDate),
-    dueTime: cleanText(updates.dueTime),
-    reminderAt: cleanText(updates.reminderAt),
-    eventType: 'Rescheduled',
-  });
+async function rescheduleTask(taskId, updates = {}, options = {}) {
+  return updateTask(
+    taskId,
+    {
+      dueDate: cleanText(updates.dueDate),
+      dueTime: cleanText(updates.dueTime),
+      reminderAt: cleanText(updates.reminderAt),
+      eventType: 'Rescheduled',
+    },
+    options
+  );
 }
 
 function reminderAtForOption(option, customDate) {
@@ -470,10 +480,10 @@ function reminderAtForOption(option, customDate) {
   return date.toISOString();
 }
 
-async function remindTaskLater(taskId, option = 'tomorrow', customDate = '') {
+async function remindTaskLater(taskId, option = 'tomorrow', customDate = '', options = {}) {
   const reminderAt = reminderAtForOption(option, customDate);
   if (!reminderAt) return null;
-  return updateTask(taskId, { reminderAt, eventType: 'Rescheduled' });
+  return updateTask(taskId, { reminderAt, eventType: 'Rescheduled' }, options);
 }
 
 async function processTaskReminders(userId, profile = {}) {
@@ -614,7 +624,7 @@ async function completeTasksForGoal(userId, goal) {
   if (!targetModule) return [];
   const completed = [];
   for (const task of tasks.filter((item) => item.relatedModule === targetModule && isOpenTask(item))) {
-    completed.push(await completeTask(task.taskId));
+    completed.push(await completeTask(task.taskId, { ownerUserId: userId }));
   }
   return completed.filter(Boolean);
 }
@@ -626,7 +636,7 @@ async function completeRelatedTasks(userId, relatedModule, relatedRecordId = '')
     if (!isOpenTask(task)) continue;
     if (task.relatedModule !== relatedModule) continue;
     if (relatedRecordId && task.relatedRecordId && task.relatedRecordId !== relatedRecordId) continue;
-    completed.push(await completeTask(task.taskId));
+    completed.push(await completeTask(task.taskId, { ownerUserId: userId }));
   }
   return completed.filter(Boolean);
 }

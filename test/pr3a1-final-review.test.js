@@ -192,20 +192,11 @@ test('blocked personal routes reject method and URL variants before repository a
   const server = listen();
   try {
     const paths = [
-      '/api/documents',
       '/api/documents/',
       '/api/Documents',
       '/api//documents',
       '/api/%64ocuments',
-      '/api/documents?channelUserId=web_1&userId=usr_x',
-      '/api/tasks/probe',
-      '/api/notifications/summary',
-      '/api/jobs/matches',
       '/api/housing/matches/',
-      '/api/services/matches',
-      '/api/money/defaults',
-      '/api/community/relevant',
-      '/api/community/post/comments',
       '/api/community/comments/probe/flag',
     ];
     const methods = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'];
@@ -302,24 +293,27 @@ test('channel flows do not fall back to a shared web profile', async () => {
   if (shared) assert.equal(shared.profile.fullName, 'Legacy Shared Person');
 });
 
-test('the web UI explains the paused panels in every supported language', () => {
+test('the web UI pauses only comment reporting and does not send a user id', () => {
   const source = fs.readFileSync(path.join(root, 'src/public/chat.js'), 'utf8');
   for (const code of ['en', 'he', 'ar', 'th', 'si', 'hi', 'ru', 'tl']) {
     assert.equal(source.includes(`${code}:`), true, code);
   }
   assert.match(source, /PERSONAL_DATA_TEMPORARILY_UNAVAILABLE/);
-  assert.match(source, /unavailableCopy\(\)/);
+  assert.match(source, /commentReportPausedCopy\(\)/);
   assert.equal(source.includes('Request failed.'), true);
   assert.equal(source.includes("credentials: 'same-origin'"), true);
+  assert.equal(source.includes('channelUserId'), false);
+  assert.equal(source.includes('gringoWebUserId'), false);
+  assert.equal(source.includes('This part of Gringo is paused'), false);
   const paused = [
-    'This part of Gringo is paused',
-    'החלק הזה של גרינגו',
-    'هذا الجزء من Gringo',
-    'ส่วนนี้ของ Gringo',
-    'Gringo හි මෙම කොටස',
-    'Gringo का यह हिस्सा',
-    'Этот раздел Gringo',
-    'Pansamantalang nakahinto',
+    'Reporting a comment is paused',
+    'דיווח על תגובה מושהה',
+    'الإبلاغ عن تعليق متوقف',
+    'การรายงานความคิดเห็นปิดชั่วคราว',
+    'අදහසක් වාර්තා කිරීම',
+    'टिप्पणी की रिपोर्ट अभी रोकी',
+    'Жалоба на комментарий пока на паузе',
+    'Pansamantalang nakahinto ang pag-uulat ng komento',
   ];
   for (const phrase of paused) assert.equal(source.includes(phrase), true, phrase);
 });

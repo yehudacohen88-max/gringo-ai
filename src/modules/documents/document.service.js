@@ -1,4 +1,5 @@
 const documentRepository = require('./document.repository');
+const { isOwnedBy } = require('../../shared/recordOwner');
 const {
   ALLOWED_FILE_EXTENSIONS,
   DOCUMENT_CHANGE_TYPES,
@@ -173,9 +174,14 @@ async function createDocument(input = {}) {
   }
 }
 
-async function updateDocument(documentId, updates = {}) {
+function ownerUserIdFrom(options) {
+  if (!options || !Object.prototype.hasOwnProperty.call(options, 'ownerUserId')) return undefined;
+  return options.ownerUserId;
+}
+
+async function updateDocument(documentId, updates = {}, options = {}) {
   const existing = await getDocumentById(documentId);
-  if (!existing) return null;
+  if (!isOwnedBy(existing, ownerUserIdFrom(options))) return null;
   const changeType = cleanText(updates.changeType) || inferChangeType(existing, updates);
   const updated = buildDocument({
     ...existing,
@@ -232,15 +238,19 @@ async function getExpiringDocuments(userId, daysAhead = 30) {
   });
 }
 
-async function archiveDocument(documentId) {
-  return updateDocument(documentId, { status: 'Archived', changeType: 'Archived' });
+async function archiveDocument(documentId, options = {}) {
+  return updateDocument(documentId, { status: 'Archived', changeType: 'Archived' }, options);
 }
 
-async function renewDocument(documentId, newExpiryDate) {
-  return updateDocument(documentId, {
-    expiryDate: cleanText(newExpiryDate),
-    changeType: 'Renewed',
-  });
+async function renewDocument(documentId, newExpiryDate, options = {}) {
+  return updateDocument(
+    documentId,
+    {
+      expiryDate: cleanText(newExpiryDate),
+      changeType: 'Renewed',
+    },
+    options
+  );
 }
 
 function getRequiredDocuments(workSector) {

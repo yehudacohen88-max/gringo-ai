@@ -1,5 +1,5 @@
 const { coreAgentService } = require('../core-agent');
-const { refusePersonalDataChannelUserId } = require('../../shared/blockPersonalDataRoute');
+const { loadWebProfile } = require('../../shared/webPersonalData');
 const serviceService = require('./service.service');
 
 async function getServices(req, res, next) {
@@ -13,11 +13,11 @@ async function getServices(req, res, next) {
 
 async function getMatchingServices(req, res, next) {
   try {
-    const onboardingStatus = await coreAgentService.getOnboardingStatus({
-      channel: req.query.channel || 'web',
-      channelUserId: refusePersonalDataChannelUserId(),
-    });
-    const profile = onboardingStatus.profile || {};
+    const { context, profile, userId } = await loadWebProfile(req);
+    if (!userId) {
+      res.status(200).json({ services: [], search: {} });
+      return;
+    }
     const search = {
       category: req.query.category,
       city: req.query.city || profile.lastServiceCity || profile.city,
@@ -28,23 +28,17 @@ async function getMatchingServices(req, res, next) {
     const services = await serviceService.findMatchingServices(profile, search);
 
     if (services.length) {
-      await coreAgentService.updateUserProfile(
-        {
-          channel: req.query.channel || 'web',
-          channelUserId: refusePersonalDataChannelUserId(),
-        },
-        {
-          lastViewedServices: services
-            .slice(0, 5)
-            .map((service) => service.id)
-            .join(', '),
-          lastServiceCategory: search.category || services[0].category,
-          lastServiceCity: search.city || services[0].city,
-        }
-      );
+      await coreAgentService.updateUserProfile(context, {
+        lastViewedServices: services
+          .slice(0, 5)
+          .map((service) => service.id)
+          .join(', '),
+        lastServiceCategory: search.category || services[0].category,
+        lastServiceCity: search.city || services[0].city,
+      });
     }
 
-    res.status(200).json({ services, profile, search });
+    res.status(200).json({ services, search });
   } catch (error) {
     next(error);
   }

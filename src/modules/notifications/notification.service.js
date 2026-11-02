@@ -8,6 +8,7 @@ const telegramDeliveryService = require('../telegram/telegram-delivery.service')
 const whatsappDeliveryService = require('../whatsapp/whatsapp-delivery.service');
 const lineDeliveryService = require('../line/line-delivery.service');
 const notificationRepository = require('./notification.repository');
+const { isOwnedBy } = require('../../shared/recordOwner');
 const {
   NOTIFICATION_PRIORITIES,
   NOTIFICATION_STATUSES,
@@ -183,7 +184,7 @@ function notificationPassesFilters(notification, filters = {}) {
 }
 
 async function getUserNotifications(userId, filters = {}) {
-  await expireOldNotifications();
+  await expireOldNotifications(userId);
   const notifications = await readNotificationsWithFallback();
   const now = new Date();
   return notifications
@@ -202,10 +203,21 @@ async function getUnreadCount(userId) {
   return notifications.length;
 }
 
-async function updateNotificationStatus(notificationId, status, extra = {}) {
+function ownerUserIdFrom(options) {
+  if (!options || !Object.prototype.hasOwnProperty.call(options, 'ownerUserId')) return undefined;
+  return options.ownerUserId;
+}
+
+async function getNotificationById(notificationId) {
   const notifications = await readNotificationsWithFallback();
   const existing = notifications.find((notification) => notification.notificationId === notificationId);
-  if (!existing) return null;
+  return existing ? { ...existing } : null;
+}
+
+async function updateNotificationStatus(notificationId, status, extra = {}, options = {}) {
+  const notifications = await readNotificationsWithFallback();
+  const existing = notifications.find((notification) => notification.notificationId === notificationId);
+  if (!isOwnedBy(existing, ownerUserIdFrom(options))) return null;
   const now = new Date().toISOString();
   const updated = {
     ...existing,
@@ -228,23 +240,24 @@ async function updateNotificationStatus(notificationId, status, extra = {}) {
   }
 }
 
-async function markAsRead(notificationId) {
-  return updateNotificationStatus(notificationId, 'Read');
+async function markAsRead(notificationId, options = {}) {
+  return updateNotificationStatus(notificationId, 'Read', {}, options);
 }
 
-async function dismissNotification(notificationId) {
-  return updateNotificationStatus(notificationId, 'Dismissed');
+async function dismissNotification(notificationId, options = {}) {
+  return updateNotificationStatus(notificationId, 'Dismissed', {}, options);
 }
 
-async function completeNotification(notificationId) {
-  return updateNotificationStatus(notificationId, 'Completed');
+async function completeNotification(notificationId, options = {}) {
+  return updateNotificationStatus(notificationId, 'Completed', {}, options);
 }
 
-async function expireOldNotifications() {
+async function expireOldNotifications(userId) {
   const notifications = await readNotificationsWithFallback();
   const now = new Date();
   const expired = [];
   for (const notification of notifications) {
+    if (userId && notification.userId !== userId) continue;
     if (
       notification.expiresAt &&
       notification.status !== 'Expired' &&
@@ -270,10 +283,10 @@ async function processScheduledNotifications() {
   return due;
 }
 
-async function rescheduleNotification(notificationId, days = 1) {
+async function rescheduleNotification(notificationId, days = 1, options = {}) {
   const notifications = await readNotificationsWithFallback();
   const existing = notifications.find((notification) => notification.notificationId === notificationId);
-  if (!existing) return null;
+  if (!isOwnedBy(existing, ownerUserIdFrom(options))) return null;
   const scheduledDate = new Date();
   scheduledDate.setUTCDate(scheduledDate.getUTCDate() + Number(days || 1));
   const scheduledAt = scheduledDate.toISOString();
@@ -288,7 +301,7 @@ async function rescheduleNotification(notificationId, days = 1) {
     status: 'New',
     sourceRecordId: `${existing.sourceRecordId || existing.notificationId}_reminder_${scheduledAt.slice(0, 10)}`,
   });
-  const current = await updateNotificationStatus(notificationId, 'Completed');
+  const current = await updateNotificationStatus(notificationId, 'Completed', {}, options);
   await recordNotificationEvent(reminder, 'rescheduled');
   return { current, reminder };
 }
@@ -519,6 +532,7 @@ module.exports = {
   dismissNotification,
   expireOldNotifications,
   getAllNotifications,
+  getNotificationById,
   getUnreadCount,
   getUserNotifications,
   markAsRead,

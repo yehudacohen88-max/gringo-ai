@@ -322,20 +322,20 @@ async function processNotificationAction(user, action, recordId) {
   if (!notification) return 'I cannot find this notification.';
   if (['Read', 'Dismissed', 'Completed', 'Expired'].includes(notification.status)) return 'This notification was already handled.';
   if (action === 'read') {
-    await notificationService.markAsRead(recordId);
+    await notificationService.markAsRead(recordId, { ownerUserId: user.userId });
     await lineDeliveryService.markLineNotificationRead(recordId, user.userId);
     return 'Done. I marked the notification as read.';
   }
   if (action === 'dismiss') {
-    await notificationService.dismissNotification(recordId);
+    await notificationService.dismissNotification(recordId, { ownerUserId: user.userId });
     return 'Done. I dismissed the notification.';
   }
   if (action === 'later' || action === 'later1') {
-    await notificationService.rescheduleNotification(recordId, 1);
+    await notificationService.rescheduleNotification(recordId, 1, { ownerUserId: user.userId });
     return 'Done. I will remind you tomorrow inside Gringo.';
   }
   if (action === 'later3') {
-    await notificationService.rescheduleNotification(recordId, 3);
+    await notificationService.rescheduleNotification(recordId, 3, { ownerUserId: user.userId });
     return 'Done. I will remind you in 3 days inside Gringo.';
   }
   if (action === 'view') return `${notification.title}\n${notification.message}`;
@@ -366,11 +366,11 @@ async function processModuleAction(user, profile, action, moduleName, recordId) 
     if (!task || task.userId !== user.userId) return 'I cannot update this task.';
     if (task.status === 'Completed' && action === 'complete') return 'This task is already completed.';
     if (action === 'complete') {
-      await taskService.completeTask(recordId);
+      await taskService.completeTask(recordId, { ownerUserId: user.userId });
       return 'Task completed.';
     }
     if (action === 'later') {
-      await taskService.remindTaskLater(recordId, 'tomorrow');
+      await taskService.remindTaskLater(recordId, 'tomorrow', '', { ownerUserId: user.userId });
       return 'Done. I will remind you tomorrow inside Gringo.';
     }
   }

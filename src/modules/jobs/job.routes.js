@@ -1,10 +1,11 @@
 const express = require('express');
 const jobController = require('./job.controller');
-const { blockPersonalDataRoute } = require('../../shared/blockPersonalDataRoute');
+const { attachWebIdentity } = require('../../shared/webIdentity');
+const { requireSameOrigin } = require('../../shared/requireSameOrigin');
 
 const router = express.Router();
 
 router.get('/', jobController.getActiveJobs);
-router.get('/matches', blockPersonalDataRoute, jobController.getMatchingJobs);
+router.get('/matches', requireSameOrigin, attachWebIdentity, jobController.getMatchingJobs);
 
 module.exports = router;
