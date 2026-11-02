@@ -21,7 +21,7 @@ Runtime is Node.js CommonJS. The package entry point is `src/server.js`. Schedul
 - Backend technology: Node.js with Express. Confirmed dependency versions are listed in `package.json`: `express`, `dotenv`, and `googleapis`.
 - Database: Google Sheets is the configured persistence layer. Internal knowledge-base JSON files are also present under `src/modules/knowledge-agent/knowledge-base`.
 - Database access method: `src/config/googleSheets.js` creates a Google Sheets client with `googleapis` and exports sheet read, append, and update helpers.
-- Authentication tools: Admin API access uses an environment-configured admin API key in `src/config/env.js`. Admin, contacts, and workers frontend requests send only an `x-admin-api-key` header. The operator types that key into a password field; the page keeps it in memory and does not store it in the browser. Production refuses to start when that key is missing, shorter than 32 characters, the development default, an obvious placeholder, or a very low-diversity value. That check does not prove the key is random; generate it with a cryptographically secure source and store it only in the host secret manager. The development key works only for local `development` or `test` with `ALLOW_DEV_ADMIN_KEY=true`, and only from loopback, and never when a hosting marker is present or `NODE_ENV` is unset. WhatsApp webhook verification token, LINE channel signature validation, Telegram/LINE linking codes, and Google Sheets service-account credentials are configured through environment variables. Full user login is Not Confirmed.
+- Authentication tools: Admin API access uses an environment-configured admin API key in `src/config/env.js`. Admin, contacts, and workers frontend requests send only an `x-admin-api-key` header. The operator types that key into a password field; the page keeps it in memory and does not store it in the browser. Production refuses to start when that key is missing, shorter than 32 characters, the development default, an obvious placeholder, or a very low-diversity value. That check does not prove the key is random; generate it with a cryptographically secure source and store it only in the host secret manager. The development key works only for local `development` or `test` with `ALLOW_DEV_ADMIN_KEY=true`, and only from loopback, and never when a hosting marker is present or `NODE_ENV` is unset. WhatsApp inbound events require `WHATSAPP_APP_SECRET` (`X-Hub-Signature-256` HMAC-SHA256 over the raw body) and `WHATSAPP_VERIFY_TOKEN` (SHA-256 timing-safe handshake). LINE channel signature validation, Telegram/LINE linking codes, and Google Sheets service-account credentials are configured through environment variables. WhatsApp is optional: a missing WhatsApp secret does not stop the process. Full user login is Not Confirmed.
 - Testing tools: Node's built-in test runner is configured by the `test` script in `package.json` as `node --test`. Test files exist under `test`.
 - Schedulers: Local `setInterval` schedulers process scheduled notifications and pending Telegram, WhatsApp, and LINE deliveries.
 - Build tools: Not Confirmed. No build script is defined in `package.json`.
@@ -688,7 +688,7 @@ Referenced Telegram files:
 Status summary:
 
 - Cloud API integration: Complete. `src/modules/whatsapp/whatsapp-client.service.js` calls WhatsApp Cloud API endpoints for text, reply buttons, list messages, and templates.
-- Webhook verification: Complete. `src/modules/whatsapp/whatsapp-webhook.service.js` implements Meta verification using `hub.verify_token` and `hub.challenge`, and rejects invalid verification requests.
+- Webhook verification: Complete. `GET /api/whatsapp/webhook` hashes `hub.verify_token` and `WHATSAPP_VERIFY_TOKEN` with SHA-256 and compares the digests with `crypto.timingSafeEqual`. `hub.mode` must be `subscribe`. A match returns `hub.challenge` as `text/plain`; a wrong, missing, or unconfigured token returns HTTP 403. `POST /api/whatsapp/webhook` requires `X-Hub-Signature-256: sha256=<hex>` to be HMAC-SHA256 of the original raw body using `WHATSAPP_APP_SECRET`, compared with `crypto.timingSafeEqual` after a length check. A missing or invalid signature returns HTTP 401 before any processing. A missing app secret returns HTTP 503 before any processing.
 - Incoming messages: Complete. `src/modules/whatsapp/whatsapp-message.mapper.js` extracts incoming WhatsApp messages and status events; `whatsapp-webhook.service.js` routes incoming messages through `communicationService.receiveMessage('whatsapp', message)`.
 - Session messages: Complete. `src/modules/whatsapp/whatsapp-message.service.js` uses `communicationService.sendMessage` and `communicationService.sendInteractiveMessage` when the customer-service window is open.
 - Template messages: Complete. `src/modules/whatsapp/whatsapp-template.model.js` defines template records; `whatsapp-delivery.service.js` selects approved templates when the conversation window is closed.
@@ -701,7 +701,7 @@ Status summary:
 - Retries: Complete. WhatsApp delivery uses capped retry logic, safe retry delay, permanent failure checks, retry API methods, and cancel methods.
 - Admin tools: Complete. `src/modules/admin/admin.service.js`, `admin.controller.js`, `admin.routes.js`, `src/public/admin.html`, and `src/public/admin.js` expose WhatsApp dashboard health, dashboard cards, filters, manual notification creation, retry, cancel, and failure-reason views.
 - Reports: Complete. `src/modules/manager-agent/manager-agent.service.js` and `manager-report.model.js` include WhatsApp connected users, active users, messages received/sent, session/template counts, success rate, failed deliveries, retry statistics, average response time, commands, and actions.
-- Environment variable names: Complete. Confirmed names: `WHATSAPP_ENABLED`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_BUSINESS_ACCOUNT_ID`, `GOOGLE_SHEETS_WHATSAPP_TEMPLATES_SHEET_NAME`, `GOOGLE_SHEETS_WHATSAPP_DELIVERIES_SHEET_NAME`, and `GOOGLE_SHEETS_WHATSAPP_DELIVERY_HISTORY_SHEET_NAME`.
+- Environment variable names: Complete. Confirmed names: `WHATSAPP_ENABLED`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_BUSINESS_ACCOUNT_ID`, `GOOGLE_SHEETS_WHATSAPP_TEMPLATES_SHEET_NAME`, `GOOGLE_SHEETS_WHATSAPP_DELIVERIES_SHEET_NAME`, and `GOOGLE_SHEETS_WHATSAPP_DELIVERY_HISTORY_SHEET_NAME`.
 - Database records: Complete. Confirmed storage records include WhatsApp templates, WhatsApp deliveries, WhatsApp delivery history, user profiles with WhatsApp identity fields, conversation history, and user notifications.
 - Duplicate prevention: Complete. `whatsapp-webhook.service.js` tracks processed message IDs and checks persisted message history; `whatsapp-delivery.service.js` prevents duplicate delivery records for the same notification/user/channel.
 - Error handling: Complete. WhatsApp connector errors classify retryable failures, store safe failure codes, and avoid exposing tokens or full technical error bodies to users.
@@ -960,7 +960,7 @@ WhatsApp:
 | Method | Path | Purpose | Authentication | Handler | Main service |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/whatsapp/webhook` | Meta webhook verification | Verify token | `verifyWebhook` in `whatsappWebhookService` | `whatsappWebhookService` |
-| POST | `/api/whatsapp/webhook` | Receive WhatsApp messages and status webhooks | WhatsApp signature validation Not Confirmed; duplicate checks confirmed | `receiveWebhook` in `whatsappWebhookService` | `whatsappMessageService`, `whatsappDeliveryService` |
+| POST | `/api/whatsapp/webhook` | Receive WhatsApp messages and status webhooks | `X-Hub-Signature-256` HMAC-SHA256 of the raw body using `WHATSAPP_APP_SECRET`; duplicate checks confirmed | `receiveWebhook` in `whatsappWebhookService` | `whatsappMessageService`, `whatsappDeliveryService` |
 
 LINE:
 
@@ -983,8 +983,8 @@ Internal:
 
 | Provider | Path | Verification | Event types | Duplicate prevention | Mapper | Failure behavior | Response behavior |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| WhatsApp | `GET /api/whatsapp/webhook` | `hub.mode=subscribe` and `hub.verify_token` must match `env.whatsapp.verifyToken` | Verification challenge | Not applicable | Not applicable | Invalid verification returns HTTP 403 | Valid verification returns the challenge string |
-| WhatsApp | `POST /api/whatsapp/webhook` | Request signature validation was Not Confirmed | Incoming messages and delivery statuses | In-memory `processedMessageIds` plus persisted message-history check | `whatsapp-message.mapper.js` | Safe warning, webhook health marked failed, error handler handles response | On success returns `{ ok: true, results }`; disabled connector returns `{ ok: true, disabled: true }` |
+| WhatsApp | `GET /api/whatsapp/webhook` | `hub.mode=subscribe` and `hub.verify_token` must match `WHATSAPP_VERIFY_TOKEN` by SHA-256 then `timingSafeEqual`. An unconfigured token fails closed | Verification challenge | Not applicable | Not applicable | Wrong, missing, or unconfigured token returns HTTP 403 | Valid verification returns `hub.challenge` as `text/plain` and nothing else |
+| WhatsApp | `POST /api/whatsapp/webhook` | `X-Hub-Signature-256` must be `sha256=<hex>` HMAC-SHA256 of the raw body using `WHATSAPP_APP_SECRET`, compared with `timingSafeEqual` after a length check | Incoming messages and delivery statuses | In-memory `processedMessageIds` plus persisted message-history check | `whatsapp-message.mapper.js` | Missing or invalid signature returns HTTP 401 before processing. Missing `WHATSAPP_APP_SECRET` returns HTTP 503 before processing. Handler failures use a safe warning and the error handler | On success returns `{ ok: true, results }`. A verified request while the connector is disabled returns `{ ok: true, disabled: true }` without processing |
 | LINE | `POST /api/line/webhook` | `x-line-signature` validated with HMAC SHA-256 using `LINE_CHANNEL_SECRET` | Text messages, postback actions, unsupported private content | In-memory `processedMessageIds` plus persisted message-history check | `line-message.mapper.js` | Safe warning, webhook health marked failed, error handler handles response | On success returns `{ ok: true, results }`; disabled connector returns `{ ok: true, disabled: true }`; invalid signature returns HTTP 401 |
 
 Webhook notes:
@@ -1017,7 +1017,7 @@ Confirmed authorization and safety controls:
 
 1. Admin API-key gate through `requireAdminKey` on every `/api/admin`, `/api/contacts`, and `/api/workers` route, plus Telegram and LINE link-history and every LINE rich-menu route.
 2. LINE rich-menu routes use that shared middleware. Link-code and disconnect do not.
-3. WhatsApp webhook verification uses `WHATSAPP_VERIFY_TOKEN` for the verification handshake.
+3. WhatsApp `GET /api/whatsapp/webhook` compares `WHATSAPP_VERIFY_TOKEN` with a SHA-256 timing-safe check. `POST /api/whatsapp/webhook` requires `WHATSAPP_APP_SECRET` and `X-Hub-Signature-256` over the raw body. Missing secrets fail closed (HTTP 403 on GET, HTTP 503 on POST) and do not stop the process, because WhatsApp is optional.
 4. LINE webhook validates `x-line-signature` with `LINE_CHANNEL_SECRET`.
 5. User-scoped web API operations resolve a current profile from `channel` and `channelUserId`.
 6. Document controllers attach created documents to the resolved `userId`.
@@ -1513,7 +1513,8 @@ Authentication and security:
 
 - `ADMIN_API_KEY`: used by the shared admin middleware and by the admin, contacts, and workers pages. Required in production. Generate it with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` or `openssl rand -hex 32`, and store it only in the hosting provider secret store. The server rejects missing, short, placeholder, and low-diversity values, but it cannot verify true randomness. The development placeholder is allowed only for local `NODE_ENV=development` or `NODE_ENV=test` when `ALLOW_DEV_ADMIN_KEY=true` and no hosting marker is present (`VERCEL`, `RENDER`, `RAILWAY_ENVIRONMENT`, `FLY_APP_NAME`, `K_SERVICE`, `DYNO`, `HEROKU_APP_NAME`, `AWS_EXECUTION_ENV`). An unset `NODE_ENV` does not enable it.
 - `ALLOW_DEV_ADMIN_KEY`: local opt-in for the development admin key. Set to `true` only on a developer machine or in the test runner. Ignored in production and ignored when a hosting marker is present.
-- `WHATSAPP_VERIFY_TOKEN`: used for WhatsApp webhook verification.
+- `WHATSAPP_APP_SECRET`: Meta app secret for `POST /api/whatsapp/webhook`. The route checks `X-Hub-Signature-256` as HMAC-SHA256 of the raw body. A missing secret fails that POST with HTTP 503 before processing. Store it only in the host secret manager.
+- `WHATSAPP_VERIFY_TOKEN`: Meta `hub.verify_token`. Compared with SHA-256 and `timingSafeEqual`. A missing or wrong token returns HTTP 403. The challenge is returned as `text/plain` only when `hub.mode` is `subscribe`.
 - `LINE_CHANNEL_SECRET`: used for LINE webhook signature validation.
 
 Telegram:
@@ -1526,8 +1527,9 @@ Telegram:
 
 WhatsApp:
 
-- `WHATSAPP_ENABLED`: optional feature flag; WhatsApp processing is skipped when disabled.
-- `WHATSAPP_VERIFY_TOKEN`: required for Meta webhook verification.
+- `WHATSAPP_ENABLED`: optional feature flag. Signature verification still runs when this is false. A verified request returns `{ ok: true, disabled: true }` and is not processed. An unverified request is rejected. The process still starts when this flag is false and the WhatsApp secrets are empty. Development and production log a startup warning, without secret values, only when this flag is true and `WHATSAPP_APP_SECRET` or `WHATSAPP_VERIFY_TOKEN` is missing. There is no unsigned bypass.
+- `WHATSAPP_APP_SECRET`: required for a webhook POST to be accepted. See the authentication list above.
+- `WHATSAPP_VERIFY_TOKEN`: required for the Meta verification handshake. See the authentication list above.
 - `WHATSAPP_ACCESS_TOKEN`: required for live WhatsApp Cloud API requests.
 - `WHATSAPP_PHONE_NUMBER_ID`: required for live WhatsApp Cloud API send operations.
 - `WHATSAPP_BUSINESS_ACCOUNT_ID`: configured for WhatsApp Business account context.
@@ -1665,7 +1667,8 @@ Sensitive-data masking:
 
 Webhook verification:
 
-- WhatsApp GET webhook verification uses `WHATSAPP_VERIFY_TOKEN`.
+- WhatsApp GET webhook verification uses `WHATSAPP_VERIFY_TOKEN` with a SHA-256 timing-safe compare and returns HTTP 403 when that token is missing or wrong.
+- WhatsApp POST webhook verification uses `WHATSAPP_APP_SECRET` and HMAC-SHA256 over the original raw body captured by the `express.json` verify callback. HTTP 401 rejects a bad signature. HTTP 503 rejects a missing app secret. Neither path processes the event.
 - LINE POST webhook verification uses `LINE_CHANNEL_SECRET` and HMAC SHA-256.
 - Telegram uses polling; Telegram webhook verification was Not Confirmed.
 

@@ -67,6 +67,36 @@ function isObviouslyWeakProductionKey(key) {
   );
 }
 
+function readTrimmed(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+// WhatsApp is optional. A missing app secret or verify token must not stop the
+// process: web chat, Telegram, and LINE keep running. Startup only warns when
+// the connector is explicitly enabled in development or production. Requests
+// still fail closed in every environment. There is no unsigned opt-in.
+function warnIfEnabledWhatsAppCannotVerify(nodeEnv, config) {
+  if (nodeEnv !== 'production' && nodeEnv !== 'development') return;
+  if (!config.enabled || (config.appSecret && config.verifyToken)) return;
+  console.warn(
+    '[startup] WHATSAPP_ENABLED is true but WHATSAPP_APP_SECRET or WHATSAPP_VERIFY_TOKEN is missing. WhatsApp stays optional, so startup continues. POST /api/whatsapp/webhook fails closed until WHATSAPP_APP_SECRET is set, and GET verification returns 403 until WHATSAPP_VERIFY_TOKEN is set. This warning does not include secret values.'
+  );
+}
+
+function buildWhatsAppConfig(rawNodeEnv, sourceEnv) {
+  const nodeEnv = typeof rawNodeEnv === 'string' ? rawNodeEnv.trim() : '';
+  const config = {
+    enabled: String(sourceEnv.WHATSAPP_ENABLED || 'false').toLowerCase() === 'true',
+    verifyToken: readTrimmed(sourceEnv.WHATSAPP_VERIFY_TOKEN),
+    appSecret: readTrimmed(sourceEnv.WHATSAPP_APP_SECRET),
+    accessToken: sourceEnv.WHATSAPP_ACCESS_TOKEN || '',
+    phoneNumberId: sourceEnv.WHATSAPP_PHONE_NUMBER_ID || '',
+    businessAccountId: sourceEnv.WHATSAPP_BUSINESS_ACCOUNT_ID || '',
+  };
+  warnIfEnabledWhatsAppCannotVerify(nodeEnv, config);
+  return config;
+}
+
 function devDefaultRefusalMessage(nodeEnv, sourceEnv) {
   if (isHostedDeployment(sourceEnv)) {
     return 'Refusing to start: ADMIN_API_KEY must be a unique secret. The development default is disabled because this process looks like a hosted deployment. Store the key only in the hosting provider secret store.';
@@ -132,13 +162,7 @@ const env = {
     pollingTimeoutSeconds: Number(process.env.TELEGRAM_POLLING_TIMEOUT_SECONDS || 30),
     linkCodeTtlMinutes: Number(process.env.TELEGRAM_LINK_CODE_TTL_MINUTES || 10),
   },
-  whatsapp: {
-    enabled: String(process.env.WHATSAPP_ENABLED || 'false').toLowerCase() === 'true',
-    verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || '',
-    accessToken: process.env.WHATSAPP_ACCESS_TOKEN || '',
-    phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
-    businessAccountId: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '',
-  },
+  whatsapp: buildWhatsAppConfig(process.env.NODE_ENV, process.env),
   line: {
     enabled: String(process.env.LINE_ENABLED || 'false').toLowerCase() === 'true',
     channelId: process.env.LINE_CHANNEL_ID || '',
