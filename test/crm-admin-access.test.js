@@ -477,8 +477,20 @@ test('contacts and workers pages keep the admin key in page memory', () => {
     assert.equal(/\blocalStorage\b/.test(source), false, script);
     assert.equal(/\bsessionStorage\b/.test(source), false, script);
     assert.equal(/\bdocument\.cookie\b/.test(source), false, script);
+    assert.equal(/\bconsole\./.test(source), false, script);
+    assert.equal(/history\.(pushState|replaceState)/.test(source), false, script);
+    assert.equal(/location\.(assign|replace|href\s*=)/.test(source), false, script);
     assert.equal(source.includes('dev-admin-key'), false, script);
     assert.equal(source.includes('adminApiKey='), false, script);
+  }
+
+  for (const page of pages) {
+    const html = fs.readFileSync(path.join(root, page), 'utf8');
+    const forms = html.match(/<form\b[^>]*>[\s\S]*?<\/form>/gi) || [];
+    for (const form of forms) {
+      assert.equal(form.includes('adminApiKey'), false, page);
+      assert.equal(/method\s*=\s*["']get["']/i.test(form) && form.includes('adminApiKey'), false, page);
+    }
   }
 
   assert.match(fs.readFileSync(path.join(root, 'src/public/contact-form.js'), 'utf8'), /adminApiKeyHeaders\(/);
