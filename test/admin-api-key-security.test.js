@@ -9,6 +9,7 @@ const DEV_ADMIN_API_KEY = 'dev-admin-key';
 const TEST_ADMIN_API_KEY = 'test-only-admin-key-0123456789abcdef';
 const WRONG_ADMIN_API_KEY = 'wrong-admin-key-fedcba9876543210ffff';
 const SHORT_WRONG_ADMIN_API_KEY = 'nope';
+const TEST_WEB_SESSION_SECRET = 'test-only-web-session-secret-0123456789abcdef';
 
 process.env.ADMIN_API_KEY = TEST_ADMIN_API_KEY;
 
@@ -23,6 +24,7 @@ function runNode(args, envOverrides = {}, unsetKeys = []) {
     PATH: process.env.PATH,
     HOME: process.env.HOME,
     NODE_ENV: 'test',
+    WEB_SESSION_SECRET: TEST_WEB_SESSION_SECRET,
     ...envOverrides,
   };
   for (const key of unsetKeys) delete childEnv[key];

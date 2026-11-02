@@ -163,9 +163,9 @@ function buildConversationEvent(event = {}) {
   };
 }
 
-async function findOrCreateUser(context = {}) {
-  const channel = cleanText(context.channel) || USER_PROFILE_DEFAULTS.channel;
-  const channelUserId = cleanText(context.channelUserId);
+const profileCreateLocks = new Map();
+
+async function createUserIfMissing(context, channel, channelUserId) {
   let record = null;
 
   if (context.userId) {
@@ -176,9 +176,7 @@ async function findOrCreateUser(context = {}) {
     record = await crmAgentRepository.findUserProfileRecordByChannel(channel, channelUserId);
   }
 
-  if (record) {
-    return record.profile;
-  }
+  if (record) return record.profile;
 
   const profile = buildUserProfile({
     ...context,
@@ -187,6 +185,49 @@ async function findOrCreateUser(context = {}) {
   });
 
   return crmAgentRepository.createUserProfile(profile);
+}
+
+async function findOrCreateUser(context = {}) {
+  const channel = cleanText(context.channel) || USER_PROFILE_DEFAULTS.channel;
+  const channelUserId = cleanText(context.channelUserId);
+  if (!channelUserId && !cleanText(context.userId)) {
+    const error = new Error('A channel user id is required.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const lockKey = channelUserId ? `${channel}\n${channelUserId}` : '';
+  if (!lockKey) return createUserIfMissing(context, channel, channelUserId);
+
+  const pending = profileCreateLocks.get(lockKey);
+  if (pending) return pending;
+
+  let resolveLock;
+  let rejectLock;
+  const gate = new Promise((resolve, reject) => {
+    resolveLock = resolve;
+    rejectLock = reject;
+  });
+  profileCreateLocks.set(lockKey, gate);
+
+  try {
+    const profile = await createUserIfMissing(context, channel, channelUserId);
+    resolveLock(profile);
+    return profile;
+  } catch (error) {
+    rejectLock(error);
+    throw error;
+  } finally {
+    if (profileCreateLocks.get(lockKey) === gate) profileCreateLocks.delete(lockKey);
+  }
+}
+
+async function findUserByChannel(channel, channelUserId) {
+  const normalizedChannel = cleanText(channel);
+  const normalizedId = cleanText(channelUserId);
+  if (!normalizedChannel || !normalizedId) return null;
+  const record = await crmAgentRepository.findUserProfileRecordByChannel(normalizedChannel, normalizedId);
+  return record ? record.profile : null;
 }
 
 async function updateUserProfile(userId, updates = {}) {
@@ -418,6 +459,7 @@ module.exports = {
   clearPreferredLanguage,
   extractAndUpdateMemory,
   findOrCreateUser,
+  findUserByChannel,
   getUserLanguage,
   getUserMemory,
   saveConversation,

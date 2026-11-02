@@ -1,4 +1,5 @@
 const { coreAgentService } = require('../core-agent');
+const { refusePersonalDataChannelUserId } = require('../../shared/blockPersonalDataRoute');
 const moneyService = require('./money.service');
 
 async function getRate(req, res, next) {
@@ -43,7 +44,7 @@ async function getProfileMoneyDefaults(req, res, next) {
   try {
     const status = await coreAgentService.getOnboardingStatus({
       channel: req.query.channel || 'web',
-      channelUserId: req.query.channelUserId || 'local-web-user',
+      channelUserId: refusePersonalDataChannelUserId(),
     });
     const profile = status.profile || {};
 

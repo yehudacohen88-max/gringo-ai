@@ -1,4 +1,5 @@
 const { coreAgentService } = require('../core-agent');
+const { refusePersonalDataChannelUserId } = require('../../shared/blockPersonalDataRoute');
 const housingService = require('./housing.service');
 
 function splitList(value) {
@@ -30,7 +31,7 @@ async function getMatchingHousing(req, res, next) {
   try {
     const onboardingStatus = await coreAgentService.getOnboardingStatus({
       channel: req.query.channel || 'web',
-      channelUserId: req.query.channelUserId || 'local-web-user',
+      channelUserId: refusePersonalDataChannelUserId(),
     });
     const profile = onboardingStatus.profile || {};
     const hasActiveHousingGoal = splitList(profile.activeGoals).includes('Find Housing');
@@ -43,7 +44,7 @@ async function getMatchingHousing(req, res, next) {
       await coreAgentService.updateUserProfile(
         {
           channel: req.query.channel || 'web',
-          channelUserId: req.query.channelUserId || 'local-web-user',
+          channelUserId: refusePersonalDataChannelUserId(),
         },
         {
           lastRecommendedHousingIds: listings

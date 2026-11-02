@@ -998,9 +998,9 @@ Webhook notes:
 
 Login:
 
-- User login system: Not Confirmed.
+- User login system: Not Confirmed. There is no password or OTP login.
 - Payment/login provider: Not Confirmed.
-- Session cookies or JWT user sessions: Not Confirmed.
+- Web session: `gw_sid` is an HttpOnly, SameSite=Lax cookie. The value is `v1.<id>.<hmac>` where `<id>` is 32 random bytes (256 bits) and the HMAC is SHA-256 with `WEB_SESSION_SECRET`. `Secure` is set when `NODE_ENV=production`. Max-Age is 180 days and refreshes on use. `WEB_SESSION_SECRET_PREVIOUS` can verify older cookies during rotation. Production refuses to start when the secret is missing, shorter than 32 characters, or an obvious placeholder. Local development without the secret uses an ephemeral secret and prints a warning that does not include the value. Legacy `web_<timestamp>` and `local-web-user` profiles stay in storage and are not claimed from the browser.
 
 Sessions or tokens:
 
@@ -1011,7 +1011,7 @@ Roles and permissions:
 
 - Role model: Not Confirmed.
 - Fine-grained permission model: Not Confirmed.
-- Admin permission is a single API-key gate for `/api/admin`, `/api/contacts`, `/api/workers`, link-history, and LINE rich-menu routes. Chat, documents, tasks, notifications, community writes, link-code, and disconnect are not covered by that gate.
+- Admin permission is a single API-key gate for `/api/admin`, `/api/contacts`, `/api/workers`, link-history, and LINE rich-menu routes. Chat, link-code, and disconnect use the signed web session instead of that gate. Documents, tasks, notifications, personalized matches, money defaults, and community comments/flags are temporarily blocked until PR3a-2.
 
 Confirmed authorization and safety controls:
 
@@ -1019,12 +1019,12 @@ Confirmed authorization and safety controls:
 2. LINE rich-menu routes use that shared middleware. Link-code and disconnect do not.
 3. WhatsApp `GET /api/whatsapp/webhook` compares `WHATSAPP_VERIFY_TOKEN` with a SHA-256 timing-safe check. `POST /api/whatsapp/webhook` requires `WHATSAPP_APP_SECRET` and `X-Hub-Signature-256` over the raw body. Missing secrets fail closed (HTTP 403 on GET, HTTP 503 on POST) and do not stop the process, because WhatsApp is optional.
 4. LINE webhook validates `x-line-signature` with `LINE_CHANNEL_SECRET`.
-5. User-scoped web API operations resolve a current profile from `channel` and `channelUserId`.
-6. Document controllers attach created documents to the resolved `userId`.
-7. Notification controllers resolve the current user before listing or mutating notifications.
-8. Task controllers resolve the current user before listing, creating, and mutating tasks.
-9. Telegram link codes store `codeHash`, expire, and have single-use statuses.
-10. LINE channel link codes store `codeHash`, expire, and have single-use statuses.
+5. Web chat, Telegram link-code, and LINE link-code resolve the caller from the verified `gw_sid` cookie (`req.identity`). Browser `channel` and `channelUserId` are not authorization. A non-web `channel` on those routes returns HTTP 400. Telegram, LINE, and WhatsApp identities still come only from polling or signed webhooks.
+6. Document, task, and notification HTTP routes, plus personalized matches, money defaults, and community comments/flags, return HTTP 403 `PERSONAL_DATA_TEMPORARILY_UNAVAILABLE` before any data-store access. PR3a-2 will bind them to the signed session. Record-id ownership remains PR3b. Admin routes stay on the admin key.
+7. State-changing web-session routes require `Content-Type: application/json`. A session cookie is accepted only with a matching `Origin` (scheme and host; `http` is rejected when the public scheme is `https`) or `Sec-Fetch-Site: same-origin`. `Referer` is ignored. `Origin: null`, a mismatched host, and `Sec-Fetch-Site` of `cross-site` or `same-site` are rejected. A cookie with neither signal is rejected. Explicit `SameSite=Lax` is outside Chrome's old two-minute default-Lax POST exception; the missing-Origin rule still fails closed.
+8. Telegram and LINE link codes are 12 Crockford characters (60 bits, `crypto.randomInt`), stored as HMAC-SHA256 with `WEB_SESSION_SECRET`, single-use, and expire after the configured TTL (default 10 minutes). Redeem attempts are limited per channel account, per code, and globally in memory.
+9. Web disconnect requires `confirm: true` and the signed session that owns the linked profile. LINE self-unlink from the LINE chat is unchanged.
+10. Legacy web profiles are kept. No browser claim endpoint exists.
 11. Telegram callback handling validates private chat, resolved user, allowed action, record/action state, and duplicate callback processing.
 12. WhatsApp action handling validates command/action availability and conversation window state before free-form replies.
 13. LINE action handling validates linked/resolved user context, action format, and duplicate action outcomes.
@@ -1041,7 +1041,7 @@ Linking codes:
 
 - Telegram has `TelegramLinkCodes` and `TelegramLinkHistory`.
 - LINE uses shared `ChannelLinkCodes` and `ChannelLinkHistory`.
-- Code hashing, expiry, cancellation, and used states are confirmed.
+- Code hashing, expiry, cancellation, and used states are confirmed. The hash is HMAC-SHA256 with `WEB_SESSION_SECRET`, not an unkeyed digest. Codes are 12 characters from a 32-character alphabet (60 bits) and are single-use.
 - WhatsApp one-time linking codes were Not Confirmed.
 
 Expiration:

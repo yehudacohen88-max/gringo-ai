@@ -1,3 +1,5 @@
+const crypto = require('crypto');
+
 try {
   require('dotenv').config();
 } catch (error) {
@@ -151,10 +153,80 @@ function resolveAdminApiKey(nodeEnv, rawValue, sourceEnv = {}) {
   return configured;
 }
 
+const MIN_SESSION_SECRET_LENGTH = 32;
+
+function assertSessionSecretQuality(name, value, { required }) {
+  if (!value) {
+    if (!required) return;
+    throw new Error(
+      `Refusing to start: ${name} is missing. Set ${name} to a unique secret of at least 32 characters from a cryptographically secure source.`
+    );
+  }
+  if (value.length < MIN_SESSION_SECRET_LENGTH) {
+    throw new Error(
+      `Refusing to start: ${name} is too short. Set ${name} to a unique secret of at least 32 characters from a cryptographically secure source.`
+    );
+  }
+  if (isObviouslyWeakProductionKey(value)) {
+    throw new Error(
+      `Refusing to start: ${name} is an obvious placeholder or has too little character variety. Generate a new value from a cryptographically secure source. This check cannot prove that the secret is truly random.`
+    );
+  }
+}
+
+// Production fails closed. Other environments keep an explicit ephemeral secret
+// when WEB_SESSION_SECRET is unset, so local cookies are signed but do not
+// survive a restart. A configured secret that is too short is refused everywhere.
+function resolveWebSessionSecret(nodeEnv, sourceEnv = {}) {
+  const normalizedEnv = typeof nodeEnv === 'string' ? nodeEnv.trim() : '';
+  const configured = readTrimmed(sourceEnv.WEB_SESSION_SECRET);
+  const previous = readTrimmed(sourceEnv.WEB_SESSION_SECRET_PREVIOUS);
+  const production = normalizedEnv === 'production';
+
+  if (previous) {
+    assertSessionSecretQuality('WEB_SESSION_SECRET_PREVIOUS', previous, { required: true });
+  }
+
+  if (configured) {
+    assertSessionSecretQuality('WEB_SESSION_SECRET', configured, { required: true });
+    return { current: configured, previous, ephemeral: false };
+  }
+
+  if (production) {
+    assertSessionSecretQuality('WEB_SESSION_SECRET', '', { required: true });
+  }
+
+  const ephemeral = crypto.randomBytes(32).toString('hex');
+  if (normalizedEnv === 'development') {
+    console.warn(
+      '[startup] WEB_SESSION_SECRET is unset. This process generated an ephemeral session secret. Sessions will not survive a restart. Production refuses to start until WEB_SESSION_SECRET is a unique secret of at least 32 characters. This warning does not include the secret.'
+    );
+  }
+  return { current: ephemeral, previous, ephemeral: true };
+}
+
+// Telegram still uses polling. Webhook mode has no request handler, so do not
+// boot that mode until a secret exists for a future signature check.
+function assertTelegramWebhookSecret(sourceEnv = {}) {
+  const mode = readTrimmed(sourceEnv.TELEGRAM_BOT_MODE) || 'polling';
+  if (mode.toLowerCase() !== 'webhook') return;
+  const secret = readTrimmed(sourceEnv.TELEGRAM_WEBHOOK_SECRET);
+  if (secret.length < MIN_SESSION_SECRET_LENGTH) {
+    throw new Error(
+      'Refusing to start: TELEGRAM_BOT_MODE=webhook requires TELEGRAM_WEBHOOK_SECRET of at least 32 characters. Telegram webhook handling is not implemented, so the process will not start in webhook mode without that secret.'
+    );
+  }
+}
+
+const webSession = resolveWebSessionSecret(process.env.NODE_ENV, process.env);
+assertTelegramWebhookSecret(process.env);
+
 const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: Number(process.env.PORT || 3000),
   adminApiKey: resolveAdminApiKey(process.env.NODE_ENV, process.env.ADMIN_API_KEY, process.env),
+  webSessionSecret: webSession.current,
+  webSessionSecretPrevious: webSession.previous,
   telegram: {
     enabled: String(process.env.TELEGRAM_BOT_ENABLED || 'false').toLowerCase() === 'true',
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',

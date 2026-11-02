@@ -388,7 +388,16 @@ test('telegram and line link-code and disconnect stay available without an admin
   const calls = { onboarding: 0, telegramCreate: 0, telegramDisconnect: 0, lineCreate: 0, lineDisconnect: 0 };
   coreAgentService.getOnboardingStatus = async () => {
     calls.onboarding += 1;
-    return { user: {}, profile: { userId: 'user_probe' } };
+    return {
+      user: { userId: 'user_probe' },
+      profile: {
+        userId: 'user_probe',
+        channel: 'web',
+        telegramUserId: 'tg_probe',
+        lineUserId: 'line_probe',
+        lineLinkStatus: 'Connected',
+      },
+    };
   };
   telegramLinkService.createLinkCode = async () => {
     calls.telegramCreate += 1;
@@ -420,7 +429,7 @@ test('telegram and line link-code and disconnect stay available without an admin
         const response = await fetch(createUrl(server, requestPath), {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: '{}',
+          body: requestPath.endsWith('/disconnect') ? '{"confirm":true}' : '{}',
         });
         const body = await response.json();
         assert.equal(response.status, status, requestPath);

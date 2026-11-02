@@ -21,6 +21,7 @@ const VERIFY_TOKEN = 'test-only-whatsapp-verify-token';
 const ACCESS_TOKEN = 'test-only-whatsapp-access-token';
 const PHONE_NUMBER_ID = 'test-only-phone-number-id';
 const ADMIN_API_KEY = 'test-only-admin-key-0123456789abcdef';
+const TEST_WEB_SESSION_SECRET = 'test-only-web-session-secret-0123456789abcdef';
 const LOAD_CONFIG = "require('./src/config/env');process.stdout.write('config-loaded');";
 
 let server;
@@ -58,6 +59,7 @@ function runConfig(envOverrides = {}, unsetKeys = []) {
     NODE_ENV: 'test',
     ALLOW_DEV_ADMIN_KEY: 'true',
     ADMIN_API_KEY,
+    WEB_SESSION_SECRET: TEST_WEB_SESSION_SECRET,
     WHATSAPP_ENABLED: 'false',
     WHATSAPP_APP_SECRET: '',
     WHATSAPP_VERIFY_TOKEN: '',

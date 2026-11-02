@@ -1,7 +1,10 @@
 const express = require('express');
 const taskController = require('./task.controller');
+const { blockPersonalDataRoute } = require('../../shared/blockPersonalDataRoute');
 
 const router = express.Router();
+
+router.use(blockPersonalDataRoute);
 
 router.get('/', taskController.listTasks);
 router.get('/alerts', taskController.listAlerts);

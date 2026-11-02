@@ -1,4 +1,5 @@
 const { coreAgentService } = require('../core-agent');
+const { refusePersonalDataChannelUserId } = require('../../shared/blockPersonalDataRoute');
 const jobService = require('./job.service');
 
 function splitList(value) {
@@ -27,7 +28,7 @@ async function getMatchingJobs(req, res, next) {
   try {
     const onboardingStatus = await coreAgentService.getOnboardingStatus({
       channel: req.query.channel || 'web',
-      channelUserId: req.query.channelUserId || 'local-web-user',
+      channelUserId: refusePersonalDataChannelUserId(),
     });
     const profile = onboardingStatus.profile || {};
     const hasActiveJobGoal = splitList(profile.activeGoals).includes('Find Job');
@@ -38,7 +39,7 @@ async function getMatchingJobs(req, res, next) {
       await coreAgentService.updateUserProfile(
         {
           channel: req.query.channel || 'web',
-          channelUserId: req.query.channelUserId || 'local-web-user',
+          channelUserId: refusePersonalDataChannelUserId(),
         },
         {
           lastRecommendedJobIds: jobs

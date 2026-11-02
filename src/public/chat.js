@@ -70,9 +70,19 @@ const returnToChatFromNotificationsButton = document.querySelector('#returnToCha
 const returnToChatFromHousingButton = document.querySelector('#returnToChatFromHousingButton');
 const returnToChatFromMoneyButton = document.querySelector('#returnToChatFromMoneyButton');
 
-const channelUserId = localStorage.getItem('gringoWebUserId') || `web_${Date.now()}`;
-localStorage.setItem('gringoWebUserId', channelUserId);
 let currentCommunityPostId = '';
+let uiLanguage = 'en';
+
+const PERSONAL_DATA_UNAVAILABLE_COPY = {
+  en: 'This part of Gringo is paused for now. Chat still works. Tasks, documents, notifications, and personal matches will come back in a later update.',
+  he: 'החלק הזה של גרינגו מושהה כרגע. הצ׳אט עדיין עובד. משימות, מסמכים, התראות והתאמות אישיות יחזרו בעדכון הבא.',
+  ar: 'هذا الجزء من Gringo متوقف مؤقتًا. الدردشة ما زالت تعمل. ستعود المهام والمستندات والتنبيهات والمطابقات الشخصية في تحديث لاحق.',
+  th: 'ส่วนนี้ของ Gringo ปิดชั่วคราว แชทยังใช้ได้ งาน เอกสาร การแจ้งเตือน และการจับคู่ส่วนตัวจะกลับมาในอัปเดตถัดไป',
+  si: 'Gringo හි මෙම කොටස දැනට නවතා ඇත. කතාබස් තවමත් ක්‍රියා කරයි. කාර්ය, ලේඛන, දැනුම්දීම් සහ පෞද්ගලික ගැලපීම් පසු යාවත්කාලීනයකින් නැවත එයි.',
+  hi: 'Gringo का यह हिस्सा अभी रोका गया है। चैट अभी भी चलती है। काम, दस्तावेज़, सूचनाएँ और व्यक्तिगत मिलान बाद के अपडेट में वापस आएँगे।',
+  ru: 'Этот раздел Gringo пока на паузе. Чат по-прежнему работает. Задачи, документы, уведомления и личные подборки вернутся в следующем обновлении.',
+  tl: 'Pansamantalang nakahinto ang bahaging ito ng Gringo. Gumagana pa rin ang chat. Babalik ang mga gawain, dokumento, abiso, at personal na tugma sa susunod na update.',
+};
 
 function showError(message) {
   chatAlert.textContent = message;
@@ -101,26 +111,45 @@ function addMessage(author, text) {
   chatHistory.scrollTop = chatHistory.scrollHeight;
 }
 
+function apiFetch(url, options = {}) {
+  return fetch(url, { credentials: 'same-origin', ...options });
+}
+
+function rememberLanguage(profile) {
+  const code = normalizeLanguageValue(profile && profile.preferredLanguage);
+  if (code) uiLanguage = code;
+}
+
+function unavailableCopy() {
+  return PERSONAL_DATA_UNAVAILABLE_COPY[uiLanguage] || PERSONAL_DATA_UNAVAILABLE_COPY.en;
+}
+
+function isPersonalDataUnavailable(error) {
+  return Boolean(error) && (error.code === 'PERSONAL_DATA_TEMPORARILY_UNAVAILABLE' || /PERSONAL_DATA_TEMPORARILY_UNAVAILABLE/.test(String(error.message || '')));
+}
+
 async function readJson(response) {
-  const body = await response.json();
+  const body = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(body.error?.message || 'Request failed.');
+    const code = body.error?.code || '';
+    const error = new Error(code === 'PERSONAL_DATA_TEMPORARILY_UNAVAILABLE' ? unavailableCopy() : (body.error?.message || 'Request failed.'));
+    error.code = code;
+    throw error;
   }
 
+  if (body && body.profile) rememberLanguage(body.profile);
   return body;
 }
 
 async function sendMessage(message) {
-  const response = await fetch('/api/chat/message', {
+  const response = await apiFetch('/api/chat/message', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
     },
     body: JSON.stringify({
       message,
-      channel: 'web',
-      channelUserId,
     }),
   });
 
@@ -128,7 +157,7 @@ async function sendMessage(message) {
 }
 
 async function loadOnboardingStatus() {
-  const response = await fetch(`/api/chat/onboarding-status?channel=web&channelUserId=${encodeURIComponent(channelUserId)}`);
+  const response = await apiFetch(`/api/chat/onboarding-status`);
   return readJson(response);
 }
 
@@ -289,49 +318,47 @@ function fillProfileForm(profile = {}) {
 }
 
 async function loadProfile() {
-  const response = await fetch(`/api/chat/profile?channel=web&channelUserId=${encodeURIComponent(channelUserId)}`);
+  const response = await apiFetch(`/api/chat/profile`);
   return readJson(response);
 }
 
 async function loadStartupSummary() {
-  const response = await fetch(`/api/chat/startup-summary?channel=web&channelUserId=${encodeURIComponent(channelUserId)}`);
+  const response = await apiFetch(`/api/chat/startup-summary`);
   return readJson(response);
 }
 
 async function loadActiveJobs() {
-  const response = await fetch('/api/jobs');
+  const response = await apiFetch('/api/jobs');
   return readJson(response);
 }
 
 async function loadMatchingJobs() {
-  const response = await fetch(`/api/jobs/matches?channel=web&channelUserId=${encodeURIComponent(channelUserId)}`);
+  const response = await apiFetch(`/api/jobs/matches`);
   return readJson(response);
 }
 
 async function loadServices() {
-  const response = await fetch(`/api/services/matches?channel=web&channelUserId=${encodeURIComponent(channelUserId)}`);
+  const response = await apiFetch(`/api/services/matches`);
   return readJson(response);
 }
 
 async function loadDocuments() {
-  const response = await fetch(`/api/documents?channel=web&channelUserId=${encodeURIComponent(channelUserId)}`);
+  const response = await apiFetch(`/api/documents`);
   return readJson(response);
 }
 
 async function loadDocumentAlerts() {
-  const response = await fetch(`/api/documents/alerts?channel=web&channelUserId=${encodeURIComponent(channelUserId)}`);
+  const response = await apiFetch(`/api/documents/alerts`);
   return readJson(response);
 }
 
 async function renewDocument(documentId, newExpiryDate) {
-  const response = await fetch(`/api/documents/${encodeURIComponent(documentId)}/renew`, {
+  const response = await apiFetch(`/api/documents/${encodeURIComponent(documentId)}/renew`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      channel: 'web',
-      channelUserId,
       newExpiryDate,
     }),
   });
@@ -339,31 +366,31 @@ async function renewDocument(documentId, newExpiryDate) {
 }
 
 async function loadNotifications(filter = 'All') {
-  const params = new URLSearchParams({ channel: 'web', channelUserId, filter });
-  const response = await fetch(`/api/notifications?${params.toString()}`);
+  const params = new URLSearchParams({ filter });
+  const response = await apiFetch(`/api/notifications?${params.toString()}`);
   return readJson(response);
 }
 
 async function loadNotificationSummary() {
-  const response = await fetch(`/api/notifications/summary?channel=web&channelUserId=${encodeURIComponent(channelUserId)}`);
+  const response = await apiFetch(`/api/notifications/summary`);
   return readJson(response);
 }
 
 async function loadTasks(view = 'Today') {
-  const params = new URLSearchParams({ channel: 'web', channelUserId });
+  const params = new URLSearchParams();
   if (view && view !== 'All') params.set('view', view);
-  const response = await fetch(`/api/tasks?${params.toString()}`);
+  const response = await apiFetch(`/api/tasks?${params.toString()}`);
   return readJson(response);
 }
 
 async function loadTaskSchedule(view = 'Today') {
-  const params = new URLSearchParams({ channel: 'web', channelUserId, view });
-  const response = await fetch(`/api/tasks/schedule?${params.toString()}`);
+  const params = new URLSearchParams({ view });
+  const response = await apiFetch(`/api/tasks/schedule?${params.toString()}`);
   return readJson(response);
 }
 
 async function loadTaskAlerts() {
-  const response = await fetch(`/api/tasks/alerts?channel=web&channelUserId=${encodeURIComponent(channelUserId)}`);
+  const response = await apiFetch(`/api/tasks/alerts`);
   return readJson(response);
 }
 
@@ -371,8 +398,6 @@ async function saveTask(formData) {
   const taskId = formData.get('taskId');
   const reminderAt = formData.get('reminderAt') ? new Date(formData.get('reminderAt')).toISOString() : '';
   const payload = {
-    channel: 'web',
-    channelUserId,
     title: formData.get('title'),
     description: formData.get('description'),
     category: formData.get('category'),
@@ -386,7 +411,7 @@ async function saveTask(formData) {
     recurrenceEndDate: formData.get('recurrenceEndDate') || '',
     createdBy: 'User',
   };
-  const response = await fetch(taskId ? `/api/tasks/${encodeURIComponent(taskId)}` : '/api/tasks', {
+  const response = await apiFetch(taskId ? `/api/tasks/${encodeURIComponent(taskId)}` : '/api/tasks', {
     method: taskId ? 'PUT' : 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(payload),
@@ -395,25 +420,25 @@ async function saveTask(formData) {
 }
 
 async function updateTaskAction(taskId, action) {
-  const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/${action}`, {
+  const response = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/${action}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ channel: 'web', channelUserId }),
+    body: JSON.stringify({}),
   });
   return readJson(response);
 }
 
 async function remindTask(taskId, option, customDate = '') {
-  const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/remind`, {
+  const response = await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}/remind`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ channel: 'web', channelUserId, option, customDate }),
+    body: JSON.stringify({ option, customDate }),
   });
   return readJson(response);
 }
 
 async function updateNotification(notificationId, action) {
-  const response = await fetch(`/api/notifications/${encodeURIComponent(notificationId)}/${action}`, {
+  const response = await apiFetch(`/api/notifications/${encodeURIComponent(notificationId)}/${action}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
   });
@@ -421,7 +446,7 @@ async function updateNotification(notificationId, action) {
 }
 
 async function remindNotification(notificationId, days) {
-  const response = await fetch(`/api/notifications/${encodeURIComponent(notificationId)}/remind`, {
+  const response = await apiFetch(`/api/notifications/${encodeURIComponent(notificationId)}/remind`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ days }),
@@ -432,8 +457,6 @@ async function remindNotification(notificationId, days) {
 async function saveDocument(formData) {
   const file = formData.get('file');
   const payload = {
-    channel: 'web',
-    channelUserId,
     documentType: formData.get('documentType'),
     documentNumber: formData.get('documentNumber'),
     issuingCountry: formData.get('issuingCountry'),
@@ -451,7 +474,7 @@ async function saveDocument(formData) {
   }
 
   const documentId = formData.get('documentId');
-  const response = await fetch(documentId ? `/api/documents/${encodeURIComponent(documentId)}` : '/api/documents', {
+  const response = await apiFetch(documentId ? `/api/documents/${encodeURIComponent(documentId)}` : '/api/documents', {
     method: documentId ? 'PUT' : 'POST',
     headers: {
       'content-type': 'application/json',
@@ -462,53 +485,48 @@ async function saveDocument(formData) {
 }
 
 async function archiveDocument(documentId) {
-  const response = await fetch(`/api/documents/${encodeURIComponent(documentId)}/archive`, {
+  const response = await apiFetch(`/api/documents/${encodeURIComponent(documentId)}/archive`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
     },
-    body: JSON.stringify({
-      channel: 'web',
-      channelUserId,
-    }),
+    body: JSON.stringify({}),
   });
   return readJson(response);
 }
 
 async function loadActiveHousing() {
-  const response = await fetch('/api/housing');
+  const response = await apiFetch('/api/housing');
   return readJson(response);
 }
 
 async function loadMatchingHousing() {
-  const response = await fetch(`/api/housing/matches?channel=web&channelUserId=${encodeURIComponent(channelUserId)}`);
+  const response = await apiFetch(`/api/housing/matches`);
   return readJson(response);
 }
 
 async function loadCommunityPosts() {
-  const response = await fetch('/api/community');
+  const response = await apiFetch('/api/community');
   return readJson(response);
 }
 
 async function loadRelevantCommunityPosts() {
-  const response = await fetch(`/api/community/relevant?channel=web&channelUserId=${encodeURIComponent(channelUserId)}`);
+  const response = await apiFetch(`/api/community/relevant`);
   return readJson(response);
 }
 
 async function loadCommunityPost(postId) {
-  const response = await fetch(`/api/community/${encodeURIComponent(postId)}`);
+  const response = await apiFetch(`/api/community/${encodeURIComponent(postId)}`);
   return readJson(response);
 }
 
 async function addCommunityComment(postId, body) {
-  const response = await fetch(`/api/community/${encodeURIComponent(postId)}/comments`, {
+  const response = await apiFetch(`/api/community/${encodeURIComponent(postId)}/comments`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      channel: 'web',
-      channelUserId,
       body,
     }),
   });
@@ -516,33 +534,33 @@ async function addCommunityComment(postId, body) {
 }
 
 async function flagCommunityComment(commentId) {
-  const response = await fetch(`/api/community/comments/${encodeURIComponent(commentId)}/flag`, {
+  const response = await apiFetch(`/api/community/comments/${encodeURIComponent(commentId)}/flag`, {
     method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({}),
   });
   return readJson(response);
 }
 
 async function loadMoneyDefaults() {
-  const response = await fetch(`/api/money/defaults?channel=web&channelUserId=${encodeURIComponent(channelUserId)}`);
+  const response = await apiFetch(`/api/money/defaults`);
   return readJson(response);
 }
 
 async function compareMoney(payload) {
   const params = new URLSearchParams(payload);
-  const response = await fetch(`/api/money/compare?${params.toString()}`);
+  const response = await apiFetch(`/api/money/compare?${params.toString()}`);
   return readJson(response);
 }
 
 async function saveProfile(formData) {
   const preferredLanguage = formData.get('preferredLanguage') || null;
-  const response = await fetch('/api/chat/profile', {
+  const response = await apiFetch('/api/chat/profile', {
     method: 'PUT',
     headers: {
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      channel: 'web',
-      channelUserId,
       fullName: formData.get('fullName'),
       country: formData.get('country'),
       preferredLanguage,
@@ -598,14 +616,12 @@ async function saveProfile(formData) {
 }
 
 async function savePreferredLanguage(value) {
-  const response = await fetch('/api/chat/profile', {
+  const response = await apiFetch('/api/chat/profile', {
     method: 'PUT',
     headers: {
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      channel: 'web',
-      channelUserId,
       preferredLanguage: value || null,
     }),
   });
@@ -614,57 +630,45 @@ async function savePreferredLanguage(value) {
 }
 
 async function createTelegramLinkCode() {
-  const response = await fetch('/api/telegram/link-code', {
+  const response = await apiFetch('/api/telegram/link-code', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
     },
-    body: JSON.stringify({
-      channel: 'web',
-      channelUserId,
-    }),
+    body: JSON.stringify({}),
   });
   return readJson(response);
 }
 
 async function disconnectTelegramProfile() {
-  const response = await fetch('/api/telegram/disconnect', {
+  const response = await apiFetch('/api/telegram/disconnect', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
     },
-    body: JSON.stringify({
-      channel: 'web',
-      channelUserId,
-    }),
+    body: JSON.stringify({ confirm: true }),
   });
   return readJson(response);
 }
 
 async function createLineLinkCode() {
-  const response = await fetch('/api/line/link-code', {
+  const response = await apiFetch('/api/line/link-code', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
     },
-    body: JSON.stringify({
-      channel: 'web',
-      channelUserId,
-    }),
+    body: JSON.stringify({}),
   });
   return readJson(response);
 }
 
 async function disconnectLineProfile() {
-  const response = await fetch('/api/line/disconnect', {
+  const response = await apiFetch('/api/line/disconnect', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
     },
-    body: JSON.stringify({
-      channel: 'web',
-      channelUserId,
-    }),
+    body: JSON.stringify({ confirm: true }),
   });
   return readJson(response);
 }
@@ -729,8 +733,15 @@ function renderJobs(activeJobs = [], matchingJobs = []) {
 
 async function showJobs() {
   hideError();
-  const [activeResult, matchingResult] = await Promise.all([loadActiveJobs(), loadMatchingJobs()]);
-  renderJobs(activeResult.jobs || [], matchingResult.jobs || []);
+  const activeResult = await loadActiveJobs();
+  let matchingJobs = [];
+  try {
+    const matchingResult = await loadMatchingJobs();
+    matchingJobs = matchingResult.jobs || [];
+  } catch (error) {
+    showError(error.message);
+  }
+  renderJobs(activeResult.jobs || [], matchingJobs);
   chatView.hidden = true;
   communityView.hidden = true;
   communityPostView.hidden = true;
@@ -768,8 +779,14 @@ function renderServices(services = []) {
 
 async function showServices() {
   hideError();
-  const result = await loadServices();
-  renderServices(result.services || []);
+  try {
+    const result = await loadServices();
+    renderServices(result.services || []);
+  } catch (error) {
+    if (!isPersonalDataUnavailable(error)) throw error;
+    servicesList.innerHTML = `<p class="empty-state">${escapeHtml(error.message)}</p>`;
+    showError(error.message);
+  }
   chatView.hidden = true;
   communityView.hidden = true;
   communityPostView.hidden = true;
@@ -939,9 +956,16 @@ function fillDocumentForm(document = {}) {
 
 async function showDocuments(filters = {}) {
   hideError();
-  const result = await loadDocuments();
-  renderDocumentsChecklist(result.summary?.checklist || []);
-  renderDocuments(result.documents || [], filters);
+  try {
+    const result = await loadDocuments();
+    renderDocumentsChecklist(result.summary?.checklist || []);
+    renderDocuments(result.documents || [], filters);
+  } catch (error) {
+    if (!isPersonalDataUnavailable(error)) throw error;
+    documentsChecklist.innerHTML = `<p class="empty-state">${escapeHtml(error.message)}</p>`;
+    documentsList.innerHTML = '';
+    showError(error.message);
+  }
   chatView.hidden = true;
   communityView.hidden = true;
   communityPostView.hidden = true;
@@ -1013,8 +1037,15 @@ function clearTaskForm() {
 
 async function showTasks(view = 'Today') {
   hideError();
-  const result = await loadTasks(view);
-  renderTasks(result.tasks || [], result.summary || {});
+  try {
+    const result = await loadTasks(view);
+    renderTasks(result.tasks || [], result.summary || {});
+  } catch (error) {
+    if (!isPersonalDataUnavailable(error)) throw error;
+    tasksSummary.innerHTML = '';
+    tasksList.innerHTML = `<p class="empty-state">${escapeHtml(error.message)}</p>`;
+    showError(error.message);
+  }
   chatView.hidden = true;
   communityView.hidden = true;
   communityPostView.hidden = true;
@@ -1030,8 +1061,15 @@ async function showTasks(view = 'Today') {
 
 async function showTaskSchedule(view = 'Today') {
   hideError();
-  const result = await loadTaskSchedule(view);
-  renderTasks(result.tasks || [], result.summary || {});
+  try {
+    const result = await loadTaskSchedule(view);
+    renderTasks(result.tasks || [], result.summary || {});
+  } catch (error) {
+    if (!isPersonalDataUnavailable(error)) throw error;
+    tasksSummary.innerHTML = '';
+    tasksList.innerHTML = `<p class="empty-state">${escapeHtml(error.message)}</p>`;
+    showError(error.message);
+  }
   chatView.hidden = true;
   communityView.hidden = true;
   communityPostView.hidden = true;
@@ -1103,7 +1141,26 @@ async function showNotificationStartupSummary() {
 async function showNotifications(filter = 'All') {
   hideError();
   const type = typeForFilter(filter);
-  const result = await loadNotifications(filter === 'Unread' ? 'Unread' : 'All');
+  let result = { notifications: [], unreadCount: 0 };
+  try {
+    result = await loadNotifications(filter === 'Unread' ? 'Unread' : 'All');
+  } catch (error) {
+    if (!isPersonalDataUnavailable(error)) throw error;
+    notificationsList.innerHTML = `<p class="empty-state">${escapeHtml(error.message)}</p>`;
+    showError(error.message);
+    chatView.hidden = true;
+    communityView.hidden = true;
+    communityPostView.hidden = true;
+    profileView.hidden = true;
+    jobsView.hidden = true;
+    servicesView.hidden = true;
+    housingView.hidden = true;
+    moneyView.hidden = true;
+    documentsView.hidden = true;
+    tasksView.hidden = true;
+    notificationsView.hidden = false;
+    return;
+  }
   const notifications = type ? (result.notifications || []).filter((notification) => notification.type === type || (filter === 'Documents' && notification.type === 'Missing Document')) : result.notifications || [];
   renderNotifications(notifications);
   notificationsBadge.textContent = result.unreadCount;
@@ -1156,8 +1213,15 @@ function renderCommunityPosts(posts = [], safetyNotice = '') {
 
 async function showCommunity() {
   hideError();
-  const [publishedResult, relevantResult] = await Promise.all([loadCommunityPosts(), loadRelevantCommunityPosts()]);
-  const relevanceByPostId = new Map((relevantResult.posts || []).map((post) => [post.postId, post.relevance]));
+  const publishedResult = await loadCommunityPosts();
+  let relevantPosts = [];
+  try {
+    const relevantResult = await loadRelevantCommunityPosts();
+    relevantPosts = relevantResult.posts || [];
+  } catch (error) {
+    showError(error.message);
+  }
+  const relevanceByPostId = new Map(relevantPosts.map((post) => [post.postId, post.relevance]));
   const posts = (publishedResult.posts || []).map((post) => ({
     ...post,
     relevance: relevanceByPostId.get(post.postId),
@@ -1266,8 +1330,15 @@ function renderHousing(activeListings = [], matchingListings = [], filters = {},
 
 async function showHousing(filters = {}) {
   hideError();
-  const [activeResult, matchingResult] = await Promise.all([loadActiveHousing(), loadMatchingHousing()]);
-  renderHousing(activeResult.listings || [], matchingResult.listings || [], filters, activeResult.safetyNotice);
+  const activeResult = await loadActiveHousing();
+  let matchingListings = [];
+  try {
+    const matchingResult = await loadMatchingHousing();
+    matchingListings = matchingResult.listings || [];
+  } catch (error) {
+    showError(error.message);
+  }
+  renderHousing(activeResult.listings || [], matchingListings, filters, activeResult.safetyNotice);
   chatView.hidden = true;
   communityView.hidden = true;
   communityPostView.hidden = true;
@@ -1314,7 +1385,12 @@ function renderMoneyResults(result) {
 
 async function showMoney() {
   hideError();
-  const defaults = await loadMoneyDefaults();
+  let defaults = { amount: '2000', country: 'Thailand', targetCurrency: 'THB', sourceCurrency: 'ILS' };
+  try {
+    defaults = await loadMoneyDefaults();
+  } catch (error) {
+    showError(error.message);
+  }
   document.querySelector('#moneyAmount').value = defaults.amount || '2000';
   document.querySelector('#moneyDestinationCountry').value = defaults.country || 'Thailand';
   document.querySelector('#moneyTargetCurrency').value = defaults.targetCurrency || 'THB';
@@ -1880,6 +1956,7 @@ profileForm.addEventListener('submit', async (event) => {
 async function startChat() {
   try {
     const status = await loadOnboardingStatus();
+    rememberLanguage(status.profile);
 
     if (!status.complete && status.prompt) {
       addMessage('Gringo', status.prompt);
@@ -1888,9 +1965,15 @@ async function startChat() {
 
     const startup = await loadStartupSummary();
     addMessage('Gringo', startup.message || startup.summary || 'Hello Somchai. Your schedule is ready inside Gringo.');
-    await showNotificationStartupSummary();
-    await renderDocumentAlerts();
-    await renderTaskAlerts();
+    const personalPanels = await Promise.allSettled([
+      showNotificationStartupSummary(),
+      renderDocumentAlerts(),
+      renderTaskAlerts(),
+    ]);
+    const blocked = personalPanels.some((result) => result.status === 'rejected' && isPersonalDataUnavailable(result.reason));
+    const unexpected = personalPanels.find((result) => result.status === 'rejected' && !isPersonalDataUnavailable(result.reason));
+    if (unexpected) throw unexpected.reason;
+    if (blocked) addMessage('Gringo', unavailableCopy());
   } catch (error) {
     showError(error.message);
   }

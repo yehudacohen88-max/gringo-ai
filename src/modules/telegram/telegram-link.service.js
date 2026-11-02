@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { env } = require('../../config/env');
+const linkCode = require('../../shared/linkCode');
 const crmAgentRepository = require('../crm-agent/crm-agent.repository');
 const { crmAgentService } = require('../crm-agent');
 const linkRepository = require('./telegram-link.repository');
@@ -8,8 +8,6 @@ const { safeTelegramWarning } = require('./telegram-errors');
 
 const memoryCodes = [];
 const memoryHistory = [];
-const linkAttempts = new Map();
-
 function cleanText(value) {
   return value === undefined || value === null ? '' : String(value).trim();
 }
@@ -25,17 +23,11 @@ function generateId(prefix) {
 }
 
 function hashCode(code) {
-  return crypto.createHash('sha256').update(cleanText(code).toUpperCase()).digest('hex');
-}
-
-function generatePlainCode() {
-  return crypto.randomBytes(5).toString('base64url').replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(0, 8);
+  return linkCode.hashCode(code);
 }
 
 function expiresAt() {
-  const date = new Date();
-  date.setMinutes(date.getMinutes() + Number(env.telegram?.linkCodeTtlMinutes || 10));
-  return date.toISOString();
+  return linkCode.codeExpiresAt();
 }
 
 async function readCodeRecords() {
@@ -100,9 +92,10 @@ async function cancelActiveCodesForUser(userId) {
 }
 
 async function createLinkCode(userId) {
+  linkCode.assertCanCreate(userId);
   await expireOldCodes();
   await cancelActiveCodesForUser(userId);
-  const plainCode = generatePlainCode();
+  const plainCode = linkCode.generatePlainCode();
   const code = {
     linkCodeId: generateId('tglcode'),
     userId,
@@ -128,30 +121,22 @@ async function createLinkCode(userId) {
   };
 }
 
-function rateLimitKey(telegramUserId) {
-  return cleanText(telegramUserId);
-}
-
-function isRateLimited(telegramUserId) {
-  const key = rateLimitKey(telegramUserId);
-  const now = Date.now();
-  const attempts = (linkAttempts.get(key) || []).filter((time) => now - time < 10 * 60 * 1000);
-  attempts.push(now);
-  linkAttempts.set(key, attempts);
-  return attempts.length > 5;
-}
-
 async function findValidCode(code, telegramUserId) {
-  await expireOldCodes();
-  if (isRateLimited(telegramUserId)) {
-    await saveHistory('', telegramUserId, 'Link Failed', { reason: 'rate_limited' });
+  const attempt = linkCode.beginRedeemAttempt('telegram', telegramUserId, code);
+  if (!attempt.allowed) {
+    await saveHistory('', telegramUserId, 'Link Failed', { reason: attempt.reason, linkCodeId: '' });
     return { error: 'Too many link attempts. Please wait and try again.' };
   }
+  if (!linkCode.claimSingleUse('telegram', attempt.codeKey)) {
+    return { error: 'This link code is no longer active.' };
+  }
 
+  await expireOldCodes();
   const records = await readCodeRecords();
-  const codeHash = hashCode(code);
-  const record = records.find((item) => item.code.codeHash === codeHash);
+  const record = records.find((item) => linkCode.hashesEqual(item.code.codeHash, attempt.codeKey));
   if (!record) {
+    linkCode.releaseSingleUse('telegram', attempt.codeKey);
+    linkCode.recordRedeemFailure(attempt.codeKey);
     await saveHistory('', telegramUserId, 'Link Failed', { reason: 'not_found' });
     return { error: 'This link code is not valid.' };
   }
@@ -171,19 +156,27 @@ async function findValidCode(code, telegramUserId) {
 }
 
 async function linkTelegramToProfile(linkCodeId, telegramIdentity = {}) {
+  const confirmKey = `id:${cleanText(linkCodeId)}`;
+  if (!linkCode.claimSingleUse('telegram-confirm', confirmKey)) {
+    return { error: 'This link code is no longer active.' };
+  }
+  const rejectConfirm = (message) => {
+    linkCode.releaseSingleUse('telegram-confirm', confirmKey);
+    return { error: message };
+  };
   await expireOldCodes();
   const records = await readCodeRecords();
   const record = records.find((item) => item.code.linkCodeId === linkCodeId);
   const telegramUserId = cleanText(telegramIdentity.telegramUserId || telegramIdentity.channelUserId);
-  if (!record || record.code.status !== 'Active') return { error: 'This link code is no longer active.' };
+  if (!record || record.code.status !== 'Active') return rejectConfirm('This link code is no longer active.');
   if (new Date(record.code.expiresAt) <= new Date()) {
     await updateCodeRecord(record, { status: 'Expired' });
-    return { error: 'This link code expired.' };
+    return rejectConfirm('This link code expired.');
   }
-  if (record.code.telegramUserId !== telegramUserId) return { error: 'This confirmation must come from the Telegram account that requested the link.' };
+  if (record.code.telegramUserId !== telegramUserId) return rejectConfirm('This confirmation must come from the Telegram account that requested the link.');
 
   const webRecord = await crmAgentRepository.findUserProfileRecordByUserId(record.code.userId);
-  if (!webRecord) return { error: 'The Gringo profile was not found.' };
+  if (!webRecord) return rejectConfirm('The Gringo profile was not found.');
 
   const previousTelegram = crmAgentRepository.findUserProfileRecordByTelegramUserId
     ? await crmAgentRepository.findUserProfileRecordByTelegramUserId(telegramUserId)

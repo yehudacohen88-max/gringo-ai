@@ -155,8 +155,20 @@ function isExactBusinessDomainClarificationAnswer(message = '', selectedDomain =
   return (exactAnswers[selectedDomain] || []).includes(normalized);
 }
 
-function getConversationKey(userContext) {
-  return `${userContext.channel}:${userContext.channelUserId || 'local-web-user'}`;
+function requireChannelUserId(userContext = {}) {
+  const channelUserId = userContext.channelUserId === undefined || userContext.channelUserId === null
+    ? ''
+    : String(userContext.channelUserId).trim();
+  if (!channelUserId) {
+    const error = new Error('A channel user id is required.');
+    error.statusCode = 400;
+    throw error;
+  }
+  return channelUserId;
+}
+
+function getConversationKey(userContext = {}) {
+  return `${userContext.channel}:${requireChannelUserId(userContext)}`;
 }
 
 function getRecentConversation(userContext) {
@@ -1399,7 +1411,7 @@ async function processWebMessage(messageContext = {}) {
   const originalQuestion = String(messageContext.message || '').trim();
   let question = originalQuestion;
   const channel = messageContext.channel || 'web';
-  const channelUserId = messageContext.channelUserId || 'local-web-user';
+  const channelUserId = requireChannelUserId(messageContext);
   const incomingLanguageResolution = languageDetectionService.resolveLanguage({
     explicitLanguage: messageContext.explicitLanguage,
     channelLanguage: messageContext.language || messageContext.languageCode || messageContext.channelLanguage,

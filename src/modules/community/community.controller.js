@@ -1,4 +1,5 @@
 const { coreAgentService } = require('../core-agent');
+const { refusePersonalDataChannelUserId } = require('../../shared/blockPersonalDataRoute');
 const communityService = require('./community.service');
 
 function splitList(value) {
@@ -30,7 +31,7 @@ async function getRelevantPosts(req, res, next) {
   try {
     const onboardingStatus = await coreAgentService.getOnboardingStatus({
       channel: req.query.channel || 'web',
-      channelUserId: req.query.channelUserId || 'local-web-user',
+      channelUserId: refusePersonalDataChannelUserId(),
     });
     const profile = onboardingStatus.profile || {};
     const matchingPosts = await communityService.getRelevantPosts(profile);
@@ -39,7 +40,7 @@ async function getRelevantPosts(req, res, next) {
       await coreAgentService.updateUserProfile(
         {
           channel: req.query.channel || 'web',
-          channelUserId: req.query.channelUserId || 'local-web-user',
+          channelUserId: refusePersonalDataChannelUserId(),
         },
         {
           lastRelevantPostIds: posts
@@ -83,12 +84,12 @@ async function addComment(req, res, next) {
   try {
     const onboardingStatus = await coreAgentService.getOnboardingStatus({
       channel: req.body.channel || 'web',
-      channelUserId: req.body.channelUserId || 'local-web-user',
+      channelUserId: refusePersonalDataChannelUserId(),
     });
     const profile = onboardingStatus.profile || {};
     const comment = await communityService.addComment({
       postId: req.params.postId,
-      userId: onboardingStatus.user?.userId || req.body.channelUserId || 'local-web-user',
+      userId: onboardingStatus.user?.userId || refusePersonalDataChannelUserId(),
       userName: profile.fullName || 'Community member',
       body: req.body.body,
       language: profile.preferredLanguage || profile.language || 'English',
@@ -102,6 +103,7 @@ async function addComment(req, res, next) {
 
 async function flagComment(req, res, next) {
   try {
+    refusePersonalDataChannelUserId();
     const comment = await communityService.flagComment(req.params.commentId);
     if (!comment) {
       res.status(404).json({ error: { message: 'Comment not found.' } });

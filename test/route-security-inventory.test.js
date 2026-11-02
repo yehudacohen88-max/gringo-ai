@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const app = require('../src/app');
 const { ROUTE_SECURITY, routeKey } = require('../src/shared/routeSecurity');
 
-const CLASSIFICATION_PATTERN = /^(public|admin|webhook-signed|pending-PR\d+[a-z]?)$/;
+const CLASSIFICATION_PATTERN = /^(public|admin|webhook-signed|web-identity|blocked-until-PR3a-2|pending-PR\d+[a-z]?)$/;
 
 function mountPathFromLayer(layer) {
   if (!layer || layer.route) return '';
@@ -67,7 +67,7 @@ test('route security map matches every registered Express route', () => {
   assert.deepEqual(
     badClass.map((entry) => routeKey(entry.method, entry.path)),
     [],
-    'classification must be public, admin, webhook-signed, or pending-PRxx'
+    'classification must be public, admin, webhook-signed, web-identity, blocked-until-PR3a-2, or pending-PRxx'
   );
   assert.deepEqual(
     missingReason.map((entry) => routeKey(entry.method, entry.path)),
@@ -75,6 +75,11 @@ test('route security map matches every registered Express route', () => {
     'every classified route needs a reason'
   );
   assert.equal(registered.length, ROUTE_SECURITY.length);
+  assert.deepEqual(
+    ROUTE_SECURITY.filter((entry) => entry.classification === 'pending-PR3a').map((entry) => routeKey(entry.method, entry.path)),
+    [],
+    'PR3a-1 leaves no route classified as pending-PR3a'
+  );
 });
 
 test('admin routes reject a request that has no admin key', async () => {
