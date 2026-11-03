@@ -269,5 +269,6 @@ test('existing intent routing remains unchanged', async () => {
   });
 
   assert.equal(result.category, 'Jobs');
-  assert.match(result.reply, /job/i);
+  assert.match(result.reply, /unavailable right now|No results right now/);
+  assert.doesNotMatch(result.reply, /Aviv Construction/);
 });

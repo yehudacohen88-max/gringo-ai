@@ -28,6 +28,7 @@ const {
 } = require('../memory');
 const onboardingService = require('./onboarding.service');
 const personalizationService = require('./personalization.service');
+const { assistantCatalogReply, carryCatalog, catalogMeta } = require('../../shared/pilotCatalog');
 
 const recentConversationByUser = new Map();
 const CORE_AGENT_WORKING_LANGUAGE = 'en';
@@ -951,7 +952,7 @@ function idList(value) {
 function preferUnseen(items = [], idKey, seenValue = '') {
   const seenIds = new Set(idList(seenValue));
   const unseen = items.filter((item) => !seenIds.has(item[idKey]));
-  return unseen.length ? unseen : items;
+  return carryCatalog(items, unseen.length ? unseen : items);
 }
 
 function extractHousingContext(message, userProfile = {}) {
@@ -1014,9 +1015,13 @@ function extractMoneyContext(message, userProfile = {}) {
   return context;
 }
 
-function formatExchangeRateForChat(rate, sourceCurrency, targetCurrency) {
-  if (!rate) {
-    return `I do not have a verified demo rate for ${sourceCurrency} to ${targetCurrency} yet. ${moneyService.SAFETY_NOTICE}`;
+function formatExchangeRateForChat(rate, sourceCurrency, targetCurrency, options = {}) {
+  const language = options.language || 'en';
+  const state = options.state || (rate ? (moneyService.isDemoRate(rate) ? 'demo' : 'ok') : 'empty');
+
+  if (!rate || state === 'disabled' || state === 'unavailable' || state === 'empty') {
+    const resolved = rate ? state : (state === 'ok' ? 'empty' : state);
+    return assistantCatalogReply(resolved, language);
   }
 
   if (rate.rateType === 'reference') {
@@ -1028,11 +1033,19 @@ function formatExchangeRateForChat(rate, sourceCurrency, targetCurrency) {
     ].join('\n');
   }
 
+  if (moneyService.isDemoRate(rate) || state === 'demo') {
+    return [
+      `${moneyService.DEMO_NOTICE}`,
+      `The demo exchange rate is 1 ${sourceCurrency} = ${rate.exchangeRate} ${targetCurrency}.`,
+      moneyService.SAFETY_NOTICE,
+    ].join('\n');
+  }
+
   return [
-    `${moneyService.DEMO_NOTICE}`,
-    `The demo exchange rate is 1 ${sourceCurrency} = ${rate.exchangeRate} ${targetCurrency}.`,
+    `The stored exchange rate is 1 ${sourceCurrency} = ${rate.exchangeRate} ${targetCurrency}.`,
+    rate.sourceName ? `Source: ${rate.sourceName}.` : '',
     moneyService.SAFETY_NOTICE,
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 
 function extractJobSearchContext(message, userProfile = {}) {
@@ -1841,7 +1854,8 @@ async function processWebMessage(messageContext = {}) {
       profession: searchContext.profession || userProfile.preferredJobProfession || userProfile.profession,
     });
     const jobs = preferUnseen(matchingJobs, 'jobId', userProfile.lastRecommendedJobIds);
-    const reply = jobService.formatJobsForChat(jobs);
+    const reply = jobService.formatJobsForChat(jobs, { language: userLanguage });
+    const jobCatalogOnly = !jobs.length || ['disabled', 'unavailable'].includes(catalogMeta(jobs).state);
 
     try {
       await crmAgentService.updateUserProfile(personalization.user.userId, {
@@ -1869,6 +1883,7 @@ async function processWebMessage(messageContext = {}) {
 
     return deliverResponse({
       reply,
+      ...(jobCatalogOnly ? { replyLanguage: userLanguage } : {}),
       category: 'Jobs',
       status: jobs.length ? 'JOBS_FOUND' : 'JOBS_NOT_FOUND',
       jobs: jobs.slice(0, 5),
@@ -1917,7 +1932,8 @@ async function processWebMessage(messageContext = {}) {
 
     const matchingListings = await housingService.findMatchingHousing(updatedProfile, housingContext);
     const listings = preferUnseen(matchingListings, 'housingId', updatedProfile.lastRecommendedHousingIds);
-    const reply = housingService.formatHousingForChat(listings);
+    const reply = housingService.formatHousingForChat(listings, { language: userLanguage });
+    const housingCatalogOnly = !listings.length || ['disabled', 'unavailable'].includes(catalogMeta(listings).state);
 
     try {
       await crmAgentService.updateUserProfile(personalization.user.userId, {
@@ -1945,6 +1961,7 @@ async function processWebMessage(messageContext = {}) {
 
     return deliverResponse({
       reply,
+      ...(housingCatalogOnly ? { replyLanguage: userLanguage } : {}),
       category: 'Housing',
       status: listings.length ? 'HOUSING_FOUND' : 'HOUSING_NOT_FOUND',
       housing: {
@@ -1958,7 +1975,8 @@ async function processWebMessage(messageContext = {}) {
   if (isCommunityMessage(question)) {
     const matchingPosts = await communityService.getRelevantPosts(userProfile || {});
     const posts = preferUnseen(matchingPosts, 'postId', userProfile?.lastRelevantPostIds);
-    const reply = communityService.formatPostsForChat(posts);
+    const reply = communityService.formatPostsForChat(posts, { language: userLanguage });
+    const communityCatalogOnly = !posts.length || ['disabled', 'unavailable'].includes(catalogMeta(posts).state);
 
     try {
       await crmAgentService.updateUserProfile(personalization.user.userId, {
@@ -1986,6 +2004,7 @@ async function processWebMessage(messageContext = {}) {
 
     return deliverResponse({
       reply,
+      ...(communityCatalogOnly ? { replyLanguage: userLanguage } : {}),
       category: 'Community',
       status: posts.length ? 'COMMUNITY_POSTS_FOUND' : 'COMMUNITY_POSTS_NOT_FOUND',
       community: {
@@ -2020,13 +2039,18 @@ async function processWebMessage(messageContext = {}) {
     }
 
     if (asksOnlyRate && !moneyContext.amount) {
-      const rate = await moneyService.getExchangeRate(moneyContext.sourceCurrency, moneyContext.targetCurrency);
-      const reply = formatExchangeRateForChat(rate, moneyContext.sourceCurrency, moneyContext.targetCurrency);
+      const described = await moneyService.resolveExchangeRate(moneyContext.sourceCurrency, moneyContext.targetCurrency);
+      const reply = formatExchangeRateForChat(described.rate, moneyContext.sourceCurrency, moneyContext.targetCurrency, {
+        state: described.state,
+        language: userLanguage,
+      });
+      const rateCatalogOnly = !described.rate || ['disabled', 'unavailable', 'empty'].includes(described.state);
 
       return deliverResponse({
         reply,
+        ...(rateCatalogOnly ? { replyLanguage: userLanguage } : {}),
         category: 'Money',
-        status: rate ? 'EXCHANGE_RATE_FOUND' : 'EXCHANGE_RATE_NOT_FOUND',
+        status: described.rate ? 'EXCHANGE_RATE_FOUND' : 'EXCHANGE_RATE_NOT_FOUND',
         crm: { attempted: true, saved: false, memoryUpdated: false, error: '' },
       });
     }
@@ -2040,17 +2064,20 @@ async function processWebMessage(messageContext = {}) {
       });
     }
 
-    const comparison = await moneyService.compareTransfers(
+    const describedTransfers = await moneyService.resolveTransferComparison(
       moneyContext.amount,
       moneyContext.sourceCurrency,
       moneyContext.targetCurrency
     );
+    const comparison = describedTransfers.results;
     const reply = moneyService.formatComparisonForChat(
       moneyContext.amount,
       moneyContext.sourceCurrency,
       moneyContext.targetCurrency,
-      comparison
+      comparison,
+      { language: userLanguage, state: describedTransfers.state, demo: describedTransfers.demo }
     );
+    const transferCatalogOnly = !comparison.length || ['disabled', 'unavailable'].includes(describedTransfers.state);
 
     try {
       await crmAgentService.updateUserProfile(personalization.user.userId, {
@@ -2077,6 +2104,7 @@ async function processWebMessage(messageContext = {}) {
 
     return deliverResponse({
       reply,
+      ...(transferCatalogOnly ? { replyLanguage: userLanguage } : {}),
       category: 'Money',
       status: comparison.length ? 'MONEY_COMPARISON_FOUND' : 'MONEY_COMPARISON_NOT_FOUND',
       money: {
@@ -2187,7 +2215,8 @@ async function processWebMessage(messageContext = {}) {
   if (serviceIntent) {
     const search = serviceService.inferServiceSearch(question, userProfile || {});
     const services = await serviceService.findMatchingServices(userProfile || {}, search);
-    const reply = serviceService.formatServicesForChat(services);
+    const reply = serviceService.formatServicesForChat(services, { language: userLanguage });
+    const serviceCatalogOnly = !services.length || ['disabled', 'unavailable'].includes(catalogMeta(services).state);
 
     try {
       await crmAgentService.updateUserProfile(personalization.user.userId, {
@@ -2218,6 +2247,7 @@ async function processWebMessage(messageContext = {}) {
 
     return deliverResponse({
       reply,
+      ...(serviceCatalogOnly ? { replyLanguage: userLanguage } : {}),
       category: 'Services',
       status: services.length ? 'SERVICES_FOUND' : 'SERVICES_NOT_FOUND',
       services: services.slice(0, 5),

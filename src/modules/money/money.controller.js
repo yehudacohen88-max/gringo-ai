@@ -1,13 +1,27 @@
 const { loadWebProfile } = require('../../shared/webPersonalData');
+const { catalogMessage } = require('../../shared/pilotCatalog');
+const { languageFromRequest } = require('../../shared/userFacingCopy');
 const moneyService = require('./money.service');
+
+function moneyFields(described, language) {
+  const state = described.state || 'empty';
+  const demo = described.demo === true;
+  return {
+    availability: state,
+    demo,
+    message: state === 'ok' ? '' : catalogMessage(demo ? 'demo' : state, language),
+    ...(demo ? { demoNotice: language === 'en' ? moneyService.DEMO_NOTICE : catalogMessage('demo', language) } : {}),
+    safetyNotice: moneyService.SAFETY_NOTICE,
+  };
+}
 
 async function getRate(req, res, next) {
   try {
-    const rate = await moneyService.getExchangeRate(req.query.sourceCurrency || 'ILS', req.query.targetCurrency || 'THB');
+    const language = languageFromRequest(req);
+    const described = await moneyService.resolveExchangeRate(req.query.sourceCurrency || 'ILS', req.query.targetCurrency || 'THB');
     res.status(200).json({
-      rate,
-      demoNotice: moneyService.DEMO_NOTICE,
-      safetyNotice: moneyService.SAFETY_NOTICE,
+      rate: described.rate,
+      ...moneyFields(described, language),
     });
   } catch (error) {
     next(error);
@@ -16,23 +30,25 @@ async function getRate(req, res, next) {
 
 async function compareTransfers(req, res, next) {
   try {
+    const language = languageFromRequest(req);
     const amount = Number(req.query.amount || 0);
     const sourceCurrency = req.query.sourceCurrency || 'ILS';
     const targetCurrency = req.query.targetCurrency || 'THB';
-    const [rate, results] = await Promise.all([
-      moneyService.getExchangeRate(sourceCurrency, targetCurrency),
-      moneyService.compareTransfers(amount, sourceCurrency, targetCurrency),
+    const [rate, transfers] = await Promise.all([
+      moneyService.resolveExchangeRate(sourceCurrency, targetCurrency),
+      moneyService.resolveTransferComparison(amount, sourceCurrency, targetCurrency),
     ]);
+    const described = transfers.state === 'ok' && rate.state !== 'ok' && !transfers.results.length ? rate : transfers;
 
     res.status(200).json({
       amount,
       sourceCurrency,
       targetCurrency,
-      rate,
-      results,
-      bestOption: results[0] || null,
-      demoNotice: moneyService.DEMO_NOTICE,
-      safetyNotice: moneyService.SAFETY_NOTICE,
+      rate: rate.rate,
+      results: transfers.results,
+      bestOption: transfers.results[0] || null,
+      rateAvailability: rate.state,
+      ...moneyFields(described, language),
     });
   } catch (error) {
     next(error);

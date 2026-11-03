@@ -707,15 +707,17 @@ async function showProfile() {
   profileView.hidden = false;
 }
 
-function renderJobs(activeJobs = [], matchingJobs = []) {
+function renderJobs(activeJobs = [], matchingJobs = [], result = {}) {
   const matchesById = new Map(matchingJobs.map((job) => [job.jobId, job]));
+  const blocked = ['disabled', 'unavailable', 'empty'].includes(result.availability) || !activeJobs.length;
 
-  if (!activeJobs.length) {
-    jobsList.innerHTML = '<p class="empty-state">No active jobs yet.</p>';
+  if (blocked) {
+    jobsList.innerHTML = `<p class="empty-state">${escapeHtml(result.message || 'No results right now.')}</p>`;
     return;
   }
 
-  jobsList.innerHTML = activeJobs
+  const banner = result.demo ? `<p class="empty-state">${escapeHtml(result.demoNotice || result.message || 'Demo data only.')}</p>` : '';
+  jobsList.innerHTML = banner + activeJobs
     .map((job) => {
       const match = matchesById.get(job.jobId)?.match;
       const reason = match ? `${match.score} - ${match.reason}` : 'No profile match yet';
@@ -724,7 +726,7 @@ function renderJobs(activeJobs = [], matchingJobs = []) {
         <article class="job-item">
           <h3>${escapeHtml(job.title)}</h3>
           <p>${escapeHtml(job.workSector)} - ${escapeHtml(job.profession)} - ${escapeHtml(job.city)}</p>
-          <p>Employer: ${escapeHtml(job.employerName)}</p>
+          <p>${job.demo ? 'Demo: ' : ''}Employer: ${escapeHtml(job.employerName)}</p>
           <p>Salary: ${escapeHtml(job.salaryText)}</p>
           <p>Match: ${escapeHtml(reason)}</p>
         </article>
@@ -743,7 +745,7 @@ async function showJobs() {
   } catch (error) {
     showError(error.message);
   }
-  renderJobs(activeResult.jobs || [], matchingJobs);
+  renderJobs(activeResult.jobs || [], matchingJobs, activeResult);
   chatView.hidden = true;
   communityView.hidden = true;
   communityPostView.hidden = true;
@@ -757,16 +759,17 @@ async function showJobs() {
   jobsView.hidden = false;
 }
 
-function renderServices(services = []) {
-  if (!services.length) {
-    servicesList.innerHTML = '<p class="empty-state">No matching services yet.</p>';
+function renderServices(services = [], result = {}) {
+  if (!services.length || ['disabled', 'unavailable', 'empty'].includes(result.availability)) {
+    servicesList.innerHTML = `<p class="empty-state">${escapeHtml(result.message || 'No results right now.')}</p>`;
     return;
   }
 
-  servicesList.innerHTML = services
+  const banner = result.demo ? `<p class="empty-state">${escapeHtml(result.demoNotice || result.message || 'Demo data only.')}</p>` : '';
+  servicesList.innerHTML = banner + services
     .map((service) => `
       <article class="job-item">
-        <h3>${escapeHtml(service.title)}</h3>
+        <h3>${service.demo ? 'Demo: ' : ''}${escapeHtml(service.title)}</h3>
         <p>${escapeHtml(service.category)} | Rating: ${escapeHtml(service.rating || '-')} | Verified: ${escapeHtml(service.verified || 'No')}</p>
         <p>${escapeHtml(service.description)}</p>
         <p>Phone: ${escapeHtml(service.phone || '-')}</p>
@@ -783,7 +786,7 @@ async function showServices() {
   hideError();
   try {
     const result = await loadServices();
-    renderServices(result.services || []);
+    renderServices(result.services || [], result);
   } catch (error) {
     servicesList.innerHTML = `<p class="empty-state">${escapeHtml(error.message)}</p>`;
     showError(error.message);
@@ -1186,9 +1189,9 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('en-US');
 }
 
-function renderCommunityPosts(posts = [], safetyNotice = '') {
-  if (!posts.length) {
-    communityList.innerHTML = `<p class="empty-state">No published community posts yet.</p><p>${escapeHtml(safetyNotice)}</p>`;
+function renderCommunityPosts(posts = [], safetyNotice = '', result = {}) {
+  if (!posts.length || ['disabled', 'unavailable', 'empty'].includes(result.availability)) {
+    communityList.innerHTML = `<p class="empty-state">${escapeHtml(result.message || 'No results right now.')}</p><p>${escapeHtml(safetyNotice)}</p>`;
     return;
   }
 
@@ -1197,7 +1200,7 @@ function renderCommunityPosts(posts = [], safetyNotice = '') {
       .map((post) => `
         <article class="community-item">
           <p>${escapeHtml(post.category)} - ${escapeHtml(post.language)} - ${escapeHtml(formatDate(post.publishedAt))}</p>
-          <h3>${escapeHtml(post.title)}</h3>
+          <h3>${post.demo ? 'Demo: ' : ''}${escapeHtml(post.title)}</h3>
           <p>${escapeHtml(previewText(post.body))}</p>
           <p>Relevance: ${escapeHtml(post.relevance?.reason || 'Recent community update')}</p>
           <button class="button button-secondary button-small" type="button" data-open-post="${escapeHtml(post.postId)}">Open</button>
@@ -1223,7 +1226,7 @@ async function showCommunity() {
     ...post,
     relevance: relevanceByPostId.get(post.postId),
   }));
-  renderCommunityPosts(posts, publishedResult.safetyNotice);
+  renderCommunityPosts(posts, publishedResult.safetyNotice, publishedResult);
   chatView.hidden = true;
   communityPostView.hidden = true;
   profileView.hidden = true;
@@ -1294,16 +1297,20 @@ function listingPassesFilters(listing, filters) {
   return true;
 }
 
-function renderHousing(activeListings = [], matchingListings = [], filters = {}, safetyNotice = '') {
+function renderHousing(activeListings = [], matchingListings = [], filters = {}, safetyNotice = '', result = {}) {
   const matchesById = new Map(matchingListings.map((listing) => [listing.housingId, listing]));
   const visibleListings = activeListings.filter((listing) => listingPassesFilters(listing, filters));
+  const blocked = ['disabled', 'unavailable', 'empty'].includes(result.availability);
 
-  if (!visibleListings.length) {
-    housingList.innerHTML = `<p class="empty-state">No active housing listings match these filters.</p><p>${escapeHtml(safetyNotice)}</p>`;
+  if (blocked || !visibleListings.length) {
+    const message = blocked ? result.message || 'No results right now.' : 'No results right now.';
+    housingList.innerHTML = `<p class="empty-state">${escapeHtml(message)}</p><p>${escapeHtml(safetyNotice)}</p>`;
     return;
   }
 
+  const banner = result.demo ? `<p class="empty-state">${escapeHtml(result.demoNotice || result.message || 'Demo data only.')}</p>` : '';
   housingList.innerHTML = `
+    ${banner}
     ${visibleListings
       .map((listing) => {
         const match = matchesById.get(listing.housingId)?.match;
@@ -1311,7 +1318,7 @@ function renderHousing(activeListings = [], matchingListings = [], filters = {},
 
         return `
           <article class="housing-item">
-            <h3>${escapeHtml(listing.title)}</h3>
+            <h3>${listing.demo ? 'Demo: ' : ''}${escapeHtml(listing.title)}</h3>
             <p>${escapeHtml(listing.housingType)} - ${escapeHtml(listing.city)} - ${escapeHtml(listing.area)}</p>
             <p>Price: ${escapeHtml(listing.monthlyPrice)} NIS monthly. Bills included: ${escapeHtml(listing.billsIncluded)}</p>
             <p>Available: ${escapeHtml(listing.availableFrom)}</p>
@@ -1335,7 +1342,7 @@ async function showHousing(filters = {}) {
   } catch (error) {
     showError(error.message);
   }
-  renderHousing(activeResult.listings || [], matchingListings, filters, activeResult.safetyNotice);
+  renderHousing(activeResult.listings || [], matchingListings, filters, activeResult.safetyNotice, activeResult);
   chatView.hidden = true;
   communityView.hidden = true;
   communityPostView.hidden = true;
@@ -1354,21 +1361,34 @@ function formatNumber(value) {
 }
 
 function renderMoneyResults(result) {
-  const rateText = result.rate
-    ? `Current demo exchange rate: 1 ${escapeHtml(result.sourceCurrency)} = ${escapeHtml(result.rate.exchangeRate)} ${escapeHtml(result.targetCurrency)}`
-    : `No demo exchange rate found for ${escapeHtml(result.sourceCurrency)} to ${escapeHtml(result.targetCurrency)}.`;
   const providers = result.results || [];
+  const blocked = ['disabled', 'unavailable', 'empty'].includes(result.availability) && !providers.length && !result.rate;
+  if (blocked) {
+    moneyResults.innerHTML = `<p class="empty-state">${escapeHtml(result.message || 'No results right now.')}</p>`;
+    return;
+  }
+
+  const rate = result.rate;
+  let rateText = result.message || 'No results right now.';
+  if (rate && (rate.demo || rate.rateType !== 'reference' && result.demo)) {
+    rateText = `Demo exchange rate: 1 ${escapeHtml(result.sourceCurrency)} = ${escapeHtml(rate.exchangeRate)} ${escapeHtml(result.targetCurrency)}`;
+  } else if (rate && rate.rateType === 'reference') {
+    rateText = `Reference exchange rate: 1 ${escapeHtml(result.sourceCurrency)} = ${escapeHtml(rate.exchangeRate)} ${escapeHtml(result.targetCurrency)}`;
+  } else if (rate) {
+    rateText = `Stored exchange rate: 1 ${escapeHtml(result.sourceCurrency)} = ${escapeHtml(rate.exchangeRate)} ${escapeHtml(result.targetCurrency)}`;
+  }
+  const heading = result.demo ? result.demoNotice || result.message || 'Demo data only.' : result.safetyNotice || '';
 
   moneyResults.innerHTML = `
     <div class="money-item best-option">
-      <h3>${escapeHtml(result.demoNotice)}</h3>
+      <h3>${escapeHtml(heading)}</h3>
       <p>${rateText}</p>
-      <p>${escapeHtml(result.safetyNotice)}</p>
+      <p>${escapeHtml(result.safetyNotice || '')}</p>
     </div>
     ${providers
       .map((provider, index) => `
         <article class="money-item ${index === 0 ? 'best-option' : ''}">
-          <h3>${index === 0 ? 'Best option: ' : ''}${escapeHtml(provider.providerName)}</h3>
+          <h3>${provider.demo ? 'Demo: ' : ''}${index === 0 ? 'Best option: ' : ''}${escapeHtml(provider.providerName)}</h3>
           <p>Recipient receives: ${formatNumber(provider.finalAmountReceived)} ${escapeHtml(provider.targetCurrency)}</p>
           <p>Fee: ${formatNumber(provider.transferFee)} ${escapeHtml(provider.sourceCurrency)}</p>
           <p>Provider rate: ${formatNumber(provider.providerExchangeRate)} ${escapeHtml(provider.targetCurrency)}</p>

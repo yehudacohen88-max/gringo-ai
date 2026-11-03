@@ -1,5 +1,6 @@
 const { multiAgentConfig } = require('../../../config/agents');
 const housingService = require('../../housing/housing.service');
+const { carryCatalog } = require('../../../shared/pilotCatalog');
 const communityService = require('../../community/community.service');
 const serviceService = require('../../services/service.service');
 const documentService = require('../../documents/document.service');
@@ -188,7 +189,7 @@ async function executeHealthSupport(task, input) {
 
   const search = isObject(input.search) ? input.search : serviceService.inferServiceSearch(query, profile);
   const services = await serviceService.findMatchingServices(profile, { ...search, category: search.category || 'Medical' });
-  output.services = services.slice(0, 5);
+  output.services = carryCatalog(services, services.slice(0, 5));
   output.serviceMessage = serviceService.formatServicesForChat(output.services);
 
   return createResult(task, output.knowledge || output.services.length ? 'success' : 'partial', output, warnings);
@@ -217,7 +218,7 @@ async function executeHousingSupport(task, input) {
   const listings = hasHousingSignals(profile) || hasHousingSignals(searchContext)
     ? await housingService.findMatchingHousing(profile, searchContext)
     : await housingService.getActiveHousingListings();
-  const safeListings = listings.slice(0, 5);
+  const safeListings = carryCatalog(listings, listings.slice(0, 5));
 
   return createResult(task, safeListings.length ? 'success' : 'partial', {
     capability: 'housing.support',
@@ -237,9 +238,9 @@ async function executeCommunitySupport(task, input) {
 
   return createResult(task, posts.length ? 'success' : 'partial', {
     capability: 'community.support',
-    posts: posts.slice(0, 5),
+    posts: carryCatalog(posts, posts.slice(0, 5)),
     count: Math.min(posts.length, 5),
-    message: communityService.formatPostsForChat(posts.slice(0, 5)),
+    message: communityService.formatPostsForChat(carryCatalog(posts, posts.slice(0, 5))),
     safetyNotice: communityService.COMMUNITY_SAFETY_NOTICE,
   }, [communityService.COMMUNITY_SAFETY_NOTICE]);
 }

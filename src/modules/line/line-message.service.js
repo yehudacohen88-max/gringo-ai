@@ -10,6 +10,8 @@ const taskService = require('../tasks/task.service');
 const lineDeliveryService = require('./line-delivery.service');
 const lineLinkService = require('./line-link.service');
 const { safeLineWarning } = require('./line-errors');
+const { assistantCatalogReply, catalogMessage, moduleEnabled } = require('../../shared/pilotCatalog');
+const { languageFromProfile } = require('../../shared/userFacingCopy');
 
 const COMMAND_PROMPTS = {
   help: 'Hi Gringo',
@@ -287,15 +289,24 @@ async function completeHousingGoal(user, profile = {}) {
 }
 
 async function handleViewAction(user, moduleName, recordId) {
+  const language = languageFromProfile(user);
   if (moduleName === 'jobs') {
-    const job = await jobService.getJobById(recordId);
+    if (!moduleEnabled('jobs')) return assistantCatalogReply('disabled', language);
+    const jobs = await jobService.getActiveJobs();
+    if (jobs.catalogState === 'unavailable') return assistantCatalogReply('unavailable', language);
+    const job = jobs.find((item) => item.jobId === recordId) || null;
     if (!job || job.status !== 'Active') return 'This job is not available anymore.';
-    return `Job: ${job.title}\nCity: ${job.city}\nEmployer: ${job.employerName || '-'}\nSalary: ${job.salaryText || '-'}`;
+    const prefix = job.demo ? `${catalogMessage('demo', language)}\n` : '';
+    return `${prefix}Job: ${job.title}\nCity: ${job.city}\nEmployer: ${job.employerName || '-'}\nSalary: ${job.salaryText || '-'}`;
   }
   if (moduleName === 'housing') {
-    const listing = await housingService.getHousingById(recordId);
+    if (!moduleEnabled('housing')) return assistantCatalogReply('disabled', language);
+    const listings = await housingService.getActiveHousingListings();
+    if (listings.catalogState === 'unavailable') return assistantCatalogReply('unavailable', language);
+    const listing = listings.find((item) => item.housingId === recordId) || null;
     if (!listing || listing.status !== 'Active') return 'This housing listing is not available anymore.';
-    return `Housing: ${listing.title}\nCity: ${listing.city}\nPrice: ${listing.monthlyPrice || '-'} NIS\nContact: ${listing.contactName || '-'} ${listing.contactValue || ''}`.trim();
+    const prefix = listing.demo ? `${catalogMessage('demo', language)}\n` : '';
+    return `${prefix}Housing: ${listing.title}\nCity: ${listing.city}\nPrice: ${listing.monthlyPrice || '-'} NIS\nContact: ${listing.contactName || '-'} ${listing.contactValue || ''}`.trim();
   }
   if (moduleName === 'documents') {
     const document = await documentService.getDocumentById(recordId);

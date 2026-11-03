@@ -1,5 +1,7 @@
 const { coreAgentService } = require('../core-agent');
 const { loadWebProfile } = require('../../shared/webPersonalData');
+const { carryCatalog, publicCatalogFields } = require('../../shared/pilotCatalog');
+const { languageFromRequest, responseLanguage } = require('../../shared/userFacingCopy');
 const housingService = require('./housing.service');
 
 function splitList(value) {
@@ -12,7 +14,7 @@ function splitList(value) {
 function preferUnseen(items = [], idKey, seenValue = '') {
   const seenIds = new Set(splitList(seenValue));
   const unseen = items.filter((item) => !seenIds.has(item[idKey]));
-  return unseen.length ? unseen : items;
+  return carryCatalog(items, unseen.length ? unseen : items);
 }
 
 async function getActiveHousingListings(req, res, next) {
@@ -21,6 +23,7 @@ async function getActiveHousingListings(req, res, next) {
     res.status(200).json({
       listings,
       safetyNotice: housingService.HOUSING_SAFETY_NOTICE,
+      ...publicCatalogFields(listings, languageFromRequest(req)),
     });
   } catch (error) {
     next(error);
@@ -55,6 +58,7 @@ async function getMatchingHousing(req, res, next) {
       listings,
       lookingForHousing: profile.lookingForHousing === 'Yes',
       safetyNotice: housingService.HOUSING_SAFETY_NOTICE,
+      ...publicCatalogFields(listings, responseLanguage(req, profile)),
     });
   } catch (error) {
     next(error);

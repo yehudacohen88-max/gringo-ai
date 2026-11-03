@@ -1,5 +1,7 @@
 const { coreAgentService } = require('../core-agent');
 const { loadWebProfile } = require('../../shared/webPersonalData');
+const { carryCatalog, publicCatalogFields } = require('../../shared/pilotCatalog');
+const { languageFromRequest, responseLanguage } = require('../../shared/userFacingCopy');
 const jobService = require('./job.service');
 
 function splitList(value) {
@@ -12,13 +14,16 @@ function splitList(value) {
 function preferUnseen(items = [], idKey, seenValue = '') {
   const seenIds = new Set(splitList(seenValue));
   const unseen = items.filter((item) => !seenIds.has(item[idKey]));
-  return unseen.length ? unseen : items;
+  return carryCatalog(items, unseen.length ? unseen : items);
 }
 
 async function getActiveJobs(req, res, next) {
   try {
     const jobs = await jobService.getActiveJobs();
-    res.status(200).json({ jobs });
+    res.status(200).json({
+      jobs,
+      ...publicCatalogFields(jobs, languageFromRequest(req)),
+    });
   } catch (error) {
     next(error);
   }
@@ -47,6 +52,7 @@ async function getMatchingJobs(req, res, next) {
     res.status(200).json({
       jobs,
       wantsJobAlerts: profile.wantsJobAlerts === 'Yes',
+      ...publicCatalogFields(jobs, responseLanguage(req, profile)),
     });
   } catch (error) {
     next(error);

@@ -1,6 +1,13 @@
 const housingRepository = require('./housing.repository');
 const { HOUSING_STATUSES, HOUSING_TYPES } = require('./housing.model');
 const { SAMPLE_HOUSING_LISTINGS } = require('./sample-housing-listings');
+const {
+  assistantCatalogReply,
+  catalogMeta,
+  readPilotCatalog,
+  refuseDemoWrite,
+  tagCatalog,
+} = require('../../shared/pilotCatalog');
 
 const HOUSING_SAFETY_NOTICE = [
   'Verify the landlord or provider before paying.',
@@ -72,30 +79,35 @@ function validationError(errors) {
   return error;
 }
 
-async function readListingsWithSampleFallback() {
-  try {
-    const listings = await housingRepository.findAllHousingListings();
-    return listings.length > 0 ? listings : SAMPLE_HOUSING_LISTINGS;
-  } catch (error) {
-    return SAMPLE_HOUSING_LISTINGS;
-  }
+async function readHousingCatalog() {
+  return readPilotCatalog({
+    moduleName: 'housing',
+    read: () => housingRepository.findAllHousingListings(),
+    samples: SAMPLE_HOUSING_LISTINGS,
+    idFields: ['housingId'],
+  });
 }
 
 async function createHousingListing(input = {}) {
   const listing = buildHousingListing(input);
   const errors = validateHousingListing(listing);
   if (errors.length > 0) throw validationError(errors);
+  refuseDemoWrite(listing, SAMPLE_HOUSING_LISTINGS, ['housingId']);
   return housingRepository.createHousingListing(listing);
 }
 
 async function getActiveHousingListings() {
-  const listings = await readListingsWithSampleFallback();
-  return listings.filter((listing) => listing.status === 'Active');
+  const catalog = await readHousingCatalog();
+  return tagCatalog(
+    catalog.records.filter((listing) => listing.status === 'Active'),
+    catalog.state,
+    catalog.demo
+  );
 }
 
 async function getHousingById(housingId) {
-  const listings = await readListingsWithSampleFallback();
-  return listings.find((listing) => listing.housingId === housingId) || null;
+  const catalog = await readHousingCatalog();
+  return catalog.records.find((listing) => listing.housingId === housingId) || null;
 }
 
 function scoreListing(listing, userProfile = {}, searchContext = {}) {
@@ -121,27 +133,36 @@ function scoreListing(listing, userProfile = {}, searchContext = {}) {
 
 async function findMatchingHousing(userProfile = {}, searchContext = {}) {
   const listings = await getActiveHousingListings();
-  return listings
+  const matches = listings
     .map((listing) => ({
       ...listing,
       match: scoreListing(listing, userProfile, searchContext),
     }))
     .filter((listing) => listing.match.score > 0)
     .sort((a, b) => b.match.score - a.match.score);
+  return tagCatalog(matches, listings.catalogState, listings.catalogDemo);
 }
 
-function formatHousingForChat(listings = []) {
-  if (!listings.length) {
-    return `I did not find matching housing yet. What city, housing type, or budget should I search for? ${HOUSING_SAFETY_NOTICE}`;
+function formatHousingForChat(listings = [], options = {}) {
+  const meta = catalogMeta(listings);
+  const state = options.state || meta.state;
+  const language = options.language || 'en';
+  const demo = options.demo === true || meta.demo || listings.some((listing) => listing && listing.demo);
+
+  if (!listings.length || state === 'disabled' || state === 'unavailable') {
+    const resolved = !listings.length && (state === 'ok' || state === 'demo') ? 'empty' : state;
+    return `${assistantCatalogReply(resolved, language)} ${HOUSING_SAFETY_NOTICE}`;
   }
 
   const lines = listings.slice(0, 5).map((listing, index) => {
-    return `${index + 1}. ${listing.title} - ${listing.city}. Price: ${listing.monthlyPrice} NIS monthly. Available: ${
+    const label = listing.demo ? 'Demo: ' : '';
+    return `${index + 1}. ${label}${listing.title} - ${listing.city}. Price: ${listing.monthlyPrice} NIS monthly. Available: ${
       listing.availableFrom
-    }. Match: ${listing.match.reason}. Contact: ${listing.contactName || listing.contactMethod || 'Ask Gringo for details'}.`;
+    }. Match: ${listing.match?.reason || 'Listed housing'}. Contact: ${listing.contactName || listing.contactMethod || 'Ask Gringo for details'}.`;
   });
+  const notice = demo ? `${assistantCatalogReply('demo', language)}\n` : '';
 
-  return `I found housing options that may fit you:\n${lines.join('\n')}\nWhich listing would you like to know more about?\n${HOUSING_SAFETY_NOTICE}`;
+  return `${notice}I found housing options that may fit you:\n${lines.join('\n')}\nWhich listing would you like to know more about?\n${HOUSING_SAFETY_NOTICE}`;
 }
 
 module.exports = {

@@ -179,6 +179,7 @@ test('Core Agent keeps existing intent routing unchanged for job search', async 
   });
 
   assert.equal(result.category, 'Jobs');
-  assert.match(result.reply, /job/i);
+  assert.match(result.reply, /No results right now|ยังไม่มีผลลัพธ์ในตอนนี้|บริการนี้ไม่พร้อมใช้งานในตอนนี้/);
+  assert.doesNotMatch(result.reply, /Aviv Construction/i);
   assert.equal(state.detectedUpdates.length, 0);
 });

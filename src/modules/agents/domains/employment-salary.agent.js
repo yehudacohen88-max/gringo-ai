@@ -1,5 +1,6 @@
 ﻿const { multiAgentConfig } = require('../../../config/agents');
 const jobService = require('../../jobs/job.service');
+const { assistantCatalogReply, catalogMeta } = require('../../../shared/pilotCatalog');
 const knowledgeAgentService = require('../../knowledge-agent/knowledge-agent.service');
 const knowledgeBaseService = require('../../knowledge-agent/knowledge-base.service');
 const documentService = require('../../documents/document.service');
@@ -619,10 +620,26 @@ async function resolveProfile(input = {}) {
 
 async function executeJobsSearch(task, input) {
   const jobs = await jobService.getActiveJobs();
+  const state = jobs.catalogState || (jobs.length ? 'ok' : 'empty');
+  if (!jobs.length || state === 'disabled' || state === 'unavailable' || state === 'empty') {
+    const resolved = !jobs.length && state === 'ok' ? 'empty' : state;
+    return createResult(task, 'partial', {
+      capability: 'jobs.search',
+      jobs: [],
+      count: 0,
+      availability: resolved,
+      message: assistantCatalogReply(resolved, 'en'),
+      responseLanguage: 'en',
+      suppressGenericFollowUp: true,
+    }, [`catalog_${resolved}`]);
+  }
   return createResult(task, 'success', {
     capability: 'jobs.search',
     jobs,
     count: jobs.length,
+    availability: state,
+    demo: jobs.catalogDemo === true,
+    message: jobService.formatJobsForChat(jobs),
   });
 }
 
@@ -639,10 +656,25 @@ async function executeJobsMatch(task, input) {
   }
 
   const jobs = await jobService.findMatchingJobs(profile, searchContext);
+  const state = jobs.catalogState || (jobs.length ? 'ok' : 'empty');
+  if (!jobs.length || state === 'disabled' || state === 'unavailable') {
+    const resolved = !jobs.length && (state === 'ok' || state === 'demo') ? 'empty' : state;
+    return createResult(task, 'partial', {
+      capability: 'jobs.match',
+      jobs: [],
+      count: 0,
+      availability: resolved,
+      message: assistantCatalogReply(resolved, 'en'),
+      responseLanguage: 'en',
+      suppressGenericFollowUp: true,
+    }, [`catalog_${resolved}`]);
+  }
   return createResult(task, 'success', {
     capability: 'jobs.match',
     jobs,
     count: jobs.length,
+    availability: state,
+    demo: catalogMeta(jobs).demo,
     message: jobService.formatJobsForChat(jobs),
   });
 }

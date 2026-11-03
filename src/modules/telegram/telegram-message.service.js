@@ -12,6 +12,8 @@ const taskService = require('../tasks/task.service');
 const telegramClient = require('./telegram-client.service');
 const telegramLinkService = require('./telegram-link.service');
 const { safeTelegramWarning } = require('./telegram-errors');
+const { assistantCatalogReply, catalogListReply, catalogMessage, moduleEnabled } = require('../../shared/pilotCatalog');
+const { languageFromProfile } = require('../../shared/userFacingCopy');
 
 function cleanText(value) {
   return value === undefined || value === null ? '' : String(value).trim();
@@ -185,11 +187,15 @@ async function commandProfile(profile = {}) {
 }
 
 async function commandJobs(profile = {}) {
-  const matches = (await jobService.findMatchingJobs(profile)).slice(0, 3);
-  if (!matches.length) return { reply: 'I did not find matching active jobs yet.', status: 'TELEGRAM_JOBS_EMPTY' };
+  const language = languageFromProfile(profile);
+  const matched = await jobService.findMatchingJobs(profile);
+  const notice = catalogListReply(matched, language);
+  if (notice.blocked) return { reply: notice.blocked, status: 'TELEGRAM_JOBS_EMPTY' };
+  const matches = matched.slice(0, 3);
+  const prefix = notice.prefix ? `${notice.prefix}\n` : '';
   return {
-    reply: `Relevant jobs:\n${matches
-      .map((job, index) => `${index + 1}. ${job.title} - ${job.city}\n${job.employerName || ''} ${job.salaryText || ''}`.trim())
+    reply: `${prefix}Relevant jobs:\n${matches
+      .map((job, index) => `${index + 1}. ${job.demo ? 'Demo: ' : ''}${job.title} - ${job.city}\n${job.employerName || ''} ${job.salaryText || ''}`.trim())
       .join('\n\n')}`,
     replyMarkup: inlineKeyboard([
       [button('View Job', 'view', 'jobs', matches[0].jobId)],
@@ -200,10 +206,14 @@ async function commandJobs(profile = {}) {
 }
 
 async function commandHousing(profile = {}) {
-  const matches = (await housingService.findMatchingHousing(profile)).slice(0, 3);
-  if (!matches.length) return { reply: 'I did not find matching housing yet.', status: 'TELEGRAM_HOUSING_EMPTY' };
+  const language = languageFromProfile(profile);
+  const matched = await housingService.findMatchingHousing(profile);
+  const notice = catalogListReply(matched, language);
+  if (notice.blocked) return { reply: notice.blocked, status: 'TELEGRAM_HOUSING_EMPTY' };
+  const matches = matched.slice(0, 3);
+  const prefix = notice.prefix ? `${notice.prefix}\n` : '';
   return {
-    reply: `Relevant housing:\n${matches
+    reply: `${prefix}Relevant housing:\n${matches
       .map(
         (listing, index) =>
           `${index + 1}. ${listing.title} - ${listing.city}\n${listing.monthlyPrice || '-'} NIS | ${
@@ -220,40 +230,52 @@ async function commandHousing(profile = {}) {
 }
 
 async function commandMoney(profile = {}) {
+  const language = languageFromProfile(profile);
   const targetCurrency = profile.preferredCurrency || 'THB';
   const amount = profile.lastMoneyTransferAmount || '2000';
-  const comparison = await moneyService.compareTransfers(amount, 'ILS', targetCurrency);
-  const best = comparison[0];
+  const described = await moneyService.resolveTransferComparison(amount, 'ILS', targetCurrency);
+  const notice = catalogListReply(described.results, language);
+  if (notice.blocked && !described.results.length) return { reply: notice.blocked, status: 'TELEGRAM_MONEY' };
+  const best = described.results[0];
+  const lines = [
+    notice.prefix || '',
+    `Saved currency: ${targetCurrency}`,
+    `Saved transfer country: ${profile.lastMoneyTransferCountry || profile.moneyTransferCountry || profile.country || '-'}`,
+    best
+      ? `${described.demo ? 'Demo: ' : ''}Best ${described.demo ? 'demo ' : ''}option for ${amount} ILS: ${best.providerName}, recipient gets about ${Math.round(best.finalAmountReceived)} ${targetCurrency}.`
+      : assistantCatalogReply('empty', language),
+    moneyService.SAFETY_NOTICE,
+  ].filter(Boolean);
   return {
-    reply: [
-      moneyService.DEMO_NOTICE,
-      `Saved currency: ${targetCurrency}`,
-      `Saved transfer country: ${profile.lastMoneyTransferCountry || profile.moneyTransferCountry || profile.country || '-'}`,
-      best
-        ? `Best demo option for ${amount} ILS: ${best.providerName}, recipient gets about ${Math.round(best.finalAmountReceived)} ${targetCurrency}.`
-        : 'No demo transfer provider found.',
-      moneyService.SAFETY_NOTICE,
-    ].join('\n'),
+    reply: lines.join('\n'),
     status: 'TELEGRAM_MONEY',
   };
 }
 
 async function commandCommunity(profile = {}) {
-  const posts = (await communityService.getRelevantPosts(profile)).slice(0, 3);
-  if (!posts.length) return { reply: 'No recent community posts matched yet.', status: 'TELEGRAM_COMMUNITY_EMPTY' };
+  const language = languageFromProfile(profile);
+  const matched = await communityService.getRelevantPosts(profile);
+  const notice = catalogListReply(matched, language);
+  if (notice.blocked) return { reply: notice.blocked, status: 'TELEGRAM_COMMUNITY_EMPTY' };
+  const posts = matched.slice(0, 3);
+  const prefix = notice.prefix ? `${notice.prefix}\n` : '';
   return {
-    reply: `Community updates:\n${posts.map((post, index) => `${index + 1}. ${post.title} (${post.category})`).join('\n')}`,
+    reply: `${prefix}Community updates:\n${posts.map((post, index) => `${index + 1}. ${post.demo ? 'Demo: ' : ''}${post.title} (${post.category})`).join('\n')}`,
     replyMarkup: inlineKeyboard([[button('Open Post', 'view', 'community', posts[0].postId), button('Show More', 'more', 'community', 'posts')]]),
     status: 'TELEGRAM_COMMUNITY',
   };
 }
 
 async function commandServices(profile = {}) {
-  const services = (await serviceService.findMatchingServices(profile)).slice(0, 3);
-  if (!services.length) return { reply: 'I did not find recommended services yet.', status: 'TELEGRAM_SERVICES_EMPTY' };
+  const language = languageFromProfile(profile);
+  const matched = await serviceService.findMatchingServices(profile, {});
+  const notice = catalogListReply(matched, language);
+  if (notice.blocked) return { reply: notice.blocked, status: 'TELEGRAM_SERVICES_EMPTY' };
+  const services = matched.slice(0, 3);
+  const prefix = notice.prefix ? `${notice.prefix}\n` : '';
   return {
-    reply: `Recommended services:\n${services
-      .map((service, index) => `${index + 1}. ${service.title} - ${service.category}\n${service.city || '-'} | ${service.languages || '-'}`)
+    reply: `${prefix}Recommended services:\n${services
+      .map((service, index) => `${index + 1}. ${service.demo ? 'Demo: ' : ''}${service.title} - ${service.category}\n${service.city || '-'} | ${service.languages || '-'}`)
       .join('\n\n')}`,
     replyMarkup: inlineKeyboard([[button('View Service', 'view', 'services', services[0].id), button('Save Service', 'save', 'services', services[0].id)]]),
     status: 'TELEGRAM_SERVICES',
@@ -482,15 +504,24 @@ async function completeHousingGoal(user, profile) {
 }
 
 async function handleViewCallback(callback, user, profile, moduleName, recordId) {
+  const language = languageFromProfile(profile);
   if (moduleName === 'jobs') {
-    const job = await jobService.getJobById(recordId);
+    if (!moduleEnabled('jobs')) return assistantCatalogReply('disabled', language);
+    const jobs = await jobService.getActiveJobs();
+    if (jobs.catalogState === 'unavailable') return assistantCatalogReply('unavailable', language);
+    const job = jobs.find((item) => item.jobId === recordId) || null;
     if (!job || job.status !== 'Active') return 'This job is no longer available.';
-    return [`Job: ${job.title}`, `City: ${job.city || '-'}`, `Employer: ${job.employerName || '-'}`, `Salary: ${job.salaryText || '-'}`].join('\n');
+    const prefix = job.demo ? `${catalogMessage('demo', language)}\n` : '';
+    return prefix + [`Job: ${job.title}`, `City: ${job.city || '-'}`, `Employer: ${job.employerName || '-'}`, `Salary: ${job.salaryText || '-'}`].join('\n');
   }
   if (moduleName === 'housing') {
-    const listing = await housingService.getHousingById(recordId);
+    if (!moduleEnabled('housing')) return assistantCatalogReply('disabled', language);
+    const listings = await housingService.getActiveHousingListings();
+    if (listings.catalogState === 'unavailable') return assistantCatalogReply('unavailable', language);
+    const listing = listings.find((item) => item.housingId === recordId) || null;
     if (!listing || listing.status !== 'Active') return 'This housing listing is no longer available.';
-    return [`Housing: ${listing.title}`, `City: ${listing.city || '-'}`, `Price: ${listing.monthlyPrice || '-'} NIS`, `Available: ${listing.availableFrom || '-'}`].join('\n');
+    const prefix = listing.demo ? `${catalogMessage('demo', language)}\n` : '';
+    return prefix + [`Housing: ${listing.title}`, `City: ${listing.city || '-'}`, `Price: ${listing.monthlyPrice || '-'} NIS`, `Available: ${listing.availableFrom || '-'}`].join('\n');
   }
   if (moduleName === 'documents') {
     const document = await documentService.getDocumentById(recordId);
@@ -499,14 +530,22 @@ async function handleViewCallback(callback, user, profile, moduleName, recordId)
     return [`Document: ${safe.documentType}`, `Status: ${safe.status}`, `Expiry: ${safe.expiryDate || '-'}`, `Number: ${safe.documentNumber || 'Not saved'}`].join('\n');
   }
   if (moduleName === 'community') {
-    const post = await communityService.getPostById(recordId);
+    if (!moduleEnabled('community')) return assistantCatalogReply('disabled', language);
+    const posts = await communityService.getPublishedPosts();
+    if (posts.catalogState === 'unavailable') return assistantCatalogReply('unavailable', language);
+    const post = posts.find((item) => item.postId === recordId) || null;
     if (!post || post.status !== 'Published') return 'This post is not available.';
-    return `${post.title}\n${post.body || ''}`.slice(0, 1200);
+    const prefix = post.demo ? `${catalogMessage('demo', language)}\n` : '';
+    return `${prefix}${post.title}\n${post.body || ''}`.slice(0, 1200);
   }
   if (moduleName === 'services') {
-    const service = await serviceService.getServiceById(recordId);
+    if (!moduleEnabled('services')) return assistantCatalogReply('disabled', language);
+    const services = await serviceService.getServices({});
+    if (services.catalogState === 'unavailable') return assistantCatalogReply('unavailable', language);
+    const service = services.find((item) => item.id === recordId) || null;
     if (!service) return 'This service is not available.';
-    return [`Service: ${service.title}`, `Category: ${service.category}`, `City: ${service.city || '-'}`, `Phone: ${service.phone || '-'}`, `Languages: ${service.languages || '-'}`].join('\n');
+    const prefix = service.demo ? `${catalogMessage('demo', language)}\n` : '';
+    return prefix + [`Service: ${service.title}`, `Category: ${service.category}`, `City: ${service.city || '-'}`, `Phone: ${service.phone || '-'}`, `Languages: ${service.languages || '-'}`].join('\n');
   }
   return 'This item is not available.';
 }

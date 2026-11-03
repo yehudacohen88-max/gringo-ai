@@ -331,7 +331,7 @@ async function createNotificationsFromExistingModules(userId, userProfile = {}) 
   const created = [];
 
   if (isYes(userProfile.lookingForJob) && isYes(userProfile.wantsJobAlerts) && isEnabled(userProfile.jobNotifications)) {
-    const jobs = await jobService.findMatchingJobs(userProfile);
+    const jobs = (await jobService.findMatchingJobs(userProfile)).filter((job) => !job.demo);
     for (const job of jobs.slice(0, 3)) {
       created.push(
         await createNotification({
@@ -350,7 +350,7 @@ async function createNotificationsFromExistingModules(userId, userProfile = {}) 
   }
 
   if (isYes(userProfile.lookingForHousing) && isEnabled(userProfile.housingNotifications)) {
-    const listings = await housingService.findMatchingHousing(userProfile);
+    const listings = (await housingService.findMatchingHousing(userProfile)).filter((listing) => !listing.demo);
     for (const listing of listings.slice(0, 3)) {
       created.push(
         await createNotification({
@@ -389,14 +389,16 @@ async function createNotificationsFromExistingModules(userId, userProfile = {}) 
   }
 
   if (isYes(userProfile.wantsExchangeRateAlerts) && userProfile.preferredCurrency && isEnabled(userProfile.moneyNotifications)) {
-    const rate = await moneyService.getExchangeRate('ILS', userProfile.preferredCurrency);
-    if (rate) {
+    const describedRate = await moneyService.resolveExchangeRate('ILS', userProfile.preferredCurrency);
+    const rate = describedRate.rate;
+    if (rate && !describedRate.demo && !rate.demo) {
+      const label = rate.rateType === 'reference' ? 'Reference rate' : 'Stored rate';
       created.push(
         await createNotification({
           userId,
           type: 'Exchange Rate',
           title: 'Exchange rate update',
-          message: `Demo rate: 1 ILS = ${rate.exchangeRate} ${rate.targetCurrency}. Demo data - not a live rate.`,
+          message: `${label}: 1 ILS = ${rate.exchangeRate} ${rate.targetCurrency}. ${moneyService.SAFETY_NOTICE}`,
           sourceModule: 'Money',
           sourceRecordId: `${rate.sourceCurrency}_${rate.targetCurrency}`,
           priority: 'Normal',
@@ -408,7 +410,7 @@ async function createNotificationsFromExistingModules(userId, userProfile = {}) 
   }
 
   if (isEnabled(userProfile.communityNotifications)) {
-    const posts = await communityService.getRelevantPosts(userProfile);
+    const posts = (await communityService.getRelevantPosts(userProfile)).filter((post) => !post.demo);
     for (const post of posts.slice(0, 3)) {
       created.push(
         await createNotification({
