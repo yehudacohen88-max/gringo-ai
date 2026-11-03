@@ -112,7 +112,9 @@ function addMessage(author, text) {
 }
 
 function apiFetch(url, options = {}) {
-  return fetch(url, { credentials: 'same-origin', ...options });
+  const headers = new Headers(options.headers || {});
+  if (!headers.has('accept-language')) headers.set('accept-language', uiLanguage);
+  return fetch(url, { credentials: 'same-origin', ...options, headers });
 }
 
 function rememberLanguage(profile) {

@@ -207,6 +207,29 @@ function resolveWebSessionSecret(nodeEnv, sourceEnv = {}) {
 
 // Telegram still uses polling. Webhook mode has no request handler, so do not
 // boot that mode until a secret exists for a future signature check.
+const MAX_TRUST_PROXY_HOPS = 5;
+
+// Not a secret. Unset means rate limits use the TCP peer. A positive integer
+// trusts that many proxies in front of this process. Express trust proxy is
+// not turned on. No hosting provider is approved; the right number depends
+// on that provider (usually 1 for a single edge proxy).
+function parseTrustProxyHops(value) {
+  if (value === undefined || value === null || String(value).trim() === '') return 0;
+  const text = String(value).trim();
+  if (!/^[0-9]+$/.test(text)) {
+    throw new Error(
+      'Refusing to start: TRUST_PROXY_HOPS must be an integer from 0 to 5, or unset. Express trust proxy stays false.'
+    );
+  }
+  const hops = Number(text);
+  if (hops > MAX_TRUST_PROXY_HOPS) {
+    throw new Error(
+      'Refusing to start: TRUST_PROXY_HOPS must be an integer from 0 to 5, or unset. Express trust proxy stays false.'
+    );
+  }
+  return hops;
+}
+
 function assertTelegramWebhookSecret(sourceEnv = {}) {
   const mode = readTrimmed(sourceEnv.TELEGRAM_BOT_MODE) || 'polling';
   if (mode.toLowerCase() !== 'webhook') return;
@@ -220,6 +243,12 @@ function assertTelegramWebhookSecret(sourceEnv = {}) {
 
 const webSession = resolveWebSessionSecret(process.env.NODE_ENV, process.env);
 assertTelegramWebhookSecret(process.env);
+const trustProxyHops = parseTrustProxyHops(process.env.TRUST_PROXY_HOPS);
+if ((process.env.NODE_ENV || '').trim() === 'production' && trustProxyHops === 0) {
+  console.warn(
+    '[startup] TRUST_PROXY_HOPS is unset. Rate limits use the TCP peer and ignore X-Forwarded-For. If a reverse proxy is later placed in front, set TRUST_PROXY_HOPS to that provider\'s exact hop count (usually 1) and do not expose the process directly. Express trust proxy stays false. This warning does not include a secret.'
+  );
+}
 
 const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -227,6 +256,7 @@ const env = {
   adminApiKey: resolveAdminApiKey(process.env.NODE_ENV, process.env.ADMIN_API_KEY, process.env),
   webSessionSecret: webSession.current,
   webSessionSecretPrevious: webSession.previous,
+  trustProxyHops,
   telegram: {
     enabled: String(process.env.TELEGRAM_BOT_ENABLED || 'false').toLowerCase() === 'true',
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',
@@ -325,4 +355,9 @@ const env = {
   },
 };
 
-module.exports = { env, DEV_ADMIN_API_KEY };
+module.exports = {
+  env,
+  DEV_ADMIN_API_KEY,
+  MAX_TRUST_PROXY_HOPS,
+  parseTrustProxyHops,
+};
