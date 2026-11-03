@@ -109,6 +109,15 @@ function attachWebIdentity(req, res, next) {
     return;
   }
 
+  // Refuse to mint a gw_sid once this IP has created too many new sessions.
+  // The cookie format and signature checks above are unchanged.
+  const { consumeNewSession, sendRateLimited } = require('./rateLimit');
+  const decision = consumeNewSession(req);
+  if (!decision.allowed) {
+    sendRateLimited(req, res, decision);
+    return;
+  }
+
   const webId = createWebId();
   req.identity = identityFor(webId, true);
   writeSessionCookie(res, webId);

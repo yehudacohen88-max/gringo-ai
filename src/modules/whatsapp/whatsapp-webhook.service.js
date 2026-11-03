@@ -6,6 +6,7 @@ const whatsappMessageMapper = require('./whatsapp-message.mapper');
 const whatsappMessageService = require('./whatsapp-message.service');
 const { communicationService } = require('../communication');
 const managerRepository = require('../manager-agent/manager-agent.repository');
+const { limitWebhook } = require('../../shared/rateLimit');
 const { safeWhatsAppWarning } = require('./whatsapp-errors');
 
 const processedMessageIds = [];
@@ -206,8 +207,8 @@ function getWebhookHealth() {
 
 function createRoutes() {
   const router = express.Router();
-  router.get('/webhook', verifyWebhook);
-  router.post('/webhook', receiveWebhook);
+  router.get('/webhook', limitWebhook, verifyWebhook);
+  router.post('/webhook', limitWebhook, receiveWebhook);
   return router;
 }
 

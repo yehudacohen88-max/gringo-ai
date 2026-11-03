@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const express = require('express');
 const { env } = require('../../config/env');
 const { requireAdminKey } = require('../../shared/requireAdminKey');
+const { limitLinkGenerate, limitWebhook } = require('../../shared/rateLimit');
 const { attachWebIdentity } = require('../../shared/webIdentity');
 const { requireSameOrigin } = require('../../shared/requireSameOrigin');
 const { requireExplicitConfirm, resolveWebUserContext } = require('../../shared/requireWebIdentity');
@@ -240,8 +241,8 @@ function getWebhookHealth() {
 
 function createRoutes() {
   const router = express.Router();
-  router.post('/webhook', receiveWebhook);
-  router.post('/link-code', requireSameOrigin, attachWebIdentity, createLinkCode);
+  router.post('/webhook', limitWebhook, receiveWebhook);
+  router.post('/link-code', requireSameOrigin, limitLinkGenerate, attachWebIdentity, createLinkCode);
   router.post('/disconnect', requireSameOrigin, attachWebIdentity, disconnect);
   router.get('/link-history', requireAdminKey, history);
   router.get('/rich-menu/default', requireAdminKey, (req, res) => {

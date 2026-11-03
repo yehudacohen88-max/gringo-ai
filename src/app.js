@@ -20,6 +20,11 @@ const { blockPersonalDataVariants } = require('./shared/blockPersonalDataRoute')
 
 const app = express();
 
+// Express would otherwise send X-Powered-By: Express.
+app.disable('x-powered-by');
+// Leave forwarding headers untrusted. See src/shared/clientIp.js.
+app.set('trust proxy', false);
+
 // Before body parsing and routers, so URL variants cannot reach a data store.
 app.use(blockPersonalDataVariants);
 

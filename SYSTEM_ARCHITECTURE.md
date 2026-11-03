@@ -1052,8 +1052,15 @@ Expiration:
 
 Rate limiting:
 
-- Telegram and LINE link services contain attempt/rate-limit style checks in service logic.
-- Express middleware rate limiting: Not Confirmed.
+- Telegram and LINE link-code redeem attempts stay limited in `src/shared/linkCode.js` (per channel account, per code, and globally). Those identity rules are unchanged.
+- Express limits in `src/shared/rateLimit.js` are in-memory and single-process. They reset when the process restarts and are not shared across instances. This adds to the single-process operational requirement already required for sheet row locks.
+- The client IP is `socket.remoteAddress`. `trust proxy` is false. `X-Forwarded-For` and `X-Real-IP` are ignored, so a client cannot pick a new bucket with a header. Deploy assumption: clients connect directly to this process. A reverse proxy in front would make every user share the proxy address until a reviewed change trusts exactly one hop. Do not set `trust proxy` to `true`.
+- POST `/api/chat/message` (the HTTP route that calls OpenAI and translation): 20 requests per minute per IP and 10 per minute per valid `gw_sid`.
+- Public catalog and search reads (GET `/api/jobs`, `/api/housing`, `/api/services`, `/api/services/:id`, `/api/community`, `/api/community/:postId`, `/api/money/rate`, `/api/money/compare`): 120 requests per minute per IP and 120 per minute per valid `gw_sid`.
+- Link-code generate (POST `/api/telegram/link-code` and POST `/api/line/link-code`): 10 per hour per IP and 5 per hour per valid `gw_sid`. Redeem stays on the linkCode.js limits. Telegram inbound chat is polling, not an HTTP webhook, so this limiter does not wrap the poll loop.
+- New `gw_sid` creation: 60 per 10 minutes per IP, checked before a new id is signed. Refreshing a valid cookie does not spend this budget. The route IP limit still increments when a cookie is present.
+- Webhooks (POST `/api/line/webhook`, GET and POST `/api/whatsapp/webhook`): 600 per minute per IP. There is no browser session. Over the limit the response is HTTP 200 `{ ok: true }` and the handler does not run. LINE and Meta retry non-2xx responses, so HTTP 429 would amplify a flood. The event is dropped. User-facing limits use HTTP 429, `Retry-After`, and a localized `RATE_LIMITED` message.
+- Admin translation settings reload local configuration and do not call OpenAI, so they are not on the chat limiter.
 
 Unlinking:
 
@@ -1641,7 +1648,7 @@ Logging:
 
 - Connector modules use safe warning helpers such as `safeTelegramWarning`, `safeWhatsAppWarning`, `safeLineWarning`, and `safeCommunicationLog`.
 - Startup connector failures are logged as safe warnings in `src/server.js`.
-- Error middleware is centralized in `src/shared/errorHandler.js`.
+- Error middleware is centralized in `src/shared/errorHandler.js`. HTTP 500 and above return a generic localized message (`INTERNAL_ERROR`) with empty details. The original message, stack, and provider or sheet details stay out of the response. The server log records the method, the path without the query string, and a redacted error. Redaction covers tokens, keys, cookies, phone numbers, emails, and long quoted text. Request bodies and headers are not logged. `X-Powered-By` is disabled.
 
 Error logging:
 
@@ -1686,9 +1693,10 @@ Authorization and ownership validation:
 
 Rate limiting:
 
-- Telegram linking attempts are rate-limited in `telegram-link.service.js`.
-- LINE linking attempts are rate-limited in `line-link.service.js`.
-- Express-wide rate limiting was Not Confirmed.
+- Telegram and LINE link-code redeem attempts are rate-limited in `src/shared/linkCode.js`.
+- HTTP chat, public catalog and search, link-code generate, new `gw_sid` creation, and LINE and WhatsApp webhooks are rate-limited in memory by `src/shared/rateLimit.js`. Counters are single-process: they reset on restart and are not shared across instances.
+- Webhook limits that are exceeded return HTTP 200 `{ ok: true }` and skip processing, so LINE and Meta do not retry the dropped event.
+- User-facing limits return HTTP 429 with `Retry-After` and a message chosen from `Accept-Language` (`en`, `he`, `ar`, `th`, `si`, `hi`, `ru`, `tl`).
 
 Duplicate prevention:
 
@@ -1726,7 +1734,7 @@ Linking-code protection:
 
 Error handling:
 
-- `src/shared/errorHandler.js` centralizes API error responses.
+- `src/shared/errorHandler.js` centralizes API error responses. Unexpected server errors (HTTP 500 and above), including admin and webhook failures passed to `next(error)`, use the generic `INTERNAL_ERROR` body. Expected 4xx messages, such as validation and admin-key failures, stay specific.
 - Connector clients convert external API failures into connector-specific error classes.
 - Core Agent catches CRM and AI-provider errors and continues with safe replies where implemented.
 

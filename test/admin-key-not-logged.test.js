@@ -112,7 +112,10 @@ test('request and error paths do not log or echo the admin key', async () => {
         headers: { 'x-admin-api-key': TEST_ADMIN_API_KEY },
       });
       assert.equal(serverError.status, 500);
-      assert.equal(JSON.parse(serverError.text).error.message, 'boom-internal');
+      const serverBody = JSON.parse(serverError.text);
+      assert.equal(serverBody.error.code, 'INTERNAL_ERROR');
+      assert.equal(serverBody.error.message, 'Something went wrong. Please try again.');
+      assert.equal(serverError.text.includes('boom-internal'), false);
       assertNoKey(serverError.text, '500 response');
     });
     assertNoKey(output, 'captured console and stdio');
