@@ -16,6 +16,7 @@ const {
 } = require('../translation');
 const { lineClientService, lineDeliveryService, lineWebhookService } = require('../line');
 const { whatsappClientService, whatsappDeliveryService, whatsappWebhookService } = require('../whatsapp');
+const { demoDataEnabled } = require('../../shared/pilotCatalog');
 
 const memory = {
   followUps: [],
@@ -77,12 +78,47 @@ function splitList(value) {
     .filter(Boolean);
 }
 
-async function safeRead(readFn, fallback = []) {
+const SAMPLE_MARKERS = ['usr_somchai', 'UlineSomchai', '972500000000', 'conv_admin_sample_', 'draft_admin_sample_', 'rec_admin_sample_', 'daily_admin_sample'];
+
+function isSampleAdminRecord(record) {
+  if (!record || typeof record !== 'object') return false;
+  if (record.demo === true || record.dataSource === 'demo') return true;
+  const blob = [
+    record.userId,
+    record.fullName,
+    record.lineUserId,
+    record.lineDisplayName,
+    record.whatsappPhone,
+    record.conversationId,
+    record.draftId,
+    record.recommendationId,
+    record.sourceReportId,
+  ].map((value) => String(value || '')).join('\n');
+  return SAMPLE_MARKERS.some((marker) => blob.includes(marker));
+}
+
+function labelDemoRecords(records) {
+  return records.map((record) => ({
+    ...record,
+    demo: true,
+    dataSource: 'demo',
+    demoLabel: 'Demo data only. This is not a real worker, conversation, or report.',
+  }));
+}
+
+async function readAdminList(readFn, { samples = [], local = [] } = {}) {
+  const localRecords = (local || []).filter((record) => !isSampleAdminRecord(record));
   try {
     const result = await readFn();
-    return result.length ? result : fallback;
+    const rows = Array.isArray(result) ? result.filter((record) => !isSampleAdminRecord(record)) : [];
+    if (rows.length) return { records: rows, state: 'ok', demo: false };
+    if (localRecords.length) return { records: localRecords, state: 'ok', demo: false };
+    if (demoDataEnabled() && samples.length) return { records: labelDemoRecords(samples), state: 'demo', demo: true };
+    return { records: [], state: 'empty', demo: false };
   } catch (error) {
-    return fallback;
+    if (localRecords.length) return { records: localRecords, state: 'ok', demo: false };
+    if (demoDataEnabled() && samples.length) return { records: labelDemoRecords(samples), state: 'demo', demo: true };
+    return { records: [], state: 'unavailable', demo: false };
   }
 }
 
@@ -189,95 +225,103 @@ function sampleProfiles() {
 }
 
 function sampleContentDrafts() {
-  if (!memory.contentDrafts.length) {
-    memory.contentDrafts.push({
-      draftId: 'draft_admin_sample_money_tip',
-      contentType: 'Tips',
-      title: 'How to compare transfer fees',
-      category: 'Money',
-      language: 'English',
-      audience: 'Gringo Community',
-      summary: 'A simple post about checking fee, rate, delivery time, and final received amount.',
-      body: 'Compare the fee, exchange rate, delivery time, and final amount before sending money. Verify the final amount with the provider.',
-      sourceTopics: 'money transfer',
-      createdAt: nowIso(),
-      status: 'Draft',
-    });
-  }
-  return memory.contentDrafts;
+  return [{
+    draftId: 'draft_admin_sample_money_tip',
+    contentType: 'Tips',
+    title: 'How to compare transfer fees',
+    category: 'Money',
+    language: 'English',
+    audience: 'Gringo Community',
+    summary: 'A simple post about checking fee, rate, delivery time, and final received amount.',
+    body: 'Compare the fee, exchange rate, delivery time, and final amount before sending money. Verify the final amount with the provider.',
+    sourceTopics: 'money transfer',
+    createdAt: nowIso(),
+    status: 'Draft',
+  }];
 }
 
 function sampleRecommendations() {
-  if (!memory.recommendations.length) {
-    memory.recommendations.push({
-      recommendationId: 'rec_admin_sample_rights',
-      type: 'knowledge',
-      title: 'Prepare clearer rights answers for unpaid overtime',
-      reason: 'A user asked a rights question that needs a human answer.',
-      priority: 'high',
-      sourceReportId: 'daily_admin_sample',
-      status: 'New',
-      createdAt: nowIso(),
-    });
-  }
-  return memory.recommendations;
+  return [{
+    recommendationId: 'rec_admin_sample_rights',
+    type: 'knowledge',
+    title: 'Prepare clearer rights answers for unpaid overtime',
+    reason: 'A user asked a rights question that needs a human answer.',
+    priority: 'high',
+    sourceReportId: 'daily_admin_sample',
+    status: 'New',
+    createdAt: nowIso(),
+  }];
 }
 
 async function readBaseData() {
   const [
-    conversations,
-    profiles,
+    conversationResult,
+    profileResult,
     comments,
-    contentDrafts,
-    recommendations,
-    reports,
-    notes,
-    followUps,
-    knowledgeDrafts,
+    contentResult,
+    recommendationResult,
+    reportResult,
+    noteResult,
+    followUpResult,
+    knowledgeResult,
     documents,
     notifications,
-    tasks,
-      whatsappDeliveries,
-      whatsappDeliveryHistory,
-      lineDeliveries,
-      lineDeliveryHistory,
-  ] =
-    await Promise.all([
-      safeRead(() => managerRepository.readConversationHistory(), sampleConversations()),
-      safeRead(() => managerRepository.readUserProfiles(), sampleProfiles()),
-      communityService.getAllComments().catch(() => []),
-      safeRead(() => contentRepository.readContentDrafts(), sampleContentDrafts()),
-      safeRead(() => managerRepository.readRecommendations(), sampleRecommendations()),
-      safeRead(() => managerRepository.readDailyReports(), []),
-      safeRead(() => adminRepository.readAdminNotes(), memory.notes),
-      safeRead(() => adminRepository.readHumanFollowUps(), memory.followUps),
-      safeRead(() => adminRepository.readKnowledgeDrafts(), memory.knowledgeDrafts),
-      documentService.getAllDocuments().catch(() => []),
-      notificationService.getAllNotifications().catch(() => []),
-      taskService.getUserTasks('usr_somchai').catch(() => []),
-      whatsappDeliveryService.getAllWhatsAppDeliveries().catch(() => []),
-      whatsappDeliveryService.getAllWhatsAppDeliveryHistory().catch(() => []),
-      lineDeliveryService.getAllLineDeliveries().catch(() => []),
-      lineDeliveryService.getAllLineDeliveryHistory().catch(() => []),
-    ]);
-
-  return {
-    conversations,
-    profiles,
-    comments,
-    contentDrafts,
-    recommendations,
-    reports,
-    notes,
-    followUps,
-    knowledgeDrafts,
-    documents,
-    notifications,
-    tasks,
+    taskResult,
     whatsappDeliveries,
     whatsappDeliveryHistory,
     lineDeliveries,
     lineDeliveryHistory,
+  ] = await Promise.all([
+    readAdminList(() => managerRepository.readConversationHistory(), { samples: sampleConversations() }),
+    readAdminList(() => managerRepository.readUserProfiles(), { samples: sampleProfiles() }),
+    communityService.getAllComments().catch(() => []),
+    readAdminList(() => contentRepository.readContentDrafts(), { samples: sampleContentDrafts(), local: memory.contentDrafts }),
+    readAdminList(() => managerRepository.readRecommendations(), { samples: sampleRecommendations(), local: memory.recommendations }),
+    readAdminList(() => managerRepository.readDailyReports()),
+    readAdminList(() => adminRepository.readAdminNotes(), { local: memory.notes }),
+    readAdminList(() => adminRepository.readHumanFollowUps(), { local: memory.followUps }),
+    readAdminList(() => adminRepository.readKnowledgeDrafts(), { local: memory.knowledgeDrafts }),
+    documentService.getAllDocuments().catch(() => []),
+    notificationService.getAllNotifications().catch(() => []),
+    taskService.getReportTasks(),
+    whatsappDeliveryService.getAllWhatsAppDeliveries().catch(() => []),
+    whatsappDeliveryService.getAllWhatsAppDeliveryHistory().catch(() => []),
+    lineDeliveryService.getAllLineDeliveries().catch(() => []),
+    lineDeliveryService.getAllLineDeliveryHistory().catch(() => []),
+  ]);
+
+  return {
+    conversations: conversationResult.records,
+    profiles: profileResult.records,
+    comments,
+    contentDrafts: contentResult.records,
+    recommendations: recommendationResult.records,
+    reports: reportResult.records,
+    notes: noteResult.records,
+    followUps: followUpResult.records,
+    knowledgeDrafts: knowledgeResult.records,
+    documents,
+    notifications,
+    tasks: taskResult,
+    whatsappDeliveries,
+    whatsappDeliveryHistory,
+    lineDeliveries,
+    lineDeliveryHistory,
+    availability: {
+      conversations: conversationResult.state,
+      profiles: profileResult.state,
+      contentDrafts: contentResult.state,
+      recommendations: recommendationResult.state,
+      reports: reportResult.state,
+      tasks: taskResult.catalogState || 'empty',
+    },
+    demo: Boolean(
+      conversationResult.demo
+      || profileResult.demo
+      || contentResult.demo
+      || recommendationResult.demo
+      || taskResult.catalogDemo
+    ),
   };
 }
 
@@ -343,6 +387,8 @@ function buildActiveNeeds(profiles = []) {
     .map((profile) => ({
       userId: profile.userId,
       userName: profile.fullName || profile.userId || 'Unknown user',
+      demo: profile.demo === true,
+      demoLabel: profile.demoLabel || '',
       activeGoals: profile.activeGoals || 'None',
       currentJobNeed:
         profile.lookingForJob === 'Yes'
@@ -731,6 +777,8 @@ async function getDashboard() {
       flaggedComments: data.comments.filter((comment) => comment.status === 'Flagged'),
     },
     recommendations: data.recommendations,
+    availability: data.availability,
+    demo: data.demo === true,
   };
 }
 
@@ -773,113 +821,13 @@ async function updateDocumentFromAdmin(documentId, updates = {}) {
 }
 
 async function generateDailyReport() {
-  try {
-    const report = await managerService.generateDailySummary();
-    await managerService.generateRecommendations({ dailyReport: report });
-    return report;
-  } catch (error) {
-    const data = await readBaseData();
-    const notificationSummary = notificationService.buildAdminSummary(data.notifications || []);
-    const whatsappDashboard = buildWhatsAppDashboard(data);
-    const lineDashboard = buildLineDashboard(data);
-    const lineConversations = (data.conversations || []).filter((event) => event.channel === 'line');
-    const lineSuccessfulDeliveries = (data.lineDeliveries || []).filter((delivery) =>
-      ['Sent', 'Delivered', 'Read'].includes(delivery.status)
-    );
-    const translationMetrics = translationMetricsService.getMetrics();
-    return {
-      reportId: generateId('daily_local'),
-      reportDate: new Date().toISOString().slice(0, 10),
-      totalConversations: data.conversations.length,
-      newUsers: data.profiles.filter((profile) => isToday(profile.createdAt)).length,
-      activeUsers: new Set(data.conversations.map((event) => event.userId)).size,
-      mostCommonQuestions: topCounts(data.conversations, (event) => event.question)
-        .map((item) => `${item.label} (${item.count})`)
-        .join(', '),
-      topCategories: topCounts(data.conversations, (event) => event.category).map((item) => `${item.label} (${item.count})`).join(', '),
-      unansweredQuestions: data.conversations.filter((event) => String(event.status).toUpperCase() === 'NOT_FOUND').length,
-      needsHumanQuestions: data.conversations.filter((event) => String(event.needsHumanFollowUp).toLowerCase() === 'true').length,
-      missingKnowledgeTopics: topCounts(data.conversations, (event) => event.category).map((item) => `${item.label} (${item.count})`).join(', '),
-      mostRequestedJobs: 'Construction worker in Tel Aviv (1)',
-      mostRequestedLocations: 'Tel Aviv (1)',
-      moneyTransferRequests: data.conversations.filter((event) => /money|transfer/i.test(`${event.question} ${event.category}`)).length,
-      exchangeRateRequests: 0,
-      usersLookingForWork: data.profiles.filter((profile) => profile.lookingForJob === 'Yes').length,
-      usersLookingForHousing: data.profiles.filter((profile) => profile.lookingForHousing === 'Yes').length,
-      completedGoals: topCounts(data.profiles.flatMap((profile) => splitList(profile.completedGoals)), (goal) => goal)
-        .map((item) => `${item.label} (${item.count})`)
-        .join(', '),
-      repeatedIgnoredRecommendations: data.conversations.filter((event) =>
-        /no longer need|stop alert|ignored recommendation/i.test(`${event.question} ${event.answer} ${event.status}`)
-      ).length,
-      mostCommonActiveGoals: topCounts(data.profiles.flatMap((profile) => splitList(profile.activeGoals)), (goal) => goal)
-        .map((item) => `${item.label} (${item.count})`)
-        .join(', '),
-      expiringDocuments: data.profiles.reduce((sum, profile) => sum + Number(profile.expiringDocumentCount || 0), 0),
-      expiredDocuments: data.profiles.reduce((sum, profile) => sum + Number(profile.expiredDocumentCount || 0), 0),
-      missingRequiredDocuments: topCounts(
-        data.profiles.flatMap((profile) => splitList(profile.missingDocumentTypes)),
-        (documentType) => documentType
-      )
-        .map((item) => `${item.label} (${item.count})`)
-        .join(', '),
-      completedRenewals: 'Calculated from UserDocumentHistory when available.',
-      notificationsCreated: notificationSummary.notificationsCreated,
-      unreadNotifications: notificationSummary.unreadNotifications,
-      notificationOpenRate: notificationSummary.notificationOpenRate,
-      dismissedNotifications: notificationSummary.dismissedNotifications,
-      urgentNotifications: notificationSummary.urgentNotifications.length,
-      topNotificationCategories: Object.entries(notificationSummary.topNotificationCategories)
-        .map(([label, count]) => `${label} (${count})`)
-        .join(', '),
-      usersWithNoEngagement: notificationSummary.usersWithNoEngagement.length,
-      scheduledNotificationsDueToday: notificationSummary.scheduledNotificationsDueToday.length,
-      whatsappConnectedUsers: whatsappDashboard.cards.connectedUsers,
-      whatsappActiveUsers: whatsappDashboard.activeConversations,
-      whatsappMessagesReceived: whatsappDashboard.cards.todaysMessages,
-      whatsappMessagesSent: (data.whatsappDeliveries || []).filter((delivery) => ['Sent', 'Delivered', 'Read'].includes(delivery.status)).length,
-      whatsappSessionMessages: (data.whatsappDeliveries || []).filter((delivery) => delivery.deliveryMode === 'Session Message').length,
-      whatsappTemplateMessages: (data.whatsappDeliveries || []).filter((delivery) => delivery.deliveryMode === 'Template Message').length,
-      whatsappSuccessRate: whatsappDashboard.cards.successRate,
-      whatsappFailedDeliveries: whatsappDashboard.cards.failedDeliveries,
-      whatsappRetryStatistics: `${(data.whatsappDeliveries || []).reduce((sum, delivery) => sum + Number(delivery.retryCount || 0), 0)} retries`,
-      whatsappAverageResponseTime: 'Not available',
-      whatsappMostCommonCommands: 'Calculated by Manager Agent when conversation history is available.',
-      whatsappMostCommonActions: 'Calculated by Manager Agent when conversation history is available.',
-      lineConnectedUsers: lineDashboard.cards.connectedUsers,
-      lineDailyActiveUsers: lineDashboard.activeConversations,
-      lineMessagesReceived: lineConversations.length,
-      lineMessagesSent: lineSuccessfulDeliveries.length,
-      lineNotificationSuccessRate: lineDashboard.cards.successRate,
-      lineFailedDeliveries: lineDashboard.cards.failedDeliveries,
-      lineAverageResponseTime: 'Not available',
-      lineMostUsedCommands: 'Calculated by Manager Agent when conversation history is available.',
-      lineMostUsedActions: 'Calculated by Manager Agent when conversation history is available.',
-      translationRequests: translationMetrics.translationRequests,
-      translationSuccesses: translationMetrics.successfulTranslations,
-      translationFailures: translationMetrics.failedTranslations,
-      translationCacheHits: translationMetrics.cacheHits,
-      translationCacheMisses: translationMetrics.cacheMisses,
-      translationAverageLatencyMs: translationMetrics.averageLatencyMs,
-      translationProviderLatencyMs: translationMetrics.providerLatencyMs,
-      createdAt: nowIso(),
-    };
-  }
+  const report = await managerService.generateDailySummary();
+  await managerService.generateRecommendations({ dailyReport: report });
+  return report;
 }
 
 async function generateWeeklyReport() {
-  try {
-    return managerService.generateWeeklySummary();
-  } catch (error) {
-    return {
-      reportId: generateId('weekly_local'),
-      growth: 'Local fallback weekly report created.',
-      trends: 'Rights, Housing, Money',
-      recurringProblems: 'Missing rights answer',
-      communityOpportunities: 'Create community post from approved draft',
-      createdAt: nowIso(),
-    };
-  }
+  return managerService.generateWeeklySummary();
 }
 
 async function saveAdminNote(reportId, body) {

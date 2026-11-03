@@ -126,6 +126,82 @@ function commentReportPausedCopy() {
   return COMMENT_REPORT_PAUSED_COPY[uiLanguage] || COMMENT_REPORT_PAUSED_COPY.en;
 }
 
+const UI_COPY = {
+  en: {
+    hello: 'Hello.',
+    helloName: 'Hello {name}.',
+    updates: 'You have {count} new updates:',
+    ready: 'Your schedule is ready inside Gringo.',
+  },
+  he: {
+    hello: 'שלום.',
+    helloName: 'שלום {name}.',
+    updates: 'יש לך {count} עדכונים חדשים:',
+    ready: 'לוח הזמנים שלך מוכן ב-Gringo.',
+  },
+  ar: {
+    hello: 'مرحبًا.',
+    helloName: 'مرحبًا {name}.',
+    updates: 'لديك {count} تحديثات جديدة:',
+    ready: 'جدولك جاهز داخل Gringo.',
+  },
+  th: {
+    hello: 'สวัสดี',
+    helloName: 'สวัสดี {name}',
+    updates: 'คุณมีอัปเดตใหม่ {count} รายการ:',
+    ready: 'ตารางของคุณพร้อมแล้วใน Gringo',
+  },
+  si: {
+    hello: 'ආයුබෝවන්.',
+    helloName: 'ආයුබෝවන් {name}.',
+    updates: 'ඔබට නව යාවත්කාලීන {count} ක් ඇත:',
+    ready: 'ඔබේ කාලසටහන Gringo තුළ සූදානම්.',
+  },
+  hi: {
+    hello: 'नमस्ते।',
+    helloName: 'नमस्ते {name}।',
+    updates: 'आपके पास {count} नए अपडेट हैं:',
+    ready: 'आपका शेड्यूल Gringo में तैयार है।',
+  },
+  ru: {
+    hello: 'Здравствуйте.',
+    helloName: 'Здравствуйте, {name}.',
+    updates: 'У вас {count} новых обновлений:',
+    ready: 'Ваше расписание готово в Gringo.',
+  },
+  tl: {
+    hello: 'Kumusta.',
+    helloName: 'Kumusta, {name}.',
+    updates: 'May {count} kang bagong update:',
+    ready: 'Handa na ang iyong iskedyul sa Gringo.',
+  },
+};
+
+let currentProfileName = '';
+
+function uiText(key, values = {}) {
+  const table = UI_COPY[uiLanguage] || UI_COPY.en;
+  const template = table[key] || UI_COPY.en[key] || '';
+  return template.replace(/\{(\w+)\}/g, (match, name) => (values[name] === undefined ? match : String(values[name])));
+}
+
+function profileGreetingName(profile) {
+  if (!profile || profile.demo === true || profile.dataSource === 'demo') return '';
+  if (profile.userId === 'usr_somchai') return '';
+  if (profile.lineUserId === 'UlineSomchai') return '';
+  if (String(profile.whatsappPhone || '') === '972500000000') return '';
+  return String(profile.fullName || '').trim();
+}
+
+function rememberProfile(profile) {
+  rememberLanguage(profile);
+  currentProfileName = profileGreetingName(profile);
+}
+
+function greetingLine() {
+  return currentProfileName ? uiText('helloName', { name: currentProfileName }) : uiText('hello');
+}
+
 function isCommentReportPaused(error) {
   return Boolean(error) && error.code === 'PERSONAL_DATA_TEMPORARILY_UNAVAILABLE';
 }
@@ -140,7 +216,7 @@ async function readJson(response) {
     throw error;
   }
 
-  if (body && body.profile) rememberLanguage(body.profile);
+  if (body && body.profile) rememberProfile(body.profile);
   return body;
 }
 
@@ -1136,7 +1212,7 @@ async function showNotificationStartupSummary() {
   if (!summary.unreadCount) return;
   const summaryItems = Array.isArray(summary.summary) ? summary.summary : [];
   const lines = summaryItems.slice(0, 4).map((item) => `- ${item.count} ${String(item.type || '').toLowerCase()}`);
-  addMessage('Gringo', `Hello Somchai. You have ${summary.unreadCount} new updates:\n${lines.join('\n')}`);
+  addMessage('Gringo', `${greetingLine()} ${uiText('updates', { count: summary.unreadCount })}\n${lines.join('\n')}`);
 }
 
 async function showNotifications(filter = 'All') {
@@ -1973,7 +2049,7 @@ profileForm.addEventListener('submit', async (event) => {
 async function startChat() {
   try {
     const status = await loadOnboardingStatus();
-    rememberLanguage(status.profile);
+    rememberProfile(status.profile);
 
     if (!status.complete && status.prompt) {
       addMessage('Gringo', status.prompt);
@@ -1981,7 +2057,7 @@ async function startChat() {
     }
 
     const startup = await loadStartupSummary();
-    addMessage('Gringo', startup.message || startup.summary || 'Hello Somchai. Your schedule is ready inside Gringo.');
+    addMessage('Gringo', startup.message || startup.summary || `${greetingLine()} ${uiText('ready')}`);
     const personalPanels = await Promise.allSettled([
       showNotificationStartupSummary(),
       renderDocumentAlerts(),

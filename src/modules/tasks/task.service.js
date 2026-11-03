@@ -472,6 +472,29 @@ async function getTaskHistory(taskId) {
   }
 }
 
+async function getReportTasks() {
+  const catalog = await readTaskCatalog();
+  const real = catalog.records.filter((task) => !task.demo && !isSampleTask(task));
+  if (!real.length) {
+    return tagCatalog([], catalog.state === 'unavailable' ? 'unavailable' : 'empty', false);
+  }
+  return tagCatalog(real, catalog.state === 'unavailable' ? 'ok' : 'ok', false);
+}
+
+async function getReportTaskHistory() {
+  const sampleIds = new Set(SAMPLE_TASKS.map((task) => task.taskId));
+  const realEvent = (event) => event && !sampleIds.has(event.taskId) && event.userId !== 'usr_somchai';
+  try {
+    const history = await taskRepository.findAllTaskHistory();
+    const rows = Array.isArray(history) ? history.filter(realEvent) : [];
+    return tagCatalog(rows, rows.length ? 'ok' : 'empty', false);
+  } catch (error) {
+    const local = memoryTaskHistory.filter(realEvent);
+    if (local.length) return tagCatalog(local, 'ok', false);
+    return tagCatalog([], 'unavailable', false);
+  }
+}
+
 async function getUserTaskHistory(userId) {
   try {
     const history = await taskRepository.findAllTaskHistory();
@@ -779,6 +802,8 @@ module.exports = {
   createTaskAlerts,
   dismissTask,
   formatTasksForChat,
+  getReportTaskHistory,
+  getReportTasks,
   getSchedule,
   getDueTasks,
   getOverdueTasks,
