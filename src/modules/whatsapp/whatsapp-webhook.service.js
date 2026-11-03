@@ -6,7 +6,7 @@ const whatsappMessageMapper = require('./whatsapp-message.mapper');
 const whatsappMessageService = require('./whatsapp-message.service');
 const { communicationService } = require('../communication');
 const managerRepository = require('../manager-agent/manager-agent.repository');
-const { limitWebhook } = require('../../shared/rateLimit');
+const { limitSignedWebhook, noteUnsignedWebhook } = require('../../shared/rateLimit');
 const { safeWhatsAppWarning } = require('./whatsapp-errors');
 
 const processedMessageIds = [];
@@ -73,6 +73,7 @@ function verifyWebhook(req, res) {
   const expected = configuredSecret(env.whatsapp && env.whatsapp.verifyToken);
 
   if (!expected) {
+    noteUnsignedWebhook(req);
     safeWhatsAppWarning('WhatsApp verify token is not configured. Rejecting the webhook handshake.');
     res.status(403).json({ error: { message: 'WhatsApp webhook verification failed.' } });
     return;
@@ -83,6 +84,7 @@ function verifyWebhook(req, res) {
     return;
   }
 
+  noteUnsignedWebhook(req);
   res.status(403).json({ error: { message: 'WhatsApp webhook verification failed.' } });
 }
 
@@ -145,6 +147,7 @@ async function receiveWebhook(req, res, next) {
   try {
     const verdict = verifyHubSignature(req);
     if (!verdict.ok) {
+      noteUnsignedWebhook(req);
       webhookHealth.lastWebhookStatus = 'Rejected';
       if (verdict.status === 503) {
         safeWhatsAppWarning('WhatsApp app secret is not configured. Rejecting the webhook before processing.');
@@ -161,6 +164,8 @@ async function receiveWebhook(req, res, next) {
       res.status(200).json({ ok: true, disabled: true });
       return;
     }
+
+    if (!limitSignedWebhook(req, res)) return;
 
     const textMessages = whatsappMessageMapper.getTextMessages(req.body);
     const interactiveMessages = whatsappMessageMapper.getInteractiveMessages(req.body);
@@ -207,8 +212,8 @@ function getWebhookHealth() {
 
 function createRoutes() {
   const router = express.Router();
-  router.get('/webhook', limitWebhook, verifyWebhook);
-  router.post('/webhook', limitWebhook, receiveWebhook);
+  router.get('/webhook', verifyWebhook);
+  router.post('/webhook', receiveWebhook);
   return router;
 }
 

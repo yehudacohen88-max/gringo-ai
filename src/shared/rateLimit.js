@@ -5,31 +5,36 @@ const { languageFromRequest, messageFor } = require('./userFacingCopy');
 const { COOKIE_NAME, openWebSession, parseCookieHeader } = require('./webIdentity');
 
 // In-memory fixed windows for this process only. Counters reset on restart
-// and are not shared with other instances. That matches the existing
-// single-process requirement for sheet row locks and link-code claims.
+// and are not shared with other instances.
 //
-// Each guarded route counts the TCP peer and, when a valid gw_sid is already
-// present, that session. The IP bucket increments even if a cookie is sent,
-// so a new cookie cannot reset it. Minting a gw_sid is a separate per-IP
-// budget, applied inside attachWebIdentity before a new id is created.
+// Route limits count the client address and, when a valid gw_sid is already
+// present, that session. The address bucket increments even if a cookie is
+// sent. Minting a gw_sid is a separate per-address budget.
 //
-// Webhooks have no browser session. Over limit they return HTTP 200
-// { ok: true } and skip the handler. LINE and Meta retry non-2xx responses;
-// a 429 would turn a flood into a retry storm. The event is dropped.
-// Telegram has no HTTP webhook (it uses polling) and is not covered here.
-// Link-code redeem limits in src/shared/linkCode.js are unchanged.
+// LINE and WhatsApp verify the signature before any signed-event limit.
+// A missing or bad signature is rejected with the existing 401/403/503 and
+// counted only in webhookUnsigned. It cannot spend webhookSigned.
+// A verified event over webhookSigned returns HTTP 429 so LINE (when webhook
+// redelivery is enabled) and Meta (any non-200) can deliver it again.
+// Telegram has no HTTP webhook. Link-code redeem limits are unchanged.
 
 const MINUTE = 60 * 1000;
+const DEFAULT_BUCKET_CAP = 10000;
+const DEFAULT_SWEEP_INTERVAL = 64;
 
 const DEFAULT_POLICIES = Object.freeze({
   chat: Object.freeze({ ipLimit: 20, sessionLimit: 10, windowMs: MINUTE }),
   publicRead: Object.freeze({ ipLimit: 120, sessionLimit: 120, windowMs: MINUTE }),
   linkGenerate: Object.freeze({ ipLimit: 10, sessionLimit: 5, windowMs: 60 * MINUTE }),
-  webhook: Object.freeze({ ipLimit: 600, sessionLimit: 0, windowMs: MINUTE }),
+  webhookSigned: Object.freeze({ ipLimit: 600, sessionLimit: 0, windowMs: MINUTE }),
+  webhookUnsigned: Object.freeze({ ipLimit: 60, sessionLimit: 0, windowMs: MINUTE }),
   newSession: Object.freeze({ ipLimit: 60, sessionLimit: 0, windowMs: 10 * MINUTE }),
 });
 
 let policies = clonePolicies(DEFAULT_POLICIES);
+let bucketCap = DEFAULT_BUCKET_CAP;
+let sweepInterval = DEFAULT_SWEEP_INTERVAL;
+let operations = 0;
 const buckets = new Map();
 
 function clonePolicies(source) {
@@ -50,17 +55,61 @@ function prune(times, now, windowMs) {
   return times;
 }
 
+function sweepExpired(now) {
+  for (const [key, entry] of buckets) {
+    prune(entry.times, now, entry.windowMs);
+    if (entry.times.length === 0) buckets.delete(key);
+  }
+}
+
+function evictOldest() {
+  let oldestKey = '';
+  let oldestAt = Infinity;
+  for (const [key, entry] of buckets) {
+    if (entry.touchedAt < oldestAt) {
+      oldestAt = entry.touchedAt;
+      oldestKey = key;
+    }
+  }
+  if (!oldestKey) return false;
+  buckets.delete(oldestKey);
+  return true;
+}
+
+function maybeSweep(now) {
+  operations += 1;
+  if (sweepInterval > 0 && (operations % sweepInterval === 0 || buckets.size >= bucketCap)) {
+    sweepExpired(now);
+  }
+}
+
+function makeRoom(now) {
+  if (buckets.size < bucketCap) return;
+  sweepExpired(now);
+  while (buckets.size >= bucketCap) {
+    if (!evictOldest()) break;
+  }
+}
+
 function hit(key, limit, windowMs, now) {
   if (!limit || limit < 1) return { allowed: true, retryAfterSeconds: 0 };
-  const times = buckets.get(key) || [];
-  prune(times, now, windowMs);
-  if (times.length >= limit) {
-    buckets.set(key, times);
-    const retryAfterSeconds = Math.max(1, Math.ceil((times[0] + windowMs - now) / 1000));
+  maybeSweep(now);
+  let entry = buckets.get(key);
+  if (!entry) {
+    makeRoom(now);
+    entry = { times: [], windowMs, touchedAt: now };
+    buckets.set(key, entry);
+  } else {
+    entry.touchedAt = now;
+    entry.windowMs = windowMs;
+  }
+  prune(entry.times, now, windowMs);
+  if (entry.times.length >= limit) {
+    const retryAfterSeconds = Math.max(1, Math.ceil((entry.times[0] + windowMs - now) / 1000));
     return { allowed: false, retryAfterSeconds };
   }
-  times.push(now);
-  buckets.set(key, times);
+  entry.times.push(now);
+  entry.touchedAt = now;
   return { allowed: true, retryAfterSeconds: 0 };
 }
 
@@ -89,21 +138,11 @@ function sendRateLimited(req, res, decision) {
   });
 }
 
-function acknowledgeWebhook(req, res) {
-  console.warn(`[http] ${req.method || 'UNKNOWN'} ${requestPath(req)} webhook rate limit`);
-  res.status(200).json({ ok: true });
-}
-
-function guard(policyName, { webhook = false } = {}) {
+function guard(policyName) {
   return function rateLimitGuard(req, res, next) {
-    const sessionId = webhook ? '' : verifiedWebId(req);
-    const decision = consume(policyName, clientIp(req), sessionId);
+    const decision = consume(policyName, clientIp(req), verifiedWebId(req));
     if (decision.allowed) {
       next();
-      return;
-    }
-    if (webhook) {
-      acknowledgeWebhook(req, res);
       return;
     }
     sendRateLimited(req, res, decision);
@@ -114,27 +153,61 @@ function consumeNewSession(req, now = Date.now()) {
   return consume('newSession', clientIp(req), '', now);
 }
 
+function noteUnsignedWebhook(req) {
+  consume('webhookUnsigned', clientIp(req), '');
+}
+
+function limitSignedWebhook(req, res) {
+  const decision = consume('webhookSigned', clientIp(req), '');
+  if (decision.allowed) return true;
+  console.warn(`[http] ${req.method || 'UNKNOWN'} ${requestPath(req)} signed webhook rate limit`);
+  sendRateLimited(req, res, decision);
+  return false;
+}
+
 function setRateLimitForTests(name, config) {
   if (!policies[name]) policies[name] = { ipLimit: 0, sessionLimit: 0, windowMs: MINUTE };
   Object.assign(policies[name], config);
 }
 
+function setBucketCapForTests(cap) {
+  const numeric = Number(cap);
+  bucketCap = Number.isInteger(numeric) && numeric > 0 ? numeric : DEFAULT_BUCKET_CAP;
+}
+
+function setSweepIntervalForTests(interval) {
+  const numeric = Number(interval);
+  sweepInterval = Number.isInteger(numeric) && numeric > 0 ? numeric : DEFAULT_SWEEP_INTERVAL;
+}
+
+function bucketCountForTests() {
+  return buckets.size;
+}
+
 function resetRateLimitsForTests() {
   buckets.clear();
   policies = clonePolicies(DEFAULT_POLICIES);
+  bucketCap = DEFAULT_BUCKET_CAP;
+  sweepInterval = DEFAULT_SWEEP_INTERVAL;
+  operations = 0;
 }
 
 module.exports = {
+  DEFAULT_BUCKET_CAP,
   DEFAULT_POLICIES,
-  acknowledgeWebhook,
+  bucketCountForTests,
+  consume,
   consumeNewSession,
   guard,
   limitChat: guard('chat'),
   limitLinkGenerate: guard('linkGenerate'),
   limitPublicRead: guard('publicRead'),
-  limitWebhook: guard('webhook', { webhook: true }),
+  limitSignedWebhook,
+  noteUnsignedWebhook,
   resetRateLimitsForTests,
   sendRateLimited,
+  setBucketCapForTests,
   setRateLimitForTests,
+  setSweepIntervalForTests,
   verifiedWebId,
 };

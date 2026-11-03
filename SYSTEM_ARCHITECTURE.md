@@ -1054,12 +1054,15 @@ Rate limiting:
 
 - Telegram and LINE link-code redeem attempts stay limited in `src/shared/linkCode.js` (per channel account, per code, and globally). Those identity rules are unchanged.
 - Express limits in `src/shared/rateLimit.js` are in-memory and single-process. They reset when the process restarts and are not shared across instances. This adds to the single-process operational requirement already required for sheet row locks.
-- The client IP is `socket.remoteAddress`. `trust proxy` is false. `X-Forwarded-For` and `X-Real-IP` are ignored, so a client cannot pick a new bucket with a header. Deploy assumption: clients connect directly to this process. A reverse proxy in front would make every user share the proxy address until a reviewed change trusts exactly one hop. Do not set `trust proxy` to `true`.
+- The client address defaults to the TCP peer. `TRUST_PROXY_HOPS` may be an integer from 0 to 5. Unset or 0 ignores `X-Forwarded-For` and `X-Real-IP`. A positive value trusts that many proxies, counting from the right of the forwarding chain plus the socket peer, and uses the address immediately to the left. A missing, non-IP, or too-short chain falls back to the socket peer. Express `trust proxy` stays false, so `req.ip` and the admin loopback check do not follow the header. No hosting provider is approved. The hop count is provider-specific (usually 1 for a single edge proxy) and is safe only when that proxy is the only path to the process. Production logs a startup warning when the value is unset. An invalid value refuses startup. The variable is not a secret.
 - POST `/api/chat/message` (the HTTP route that calls OpenAI and translation): 20 requests per minute per IP and 10 per minute per valid `gw_sid`.
 - Public catalog and search reads (GET `/api/jobs`, `/api/housing`, `/api/services`, `/api/services/:id`, `/api/community`, `/api/community/:postId`, `/api/money/rate`, `/api/money/compare`): 120 requests per minute per IP and 120 per minute per valid `gw_sid`.
 - Link-code generate (POST `/api/telegram/link-code` and POST `/api/line/link-code`): 10 per hour per IP and 5 per hour per valid `gw_sid`. Redeem stays on the linkCode.js limits. Telegram inbound chat is polling, not an HTTP webhook, so this limiter does not wrap the poll loop.
 - New `gw_sid` creation: 60 per 10 minutes per IP, checked before a new id is signed. Refreshing a valid cookie does not spend this budget. The route IP limit still increments when a cookie is present.
-- Webhooks (POST `/api/line/webhook`, GET and POST `/api/whatsapp/webhook`): 600 per minute per IP. There is no browser session. Over the limit the response is HTTP 200 `{ ok: true }` and the handler does not run. LINE and Meta retry non-2xx responses, so HTTP 429 would amplify a flood. The event is dropped. User-facing limits use HTTP 429, `Retry-After`, and a localized `RATE_LIMITED` message.
+- Verified LINE and WhatsApp webhook events: 600 per minute per client address, checked only after the signature matches. Over that budget the response is HTTP 429 with `Retry-After` and the handler does not run. LINE's own docs require HTTP 200 within about 2 seconds for a normal delivery, and redelivery of a non-2xx response is off until "Webhook redelivery" is enabled on the channel; the retry count is not published. Meta retries any status other than 200, with decreasing frequency, for up to 7 days (1 hour when No Storage is on). A 429 is used anyway so a verified event can be delivered again instead of being discarded with HTTP 200. The response is immediate, inside LINE's 2 second window.
+- Missing or invalid LINE and WhatsApp signatures, a missing WhatsApp app secret, and a failed WhatsApp GET handshake are rejected with the existing 401, 403, or 503. They are counted in a separate unsigned bucket (60 per minute per address) and cannot spend the verified-event budget. A successful GET handshake is not limited by either webhook bucket.
+- User-facing limits use HTTP 429, `Retry-After`, and a localized `RATE_LIMITED` message.
+- The in-memory map is capped (10,000 buckets). Expired buckets are swept, and the stalest bucket is evicted if the cap is still full. Unique addresses cannot grow the map without bound.
 - Admin translation settings reload local configuration and do not call OpenAI, so they are not on the chat limiter.
 
 Unlinking:
@@ -1695,8 +1698,9 @@ Rate limiting:
 
 - Telegram and LINE link-code redeem attempts are rate-limited in `src/shared/linkCode.js`.
 - HTTP chat, public catalog and search, link-code generate, new `gw_sid` creation, and LINE and WhatsApp webhooks are rate-limited in memory by `src/shared/rateLimit.js`. Counters are single-process: they reset on restart and are not shared across instances.
-- Webhook limits that are exceeded return HTTP 200 `{ ok: true }` and skip processing, so LINE and Meta do not retry the dropped event.
+- Verified LINE and WhatsApp events that exceed the signed budget return HTTP 429 with `Retry-After` so the platform can redeliver. Unsigned or bad signatures are rejected first and use a separate bucket, so they cannot force real messages to be skipped.
 - User-facing limits return HTTP 429 with `Retry-After` and a message chosen from `Accept-Language` (`en`, `he`, `ar`, `th`, `si`, `hi`, `ru`, `tl`).
+- `TRUST_PROXY_HOPS` selects the rate-limit address. Unset means the TCP peer. Express `trust proxy` stays false.
 
 Duplicate prevention:
 

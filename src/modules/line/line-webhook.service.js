@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const express = require('express');
 const { env } = require('../../config/env');
 const { requireAdminKey } = require('../../shared/requireAdminKey');
-const { limitLinkGenerate, limitWebhook } = require('../../shared/rateLimit');
+const { limitLinkGenerate, limitSignedWebhook, noteUnsignedWebhook } = require('../../shared/rateLimit');
 const { attachWebIdentity } = require('../../shared/webIdentity');
 const { requireSameOrigin } = require('../../shared/requireSameOrigin');
 const { requireExplicitConfirm, resolveWebUserContext } = require('../../shared/requireWebIdentity');
@@ -201,10 +201,13 @@ async function receiveWebhook(req, res, next) {
     }
 
     if (!verifySignature(req)) {
+      noteUnsignedWebhook(req);
       webhookHealth.lastWebhookStatus = 'Rejected';
       res.status(401).json({ error: { message: 'LINE webhook signature is invalid.' } });
       return;
     }
+
+    if (!limitSignedWebhook(req, res)) return;
 
     const textMessages = lineMessageMapper.getTextMessages(req.body);
     const actionMessages = lineMessageMapper.extractPostbackEvents(req.body);
@@ -241,7 +244,7 @@ function getWebhookHealth() {
 
 function createRoutes() {
   const router = express.Router();
-  router.post('/webhook', limitWebhook, receiveWebhook);
+  router.post('/webhook', receiveWebhook);
   router.post('/link-code', requireSameOrigin, limitLinkGenerate, attachWebIdentity, createLinkCode);
   router.post('/disconnect', requireSameOrigin, attachWebIdentity, disconnect);
   router.get('/link-history', requireAdminKey, history);
