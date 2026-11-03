@@ -148,6 +148,13 @@ test('a manager weekly report is not replaced with a fictitious local report', a
 });
 
 test('an empty manager profile sheet produces an empty report without the sample user', async () => {
+  const taskService = require('../src/modules/tasks/task.service');
+  const { tagCatalog } = require('../src/shared/pilotCatalog');
+  const previousTasks = taskService.getReportTasks;
+  const previousHistory = taskService.getReportTaskHistory;
+  taskService.getReportTasks = async () => tagCatalog([], 'empty', false);
+  taskService.getReportTaskHistory = async () => tagCatalog([], 'empty', false);
+  try {
   await withRepo({
     readUserProfiles: async () => [],
     readConversationHistory: async () => [],
@@ -158,6 +165,10 @@ test('an empty manager profile sheet produces an empty report without the sample
     assert.equal(report.newUsers, 0);
     assert.doesNotMatch(text, DEMO_MARKERS);
   });
+  } finally {
+    taskService.getReportTasks = previousTasks;
+    taskService.getReportTaskHistory = previousHistory;
+  }
 });
 
 });

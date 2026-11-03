@@ -390,12 +390,19 @@ async function generateDailySummary(options = {}) {
     readRows(() => managerRepository.readConversationHistory()),
     readRows(() => managerRepository.readUserProfiles()),
     notificationService.getAllNotifications().catch(() => []),
-    taskService.getReportTasks(),
-    taskService.getReportTaskHistory(),
+    taskService.getReportTasks().catch(() => null),
+    taskService.getReportTaskHistory().catch(() => null),
     whatsappDeliveryService.getAllWhatsAppDeliveries().catch(() => []),
     lineDeliveryService.getAllLineDeliveries().catch(() => []),
   ]);
-  if (conversationResult.state === 'unavailable' || profileResult.state === 'unavailable') {
+  if (
+    conversationResult.state === 'unavailable' ||
+    profileResult.state === 'unavailable' ||
+    !Array.isArray(taskResult) ||
+    taskResult.catalogState === 'unavailable' ||
+    !Array.isArray(historyResult) ||
+    historyResult.catalogState === 'unavailable'
+  ) {
     throw unavailableReportError();
   }
   const allConversations = conversationResult.records.filter((event) => event.userId !== 'usr_somchai');
@@ -405,8 +412,8 @@ async function generateDailySummary(options = {}) {
     isWithinDateRange(profile.lastInteractionAt || profile.createdAt, startDate, endDate)
   );
   const notifications = allNotifications.filter((notification) => isWithinDateRange(notification.createdAt, startDate, endDate));
-  const allTasks = taskResult.catalogState === 'unavailable' ? [] : taskResult;
-  const allTaskHistory = historyResult.catalogState === 'unavailable' ? [] : historyResult;
+  const allTasks = taskResult;
+  const allTaskHistory = historyResult;
   const tasks = allTasks.filter((task) => isWithinDateRange(task.createdAt || task.updatedAt || task.dueDate, startDate, endDate));
   const taskHistory = allTaskHistory.filter((event) => isWithinDateRange(event.createdAt, startDate, endDate));
   const whatsappDeliveries = allWhatsAppDeliveries.filter((delivery) =>
