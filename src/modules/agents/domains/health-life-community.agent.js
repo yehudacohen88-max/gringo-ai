@@ -286,13 +286,24 @@ async function executeLifeGeneral(task, input) {
     const userId = cleanText(input.userId || profile.userId);
     if (!userId) return blocked(task, 'missing_required_input', 'Which user profile should I check documents for?');
     const documents = await documentService.getUserDocuments(userId);
+    if (documents.catalogState === 'unavailable') {
+      return createResult(task, 'partial', {
+        capability: 'life.general',
+        routedTo: 'documents',
+        documents: [],
+        availability: 'unavailable',
+        message: documentService.formatDocumentsForChat(documents),
+        suppressGenericFollowUp: true,
+      }, ['catalog_unavailable']);
+    }
     const summary = documentService.summarizeDocuments({ ...profile, userId }, documents);
-    return createResult(task, 'success', {
+    const safeDocuments = carryCatalog(documents, documents.map(documentService.toSafeDocument));
+    return createResult(task, safeDocuments.length ? 'success' : 'partial', {
       capability: 'life.general',
       routedTo: 'documents',
-      documents: documents.map(documentService.toSafeDocument),
+      documents: safeDocuments,
       summary,
-      message: documentService.formatDocumentsForChat(documents.map(documentService.toSafeDocument), summary),
+      message: documentService.formatDocumentsForChat(safeDocuments, summary),
     });
   }
   if (serviceService.isServiceMessage(query)) return executeGovernmentServices(task, input);

@@ -370,7 +370,9 @@ async function createNotificationsFromExistingModules(userId, userProfile = {}) 
 
   if (isEnabled(userProfile.documentNotifications)) {
     const documents = await documentService.getUserDocuments(userId);
-    const alerts = documentService.createDocumentAlerts(userProfile, documents, 10);
+    const alerts = documents.catalogState === 'unavailable' || documents.catalogDemo
+      ? []
+      : documentService.createDocumentAlerts(userProfile, documents.filter((document) => !document.demo), 10);
     for (const alert of alerts) {
       created.push(
         await createNotification({

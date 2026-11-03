@@ -12,6 +12,15 @@ const {
   TASK_STATUSES,
 } = require('./task.model');
 const { SAMPLE_TASKS } = require('./sample-tasks');
+const {
+  assistantCatalogReply,
+  catalogMeta,
+  isDemoRecord,
+  readPersonalCatalog,
+  refuseDemoWrite,
+  tagCatalog,
+} = require('../../shared/pilotCatalog');
+const { languageFromProfile } = require('../../shared/userFacingCopy');
 
 const memoryTasks = [];
 const memoryTaskHistory = [];
@@ -223,18 +232,22 @@ function validationError(details) {
   return error;
 }
 
+function isSampleTask(task) {
+  return isDemoRecord(task, SAMPLE_TASKS, ['taskId']);
+}
+
+async function readTaskCatalog() {
+  return readPersonalCatalog({
+    read: () => taskRepository.findAllTasks(),
+    samples: SAMPLE_TASKS,
+    idFields: ['taskId'],
+    localRecords: memoryTasks,
+  });
+}
+
 async function readTasksWithFallback() {
-  try {
-    const tasks = await taskRepository.findAllTasks();
-    const source = tasks.length ? tasks : SAMPLE_TASKS;
-    const byId = new Map(source.map((task) => [task.taskId, task]));
-    memoryTasks.forEach((task) => byId.set(task.taskId, task));
-    return Array.from(byId.values());
-  } catch (error) {
-    const byId = new Map(SAMPLE_TASKS.map((task) => [task.taskId, task]));
-    memoryTasks.forEach((task) => byId.set(task.taskId, task));
-    return Array.from(byId.values());
-  }
+  const catalog = await readTaskCatalog();
+  return tagCatalog(catalog.records, catalog.state, catalog.demo);
 }
 
 async function createTask(input = {}, options = {}) {
@@ -242,6 +255,7 @@ async function createTask(input = {}, options = {}) {
   const task = buildTask({ ...stripOwnerFields(input), userId: ownerUserId });
   const errors = validateTask(task);
   if (errors.length) throw validationError(errors);
+  refuseDemoWrite(task, SAMPLE_TASKS, ['taskId']);
   try {
     const created = await taskRepository.createTask(task);
     await recordTaskEvent(null, created, 'Created');
@@ -257,7 +271,7 @@ async function updateTask(taskId, updates = {}, options = {}) {
   const ownerUserId = requireOwnerUserId(options.ownerUserId);
   return withRecordLock(`task:${taskId}`, async () => {
     const existing = await getTaskById(taskId);
-    if (!isOwnedBy(existing, ownerUserId)) return null;
+    if (!isOwnedBy(existing, ownerUserId) || isSampleTask(existing)) return null;
     const eventType = TASK_HISTORY_EVENT_TYPES.includes(cleanText(updates.eventType)) ? cleanText(updates.eventType) : 'Updated';
     const cleanUpdates = stripOwnerFields(updates);
     delete cleanUpdates.eventType;
@@ -269,7 +283,7 @@ async function updateTask(taskId, updates = {}, options = {}) {
       createdAt: existing.createdAt,
       updatedAt: new Date().toISOString(),
     });
-    if (updated.userId !== ownerUserId) return null;
+    if (updated.userId !== ownerUserId || isSampleTask(updated)) return null;
     try {
       const saved = await taskRepository.updateTask(taskId, updated, ownerUserId);
       if (!saved) return null;
@@ -303,9 +317,9 @@ function taskPassesFilters(task, filters = {}) {
 }
 
 async function getUserTasks(userId, filters = {}) {
-  await markOverdueTasks(userId);
-  const tasks = await readTasksWithFallback();
-  return tasks
+  const catalog = await readTaskCatalog();
+  if (catalog.state === 'ok') await markOverdueTasks(userId);
+  const tasks = (catalog.state === 'ok' ? (await readTaskCatalog()).records : catalog.records)
     .filter((task) => task.userId === userId && task.status !== 'Archived')
     .map((task) => ({ ...task, status: calculateTaskStatus(task) }))
     .filter((task) => taskPassesFilters(task, filters))
@@ -314,6 +328,10 @@ async function getUserTasks(userId, filters = {}) {
       if (a.dueDate !== b.dueDate) return String(a.dueDate || '9999').localeCompare(String(b.dueDate || '9999'));
       return String(a.dueTime || '').localeCompare(String(b.dueTime || ''));
     });
+  const state = tasks.length
+    ? (catalog.state === 'unavailable' ? 'ok' : catalog.state)
+    : (catalog.state === 'unavailable' ? 'unavailable' : 'empty');
+  return tagCatalog(tasks, state, state === 'demo');
 }
 
 function endOfWeekKey() {
@@ -334,7 +352,7 @@ async function getSchedule(userId, view = 'Today') {
   const tasks = await getUserTasks(userId);
   const today = todayKey();
   const endDate = view === 'This Month' ? endOfMonthKey() : view === 'This Week' ? endOfWeekKey() : today;
-  return tasks
+  const visible = tasks
     .filter((task) => {
       if (['Completed', 'Dismissed', 'Archived'].includes(task.status)) return false;
       if (!task.dueDate) return false;
@@ -344,6 +362,8 @@ async function getSchedule(userId, view = 'Today') {
       if (a.dueDate !== b.dueDate) return String(a.dueDate).localeCompare(String(b.dueDate));
       return String(a.dueTime || '').localeCompare(String(b.dueTime || ''));
     });
+  const state = tasks.catalogState === 'unavailable' ? 'unavailable' : (visible.length ? tasks.catalogState : 'empty');
+  return tagCatalog(visible, state, state === 'demo');
 }
 
 async function markTaskInProgress(taskId, options = {}) {
@@ -376,7 +396,8 @@ async function getOverdueTasks(userId) {
 
 async function markOverdueTasks(userId) {
   const tasks = await readTasksWithFallback();
-  const overdue = tasks.filter((task) => task.userId === userId && calculateTaskStatus(task) === 'Overdue' && task.status !== 'Overdue');
+  if (tasks.catalogState === 'unavailable') return [];
+  const overdue = tasks.filter((task) => task.userId === userId && !isSampleTask(task) && calculateTaskStatus(task) === 'Overdue' && task.status !== 'Overdue');
   for (const task of overdue) {
     await updateTask(task.taskId, { status: 'Overdue', eventType: 'Updated' }, { ownerUserId: userId });
   }
@@ -417,6 +438,7 @@ async function recordTaskEvent(previousTask, newTask, eventType) {
 }
 
 async function createNextRecurringTask(task) {
+  if (isSampleTask(task)) return null;
   const nextDate = calculateNextOccurrence(task);
   if (!nextDate) return null;
   const nextTask = await createTask(
@@ -502,7 +524,7 @@ async function processTaskReminders(userId, profile = {}) {
   });
   const created = [];
   if (profile.taskRemindersEnabled === 'No') return created;
-  for (const task of dueReminders) {
+  for (const task of dueReminders.filter((item) => !isSampleTask(item))) {
     created.push(
       await notificationService.createNotification(
         {
@@ -546,10 +568,15 @@ function createTaskAlerts(tasks = [], limit = 3) {
     }));
 }
 
-function formatTasksForChat(tasks = []) {
-  if (!tasks.length) return 'You do not have any open tasks for today.';
-  const lines = tasks.slice(0, 5).map((task, index) => `${index + 1}. ${task.title}${task.dueDate ? ` - ${task.dueDate}` : ''}${task.dueTime ? ` at ${task.dueTime}` : ''} (${task.status})`);
-  return `Here are your tasks:\n${lines.join('\n')}`;
+function formatTasksForChat(tasks = [], options = {}) {
+  const meta = catalogMeta(tasks);
+  const state = options.state || meta.state;
+  const language = options.language || 'en';
+  if (state === 'unavailable' || state === 'disabled') return assistantCatalogReply(state, language);
+  if (!tasks.length || state === 'empty') return assistantCatalogReply('empty', language);
+  const notice = meta.demo || state === 'demo' ? `${assistantCatalogReply('demo', language)}\n` : '';
+  const lines = tasks.slice(0, 5).map((task, index) => `${index + 1}. ${task.demo ? 'Demo: ' : ''}${task.title}${task.dueDate ? ` - ${task.dueDate}` : ''}${task.dueTime ? ` at ${task.dueTime}` : ''} (${task.status})`);
+  return `${notice}Here are your tasks:\n${lines.join('\n')}`;
 }
 
 function parseTaskFromMessage(message = '', profile = {}) {
@@ -576,8 +603,14 @@ function parseTaskFromMessage(message = '', profile = {}) {
 async function handleTaskChat(message, user, profile = {}, channel = 'web') {
   if (isShowTasksMessage(message)) {
     const tasks = await getUserTasks(user.userId);
-    const todayTasks = await getDueTasks(user.userId, todayKey());
-    const reply = formatTasksForChat(todayTasks.length ? todayTasks : tasks);
+    const language = languageFromProfile(profile);
+    if (tasks.catalogState === 'unavailable') {
+      const reply = formatTasksForChat(tasks, { language });
+      await saveChatConversation(user.userId, channel, message, reply, 'TASKS_UNAVAILABLE');
+      return { reply, category: 'Tasks', status: 'TASKS_UNAVAILABLE', tasks: [] };
+    }
+    const todayTasks = tagCatalog(await getDueTasks(user.userId, todayKey()), tasks.catalogState, tasks.catalogDemo);
+    const reply = formatTasksForChat(todayTasks.length ? todayTasks : tasks, { language });
     await saveChatConversation(user.userId, channel, message, reply, 'TASKS_SHOWN');
     return { reply, category: 'Tasks', status: 'TASKS_SHOWN', tasks };
   }

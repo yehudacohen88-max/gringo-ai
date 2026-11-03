@@ -283,18 +283,26 @@ async function commandServices(profile = {}) {
 }
 
 async function commandDocuments(profile = {}) {
+  const language = languageFromProfile(profile);
   const documents = await documentService.getUserDocuments(profile.userId);
+  if (documents.catalogState === 'unavailable' || !documents.length) {
+    return {
+      reply: documentService.formatDocumentsForChat(documents, {}, { language }),
+      status: documents.catalogState === 'unavailable' ? 'TELEGRAM_DOCUMENTS_UNAVAILABLE' : 'TELEGRAM_DOCUMENTS_EMPTY',
+    };
+  }
   const summary = documentService.summarizeDocuments(profile, documents);
   const valid = documents.filter((document) => documentService.calculateDocumentStatus(document) === 'Valid').length;
   return {
     reply: [
+      documents.catalogDemo ? catalogMessage('demo', language) : '',
       'Documents summary:',
       `Valid: ${valid}`,
       `Missing: ${summary.missingDocumentTypes || 'None'}`,
       `Expiring soon: ${summary.expiringDocumentCount || '0'}`,
       `Expired: ${summary.expiredDocumentCount || '0'}`,
       'Document numbers are masked in Gringo.',
-    ].join('\n'),
+    ].filter(Boolean).join('\n'),
     replyMarkup: inlineKeyboard(
       documents[0]
         ? [
@@ -321,9 +329,14 @@ async function commandNotifications(profile = {}) {
 }
 
 async function commandTasks(profile = {}) {
+  const language = languageFromProfile(profile);
+  const owned = await taskService.getUserTasks(profile.userId);
+  if (owned.catalogState === 'unavailable') {
+    return { reply: taskService.formatTasksForChat(owned, { language }), status: 'TELEGRAM_TASKS_UNAVAILABLE' };
+  }
   const today = new Date().toISOString().slice(0, 10);
   const tasks = [...(await taskService.getOverdueTasks(profile.userId)), ...(await taskService.getDueTasks(profile.userId, today))].slice(0, 5);
-  if (!tasks.length) return { reply: 'You do not have open tasks for today.', status: 'TELEGRAM_TASKS_EMPTY' };
+  if (!tasks.length) return { reply: taskService.formatTasksForChat([], { language, state: 'empty' }), status: 'TELEGRAM_TASKS_EMPTY' };
   return {
     reply: `Tasks:\n${tasks.map((task, index) => `${index + 1}. ${task.title} - ${task.status}${task.dueTime ? ` at ${task.dueTime}` : ''}`).join('\n')}`,
     replyMarkup: inlineKeyboard([[button('Complete', 'complete', 'tasks', tasks[0].taskId), button('Reschedule', 'later', 'tasks', tasks[0].taskId)], [button('Open Tasks', 'open', 'tasks', 'list')]]),
@@ -527,7 +540,8 @@ async function handleViewCallback(callback, user, profile, moduleName, recordId)
     const document = await documentService.getDocumentById(recordId);
     if (!document || document.userId !== user.userId) return 'I cannot show that document.';
     const safe = documentService.toSafeDocument(document);
-    return [`Document: ${safe.documentType}`, `Status: ${safe.status}`, `Expiry: ${safe.expiryDate || '-'}`, `Number: ${safe.documentNumber || 'Not saved'}`].join('\n');
+    const prefix = document.demo ? `${catalogMessage('demo', language)}\n` : '';
+    return prefix + [`Document: ${safe.documentType}`, `Status: ${safe.status}`, `Expiry: ${safe.expiryDate || '-'}`, `Number: ${safe.documentNumber || 'Not saved'}`].join('\n');
   }
   if (moduleName === 'community') {
     if (!moduleEnabled('community')) return assistantCatalogReply('disabled', language);

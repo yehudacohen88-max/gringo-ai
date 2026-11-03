@@ -1172,9 +1172,20 @@ async function executeEmploymentDocuments(task, input) {
   }
 
   const documents = await documentService.getUserDocuments(userId);
+  if (documents.catalogState === 'unavailable') {
+    return createResult(task, 'partial', {
+      capability: 'employment.documents',
+      documents: [],
+      checklist: [],
+      availability: 'unavailable',
+      message: documentService.formatDocumentsForChat(documents),
+      responseLanguage: 'en',
+      suppressGenericFollowUp: true,
+    }, ['catalog_unavailable']);
+  }
   const summary = documentService.summarizeDocuments({ ...profile, userId }, documents);
 
-  return createResult(task, 'success', {
+  return createResult(task, documents.length ? 'success' : 'partial', {
     capability: 'employment.documents',
     documents: documents.map(documentService.toSafeDocument),
     checklist: summary.checklist,

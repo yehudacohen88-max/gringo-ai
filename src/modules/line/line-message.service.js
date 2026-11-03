@@ -312,7 +312,8 @@ async function handleViewAction(user, moduleName, recordId) {
     const document = await documentService.getDocumentById(recordId);
     if (!document || document.userId !== user.userId) return 'I cannot show this document.';
     const safe = documentService.toSafeDocument(document);
-    return `Document: ${safe.documentType}\nStatus: ${safe.status}\nExpiry: ${safe.expiryDate || '-'}\nNumber ending: ${safe.documentNumber || 'not saved'}`;
+    const prefix = document.demo ? `${catalogMessage('demo', language)}\n` : '';
+    return `${prefix}Document: ${safe.documentType}\nStatus: ${safe.status}\nExpiry: ${safe.expiryDate || '-'}\nNumber ending: ${safe.documentNumber || 'not saved'}`;
   }
   if (moduleName === 'notifications') {
     const notifications = await notificationService.getUserNotifications(user.userId, { includeScheduled: true });

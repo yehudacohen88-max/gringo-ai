@@ -683,7 +683,8 @@ test.describe('pilot catalog does not serve fake data', { concurrency: 1 }, () =
       const tasks = await taskService.getUserTasks('pilot-task-user');
       assert.equal(Array.isArray(tasks), true);
       const documents = await documentService.getAllDocuments();
-      assert.equal(documents.length > 0, true);
+      assert.equal(Array.isArray(documents), true);
+      assert.equal(documents.some((document) => document.documentId === 'doc_somchai_passport'), false);
       const jobs = await jobService.getActiveJobs();
       assert.equal(jobs.catalogState, 'disabled');
       assert.equal(jobs.length, 0);

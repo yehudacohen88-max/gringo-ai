@@ -1,5 +1,7 @@
 const { coreAgentService } = require('../core-agent');
+const { carryCatalog, publicCatalogFields } = require('../../shared/pilotCatalog');
 const { loadWebProfile, sameOwner, sendNotFound, stripClientIdentity } = require('../../shared/webPersonalData');
+const { responseLanguage } = require('../../shared/userFacingCopy');
 const documentService = require('./document.service');
 const taskService = require('../tasks/task.service');
 
@@ -12,7 +14,11 @@ async function ownedDocument(userId, documentId) {
 }
 
 async function refreshSummary(context, profile, userId) {
-  const documents = (await documentService.getUserDocuments(userId)).filter((document) => sameOwner(document, userId));
+  const loaded = await documentService.getUserDocuments(userId);
+  const documents = carryCatalog(loaded, loaded.filter((document) => sameOwner(document, userId)));
+  if (documents.catalogState === 'unavailable') {
+    return { documents, summary: { checklist: [] }, unavailable: true };
+  }
   const summary = documentService.summarizeDocuments(profile, documents);
   await coreAgentService.updateUserProfile(context, {
     documentsComplete: summary.documentsComplete,
@@ -36,12 +42,14 @@ async function listDocuments(req, res, next) {
       });
       return;
     }
-    const { documents, summary } = await refreshSummary(context, profile, userId);
+    const { documents, summary, unavailable } = await refreshSummary(context, profile, userId);
+    const fields = publicCatalogFields(documents, responseLanguage(req, profile));
     res.status(200).json({
-      documents: documents.map(documentService.toSafeDocument),
-      checklist: summary.checklist,
+      documents: unavailable ? [] : documents.map(documentService.toSafeDocument),
+      checklist: unavailable ? [] : summary.checklist,
       summary,
       safetyNotice: SAFETY_NOTICE,
+      ...fields,
     });
   } catch (error) {
     next(error);
@@ -55,11 +63,13 @@ async function listAlerts(req, res, next) {
       res.status(200).json({ alerts: [], summary: { checklist: [] }, safetyNotice: SAFETY_NOTICE });
       return;
     }
-    const { documents, summary } = await refreshSummary(context, profile, userId);
+    const { documents, summary, unavailable } = await refreshSummary(context, profile, userId);
+    const fields = publicCatalogFields(documents, responseLanguage(req, profile));
     res.status(200).json({
-      alerts: documentService.createDocumentAlerts(profile, documents, 3),
+      alerts: unavailable ? [] : documentService.createDocumentAlerts(profile, documents, 3),
       summary,
       safetyNotice: SAFETY_NOTICE,
+      ...fields,
     });
   } catch (error) {
     next(error);

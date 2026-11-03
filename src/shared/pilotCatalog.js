@@ -123,6 +123,35 @@ function refuseDemoWrite(record, samples, idFields) {
   throw error;
 }
 
+// Personal records (tasks, documents) keep the caller's own in-memory rows
+// when a sheet write could not be stored. Sample rows stay out of that set.
+async function readPersonalCatalog({ read, samples = [], idFields = ['id'], localRecords = [] }) {
+  let sheetError = false;
+  let rows = [];
+  try {
+    const result = await read();
+    rows = Array.isArray(result) ? result : [];
+  } catch (error) {
+    sheetError = true;
+  }
+
+  const idField = idFields[0];
+  const records = [];
+  const seen = new Set();
+  for (const row of [...rows, ...(localRecords || [])]) {
+    if (!row || typeof row !== 'object') continue;
+    if (isDemoRecord(row, samples, idFields)) continue;
+    const id = cleanText(row[idField]);
+    if (id && seen.has(id)) continue;
+    if (id) seen.add(id);
+    records.push(row);
+  }
+
+  if (records.length) return { state: sheetError ? 'unavailable' : 'ok', records, demo: false };
+  if (demoDataEnabled()) return { state: 'demo', records: labelDemoRecords(samples), demo: true };
+  return { state: sheetError ? 'unavailable' : 'empty', records: [], demo: false };
+}
+
 async function readPilotCatalog({ moduleName, read, samples = [], idFields = [] }) {
   if (!moduleEnabled(moduleName)) {
     return { state: 'disabled', records: [], demo: false };
@@ -211,6 +240,7 @@ module.exports = {
   moduleEnabled,
   moduleEnvName,
   publicCatalogFields,
+  readPersonalCatalog,
   readPilotCatalog,
   refuseDemoWrite,
   tagCatalog,

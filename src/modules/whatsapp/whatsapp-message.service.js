@@ -283,18 +283,26 @@ async function commandServices(profile = {}) {
 }
 
 async function commandDocuments(profile = {}) {
+  const language = languageFromProfile(profile);
   const documents = await documentService.getUserDocuments(profile.userId);
+  if (documents.catalogState === 'unavailable' || !documents.length) {
+    return {
+      reply: documentService.formatDocumentsForChat(documents, {}, { language }),
+      status: documents.catalogState === 'unavailable' ? 'WHATSAPP_DOCUMENTS_UNAVAILABLE' : 'WHATSAPP_DOCUMENTS_EMPTY',
+    };
+  }
   const summary = documentService.summarizeDocuments(profile, documents);
   const valid = documents.filter((document) => documentService.calculateDocumentStatus(document) === 'Valid').length;
   return {
     reply: [
+      documents.catalogDemo ? catalogMessage('demo', language) : '',
       'Documents summary:',
       `Valid: ${valid}`,
       `Missing: ${summary.missingDocumentTypes || 'None'}`,
       `Expiring soon: ${summary.expiringDocumentCount || '0'}`,
       `Expired: ${summary.expiredDocumentCount || '0'}`,
       'Document numbers are masked in Gringo.',
-    ].join('\n'),
+    ].filter(Boolean).join('\n'),
     buttons: documents[0]
       ? makeButtons([
           { title: 'View Docs', id: actionId('view', 'documents', documents[0].documentId) },
@@ -321,9 +329,14 @@ async function commandNotifications(profile = {}) {
 }
 
 async function commandTasks(profile = {}) {
+  const language = languageFromProfile(profile);
+  const owned = await taskService.getUserTasks(profile.userId);
+  if (owned.catalogState === 'unavailable') {
+    return { reply: taskService.formatTasksForChat(owned, { language }), status: 'WHATSAPP_TASKS_UNAVAILABLE' };
+  }
   const today = new Date().toISOString().slice(0, 10);
   const tasks = [...(await taskService.getOverdueTasks(profile.userId)), ...(await taskService.getDueTasks(profile.userId, today))].slice(0, 5);
-  if (!tasks.length) return { reply: 'You do not have open tasks for today.', status: 'WHATSAPP_TASKS_EMPTY' };
+  if (!tasks.length) return { reply: taskService.formatTasksForChat([], { language, state: 'empty' }), status: 'WHATSAPP_TASKS_EMPTY' };
   return {
     reply: `Tasks:\n${tasks.map((task, index) => `${index + 1}. ${task.title} - ${task.status}`).join('\n')}`,
     buttons: makeButtons([
@@ -460,7 +473,8 @@ async function processAction(message = {}) {
     if (!document || document.userId !== user.userId) reply = 'I cannot update that document.';
     else if (action === 'view') {
       const safe = documentService.toSafeDocument(document);
-      reply = `Document: ${safe.documentType}\nStatus: ${safe.status}\nExpiry: ${safe.expiryDate || '-'}`;
+      const prefix = document.demo ? `${catalogMessage('demo', languageFromProfile(profile))}\n` : '';
+      reply = `${prefix}Document: ${safe.documentType}\nStatus: ${safe.status}\nExpiry: ${safe.expiryDate || '-'}`;
     } else if (action === 'renew') reply = 'Please send the new expiry date in YYYY-MM-DD format so Gringo can update it.';
     else if (action === 'later') reply = 'Done. I will keep this document reminder inside Gringo.';
   } else if (moduleName === 'services') {

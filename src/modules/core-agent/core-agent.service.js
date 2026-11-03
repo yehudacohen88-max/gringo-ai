@@ -2121,6 +2121,18 @@ async function processWebMessage(messageContext = {}) {
   if (documentIntent) {
     const userId = personalization.user.userId;
     let documents = await documentService.getUserDocuments(userId);
+    if (documents.catalogState === 'unavailable') {
+      const reply = documentService.formatDocumentsForChat(documents, {}, { language: userLanguage });
+      rememberConversation(userContext, originalQuestion, reply);
+      return deliverResponse({
+        reply,
+        replyLanguage: userLanguage,
+        category: 'Documents',
+        status: 'DOCUMENTS_UNAVAILABLE',
+        documents: [],
+        crm: { attempted: true, saved: false, memoryUpdated: false, error: '' },
+      });
+    }
     let summary = documentService.summarizeDocuments(userProfile || {}, documents);
     const documentType = inferDocumentType(question);
     const expiryDate = extractExpiryDate(question);
@@ -2173,7 +2185,7 @@ async function processWebMessage(messageContext = {}) {
         : `I do not have an expiry date for your ${documentType} yet. Please add the expiry date in YYYY-MM-DD format.`;
       status = document?.expiryDate ? 'DOCUMENT_EXPIRY_FOUND' : 'DOCUMENT_EXPIRY_MISSING';
     } else {
-      reply = documentService.formatDocumentsForChat(documents, summary);
+      reply = documentService.formatDocumentsForChat(documents, summary, { language: userLanguage });
       status = documents.length ? 'DOCUMENTS_FOUND' : 'DOCUMENTS_NOT_FOUND';
     }
 
