@@ -117,6 +117,8 @@ function apiFetch(url, options = {}) {
   return fetch(url, { credentials: 'same-origin', ...options, headers });
 }
 
+window.gringoUiLanguage = () => uiLanguage;
+
 function rememberLanguage(profile) {
   const code = normalizeLanguageValue(profile && profile.preferredLanguage);
   if (code) uiLanguage = code;
@@ -213,6 +215,7 @@ async function readJson(response) {
     const code = body.error?.code || '';
     const error = new Error(body.error?.message || 'Request failed.');
     error.code = code;
+    if ((code === 'CONSENT_REQUIRED' || code === 'DELETION_PENDING') && window.gringoPrivacy) window.gringoPrivacy.open('CONSENT_REQUIRED');
     throw error;
   }
 
