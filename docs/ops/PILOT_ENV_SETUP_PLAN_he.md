@@ -38,7 +38,7 @@
 - **פרויקט API ייעודי "gringo-pilot"** ומפתח שמוגבל לפרויקט.
 - **Hard spend limit לפרויקט** (Project settings → Limits → Spend, "Enforce a hard limit") — מוצע $20/חודש. בהגעה לתקרה הבקשות נכשלות ב-429 והבוט עונה בהודעת "AI מושהה" בשפת המשתמש.
 - מכסות באפליקציה (כבר בקוד): `AI_DAILY_USER_LIMIT=30`, `AI_DAILY_GLOBAL_LIMIT=300` לפיילוט, `AI_DAILY_TOKEN_LIMIT=300000`, `AI_TIMEOUT_MS=20000`, ו-`AI_ENABLED=false` כמתג חירום.
-- **בקרות נתונים:** נתוני API לא משמשים לאימון כברירת מחדל — לאמת בהגדרות הארגון. הקוד שולח כעת `store:false` (נוסף ב-PR זה). Zero Data Retention דורש אישור מ-OpenAI — לבקש אם רלוונטי; אחרת חלה שמירת abuse-monitoring של OpenAI (לציין בהודעת הפרטיות — בדיקה משפטית).
+- **בקרות נתונים (בלי הבטחות):** לפי OpenAI, נתוני API לא משמשים לאימון כברירת מחדל. הקוד שולח `store:false` (נוסף ב-PR זה) — זה רק מונע שמירת "application state" של Responses API (ברירת מחדל: לפחות 30 יום). **זו לא הבטחה שאין שמירה:** OpenAI שומרת לוגי abuse-monitoring שעשויים לכלול את הטקסט עד 30 יום (או יותר אם נדרש בחוק). Zero Data Retention / Modified Abuse Monitoring זמינים רק באישור מראש של OpenAI. הודעת הפרטיות כבר אומרת "מידע ש-OpenAI שומרת לזמן מוגבל" — לא לשנות לניסוח של "לא נשמר".
 - מודל: מודל קטן וזול (לבחירת יהודה לפי מחירון OpenAI ביום ההקמה).
 
 ## 6. משתני סביבה וסודות (שמות בלבד)

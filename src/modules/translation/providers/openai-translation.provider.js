@@ -96,6 +96,9 @@ function createOpenAiTranslationProvider(options = {}) {
               },
             ],
             max_output_tokens: 600,
+            // store:false only asks OpenAI not to keep this response for later retrieval.
+            // It is NOT a no-retention guarantee: OpenAI may still keep API data for abuse
+            // monitoring (default up to 30 days) unless the org has an approved ZDR setup.
             store: false,
           }),
           signal: controller.signal,
