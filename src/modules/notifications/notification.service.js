@@ -1,4 +1,5 @@
 const communityService = require('../community/community.service');
+const privacyGuard = require('../privacy/privacy-guard');
 const documentService = require('../documents/document.service');
 const housingService = require('../housing/housing.service');
 const jobService = require('../jobs/job.service');
@@ -147,6 +148,12 @@ function isDuplicate(existing = [], notification = {}) {
   );
 }
 
+async function queueChannelDeliveries(notification) {
+  await telegramDeliveryService.createTelegramDelivery(notification).catch(() => null);
+  await whatsappDeliveryService.createWhatsAppDelivery(notification).catch(() => null);
+  await lineDeliveryService.createLineDelivery(notification).catch(() => null);
+}
+
 async function createNotification(input = {}, options = {}) {
   const ownerUserId = requireOwnerUserId(options.ownerUserId);
   const notification = buildNotification({ ...stripOwnerFields(input), userId: ownerUserId });
@@ -160,19 +167,19 @@ async function createNotification(input = {}, options = {}) {
     );
   }
 
+  // A worker who withdrew, never gave consent, or has a pending deletion
+  // gets no new notification at all (in Gringo or on any channel).
+  if (!(await privacyGuard.userAllowed(ownerUserId))) return null;
+  const channelsAllowed = true;
   try {
     const saved = await notificationRepository.createNotification(notification);
     await recordNotificationEvent(saved, 'created');
-    await telegramDeliveryService.createTelegramDelivery(saved).catch(() => null);
-    await whatsappDeliveryService.createWhatsAppDelivery(saved).catch(() => null);
-    await lineDeliveryService.createLineDelivery(saved).catch(() => null);
+    if (channelsAllowed) await queueChannelDeliveries(saved);
     return saved;
   } catch (error) {
     memoryNotifications.push(notification);
     await recordNotificationEvent(notification, 'created');
-    await telegramDeliveryService.createTelegramDelivery(notification).catch(() => null);
-    await whatsappDeliveryService.createWhatsAppDelivery(notification).catch(() => null);
-    await lineDeliveryService.createLineDelivery(notification).catch(() => null);
+    if (channelsAllowed) await queueChannelDeliveries(notification);
     return notification;
   }
 }
@@ -318,7 +325,7 @@ async function rescheduleNotification(notificationId, days = 1, options = {}) {
     },
     { ownerUserId }
   );
-  await recordNotificationEvent(reminder, 'rescheduled');
+  if (reminder) await recordNotificationEvent(reminder, 'rescheduled');
   return { current, reminder };
 }
 
@@ -544,7 +551,20 @@ async function createManualNotifications(profiles = [], input = {}) {
   return created.filter(Boolean);
 }
 
+function forgetUserNotifications(userId) {
+  const id = cleanText(userId);
+  let removed = 0;
+  for (let index = memoryNotifications.length - 1; index >= 0; index -= 1) {
+    if (id && memoryNotifications[index].userId === id) {
+      memoryNotifications.splice(index, 1);
+      removed += 1;
+    }
+  }
+  return removed;
+}
+
 module.exports = {
+  forgetUserNotifications,
   completeNotification,
   cancelScheduledNotification,
   createNotification,

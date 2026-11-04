@@ -3,10 +3,13 @@ const documentController = require('./document.controller');
 const { attachWebIdentity } = require('../../shared/webIdentity');
 const { requireSameOrigin } = require('../../shared/requireSameOrigin');
 
+const { requirePersonalConsent } = require('../../shared/requirePersonalConsent');
+
 const router = express.Router();
 
 router.use(requireSameOrigin);
 router.use(attachWebIdentity);
+router.use(requirePersonalConsent);
 
 router.get('/', documentController.listDocuments);
 router.get('/alerts', documentController.listAlerts);

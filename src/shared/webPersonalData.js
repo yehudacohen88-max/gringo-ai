@@ -26,6 +26,10 @@ function stripClientIdentity(body, extraFields = []) {
 // do not attach legacy web_<timestamp> or local-web-user profiles.
 async function loadWebProfile(req, { create = false } = {}) {
   const context = resolveWebUserContext(req);
+  if (create) {
+    // Lazy require: privacy loads the CRM module, which this file also loads.
+    await require('../modules/privacy/privacy.controller').assertWebConsent(context);
+  }
   const profile = create
     ? await crmAgentService.findOrCreateUser(context)
     : await crmAgentService.findUserByChannel(context.channel, context.channelUserId);

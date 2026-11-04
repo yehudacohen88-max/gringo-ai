@@ -1,4 +1,5 @@
 const documentRepository = require('./document.repository');
+const privacyGuard = require('../privacy/privacy-guard');
 const { isOwnedBy, requireOwnerUserId, stripOwnerFields } = require('../../shared/recordOwner');
 const { withRecordLock } = require('../../shared/recordWriteLock');
 const {
@@ -177,6 +178,7 @@ async function createDocument(input = {}, options = {}) {
   const errors = validateDocument(document);
   if (errors.length) throw validationError(errors);
   refuseDemoWrite(document, SAMPLE_DOCUMENTS, ['documentId']);
+  await privacyGuard.assertUserAllowed(ownerUserId);
 
   try {
     const created = await documentRepository.createDocument(document);
@@ -194,6 +196,7 @@ async function updateDocument(documentId, updates = {}, options = {}) {
   return withRecordLock(`document:${documentId}`, async () => {
     const existing = await getDocumentById(documentId);
     if (!isOwnedBy(existing, ownerUserId) || isSampleDocument(existing)) return null;
+    await privacyGuard.assertUserAllowed(ownerUserId);
     const safeUpdates = stripOwnerFields(updates);
     const changeType = cleanText(safeUpdates.changeType) || inferChangeType(existing, safeUpdates);
     const updated = buildDocument({

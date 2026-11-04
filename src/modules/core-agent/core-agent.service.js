@@ -2343,7 +2343,26 @@ async function processWebMessage(messageContext = {}) {
   });
 }
 
+// Privacy erasure: drop every in-process memory kept for one channel identity.
+function forgetConversation(userContext = {}) {
+  let key;
+  try {
+    key = getConversationKey(userContext);
+  } catch (error) {
+    return false;
+  }
+  recentConversationByUser.delete(key);
+  conversationMemoryService.clearConversation(key);
+  workingMemoryService.clearWorkingMemory(key);
+  memorySnapshotService.clearSnapshot(key);
+  require('../memory').conversationSummaryService.clearSummary(key);
+  if (memoryLifecycleService.records instanceof Map) memoryLifecycleService.records.delete(key);
+  onboardingService.forgetUser(userContext);
+  return true;
+}
+
 module.exports = {
+  forgetConversation,
   coordinateAgents,
   getOnboardingStatus: onboardingService.getStatus,
   getPersonalizedStartup,

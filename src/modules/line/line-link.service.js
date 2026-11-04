@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const privacyGuard = require('../privacy/privacy-guard');
 const linkCode = require('../../shared/linkCode');
 const crmAgentRepository = require('../crm-agent/crm-agent.repository');
 const { crmAgentService } = require('../crm-agent');
@@ -106,6 +107,7 @@ async function setProfileLineStatus(userId, lineLinkStatus) {
 
 async function createLinkCode(userId) {
   linkCode.assertCanCreate(userId);
+  await privacyGuard.assertUserAllowed(userId);
   await expireOldCodes();
   await cancelActiveCodesForUser(userId);
   const plainCode = linkCode.generatePlainCode();
@@ -297,7 +299,12 @@ async function getLinkHistory(userId) {
   }
 }
 
+function forgetPendingUnlink(lineUserId) {
+  return pendingUnlinks.delete(cleanText(lineUserId));
+}
+
 module.exports = {
+  forgetPendingUnlink,
   confirmSelfUnlink,
   createLinkCode,
   disconnectLine,

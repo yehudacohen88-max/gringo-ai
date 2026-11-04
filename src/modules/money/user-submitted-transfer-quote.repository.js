@@ -355,7 +355,26 @@ function createUserSubmittedTransferQuoteRepository(dependencies = {}) {
 
 const userSubmittedTransferQuoteRepository = createUserSubmittedTransferQuoteRepository();
 
+function purgeLocalQuotesForUser(userId) {
+  const id = cleanText(userId);
+  let removed = 0;
+  for (let index = localQuoteRows.length - 1; index >= 0; index -= 1) {
+    if (id && cleanText(localQuoteRows[index].userId) === id) {
+      localQuoteRows.splice(index, 1);
+      removed += 1;
+    }
+  }
+  return removed;
+}
+
+function localQuotesForUser(userId) {
+  const id = cleanText(userId);
+  return localQuoteRows.filter((row) => id && cleanText(row.userId) === id).map((row) => ({ ...row }));
+}
+
 module.exports = {
+  localQuotesForUser,
+  purgeLocalQuotesForUser,
   USER_SUBMITTED_TRANSFER_QUOTE_FIELDS,
   createUserSubmittedTransferQuoteRepository,
   userSubmittedTransferQuoteRepository,

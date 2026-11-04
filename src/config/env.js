@@ -351,6 +351,8 @@ const env = {
       whatsappTemplates: process.env.GOOGLE_SHEETS_WHATSAPP_TEMPLATES_SHEET_NAME || 'WhatsAppTemplates',
       whatsappDeliveries: process.env.GOOGLE_SHEETS_WHATSAPP_DELIVERIES_SHEET_NAME || 'WhatsAppDeliveries',
       whatsappDeliveryHistory: process.env.GOOGLE_SHEETS_WHATSAPP_DELIVERY_HISTORY_SHEET_NAME || 'WhatsAppDeliveryHistory',
+      privacyConsents: process.env.GOOGLE_SHEETS_PRIVACY_CONSENTS_SHEET_NAME || 'PrivacyConsents',
+      privacyAudit: process.env.GOOGLE_SHEETS_PRIVACY_AUDIT_SHEET_NAME || 'PrivacyAudit',
     },
   },
 };

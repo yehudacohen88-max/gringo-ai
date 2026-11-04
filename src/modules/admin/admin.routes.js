@@ -1,6 +1,7 @@
 const express = require('express');
 const adminController = require('./admin.controller');
 const { requireAdminKey } = require('../../shared/requireAdminKey');
+const privacyController = require('../privacy/privacy.controller');
 
 const router = express.Router();
 
@@ -29,6 +30,7 @@ router.post('/whatsapp/deliveries/:deliveryId/cancel', adminController.cancelWha
 router.get('/whatsapp/deliveries/:deliveryId/failure', adminController.getWhatsAppFailureReason);
 router.post('/tasks', adminController.assignTask);
 router.put('/tasks/:taskId', adminController.updateTask);
+router.post('/privacy/retry-deletions', privacyController.postAdminRetryDeletions);
 
 module.exports = router;
 module.exports.requireAdminKey = requireAdminKey;

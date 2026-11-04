@@ -1,4 +1,5 @@
 const { env } = require('../../config/env');
+const privacyGuard = require('../privacy/privacy-guard');
 const crmAgentRepository = require('../crm-agent/crm-agent.repository');
 const notificationRepository = require('../notifications/notification.repository');
 const { communicationService } = require('../communication');
@@ -195,6 +196,8 @@ async function canDeliverNotification(notification = {}) {
   if (BLOCKED_STATUSES.includes(notification.status)) return { ok: false, reason: 'notification_closed' };
   const profile = await getProfileForNotification(notification);
   if (!profile) return { ok: false, reason: 'profile_missing' };
+  // Checked again at send time: consent may be withdrawn after queueing.
+  if (!(await privacyGuard.userAllowed(profile.userId))) return { ok: false, reason: 'privacy_consent_missing' };
   if (!cleanText(profile.telegramUserId) || !cleanText(profile.telegramChatId)) return { ok: false, reason: 'telegram_not_linked' };
   if (!isYes(profile.telegramNotificationsEnabled)) return { ok: false, reason: 'telegram_notifications_disabled' };
   if (!respectsPreference(profile, notification.type)) return { ok: false, reason: 'preference_disabled' };

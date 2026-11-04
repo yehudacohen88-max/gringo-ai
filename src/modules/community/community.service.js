@@ -1,4 +1,5 @@
 const communityRepository = require('./community.repository');
+const privacyGuard = require('../privacy/privacy-guard');
 const { COMMUNITY_COMMENT_STATUSES } = require('./community-comment.model');
 const {
   COMMUNITY_CATEGORIES,
@@ -277,6 +278,7 @@ async function addComment(input = {}) {
   const body = cleanText(input.body);
   if (!body) throw validationError('Comment cannot be empty.');
   if (body.length > MAX_COMMENT_LENGTH) throw validationError(`Comment must be ${MAX_COMMENT_LENGTH} characters or less.`);
+  await privacyGuard.assertUserAllowed(cleanText(input.userId));
 
   const comment = {
     commentId: cleanText(input.commentId) || generateId('comment'),

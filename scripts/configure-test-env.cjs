@@ -22,4 +22,7 @@ Object.assign(process.env, {
   AI_API_KEY: '',
   TRANSLATION_API_KEY: '',
   REFERENCE_EXCHANGE_RATE_API_ENDPOINT: '',
+  // Legacy suites predate the consent gate. Privacy tests turn it back on.
+  // Production and hosted runtimes ignore this flag and always require consent.
+  GRINGO_PRIVACY_CONSENT_GATE: 'off',
 });

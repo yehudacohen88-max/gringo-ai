@@ -1,4 +1,5 @@
 const crmAgentRepository = require('./crm-agent.repository');
+const privacyGuard = require('../privacy/privacy-guard');
 const { languageDetectionService } = require('../language');
 const {
   USER_PROFILE_DEFAULTS,
@@ -178,6 +179,10 @@ async function createUserIfMissing(context, channel, channelUserId) {
 
   if (record) return record.profile;
 
+  // No profile is created for an identity without consent.
+  if (channelUserId) await privacyGuard.assertIdentityAllowed(channel, channelUserId);
+  else await privacyGuard.assertUserAllowed(context.userId);
+
   const profile = buildUserProfile({
     ...context,
     channel,
@@ -208,6 +213,9 @@ async function findOrCreateUser(context = {}) {
     resolveLock = resolve;
     rejectLock = reject;
   });
+  // A refused create (no consent) must not become an unhandled rejection
+  // when no concurrent caller is waiting on this gate.
+  gate.catch(() => {});
   profileCreateLocks.set(lockKey, gate);
 
   try {
@@ -232,6 +240,8 @@ async function findUserByChannel(channel, channelUserId) {
 
 async function updateUserProfile(userId, updates = {}) {
   const record = await requireUserProfileRecord(userId);
+  // Without consent (or while a deletion is pending) nothing is written.
+  if (!(await privacyGuard.userAllowed(record.profile.userId))) return record.profile;
 
   const updatedProfile = {
     ...record.profile,
@@ -326,6 +336,7 @@ async function updateDetectedLanguage(userId, resolution = {}) {
 }
 
 async function saveConversation(event = {}) {
+  if (!(await privacyGuard.userAllowed(cleanText(event.userId)))) return null;
   const conversationEvent = buildConversationEvent(event);
   return crmAgentRepository.createConversationHistory(conversationEvent);
 }
@@ -340,6 +351,7 @@ async function extractAndUpdateMemory(userId, message = '') {
   }
 
   const signals = extractMemorySignals(message);
+  if (!(await privacyGuard.userAllowed(record.profile.userId))) return { profile: record.profile, signals };
   const updatedProfile = {
     ...record.profile,
     interests: mergeInterests(record.profile.interests, signals.interests),

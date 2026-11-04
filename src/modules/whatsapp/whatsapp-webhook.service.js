@@ -1,3 +1,4 @@
+const { handleChannelPrivacy } = require('../privacy/privacy-channel');
 const crypto = require('crypto');
 const express = require('express');
 const { env } = require('../../config/env');
@@ -117,13 +118,15 @@ async function processMappedMessage(message = {}, handler) {
   rememberMessageId(message.messageId);
 
   const adaptedMessage = communicationService.receiveMessage('whatsapp', message);
-  const result = await handler(adaptedMessage);
+  // Consent and privacy commands run first. Without consent nothing personal is stored.
+  const privacyResult = await handleChannelPrivacy('whatsapp', adaptedMessage);
+  const result = privacyResult || (await handler(adaptedMessage));
   try {
     const delivery = await whatsappMessageService.sendReply(adaptedMessage, result.reply, {
       buttons: result.buttons,
       listRows: result.listRows,
     });
-    await whatsappMessageService.recordDeliveryStatus(
+    if (!result.privacy) await whatsappMessageService.recordDeliveryStatus(
       adaptedMessage,
       result.user?.userId,
       result.reply,
@@ -131,7 +134,7 @@ async function processMappedMessage(message = {}, handler) {
       delivery?.skipped ? 'template_required' : 'delivered'
     );
   } catch (deliveryError) {
-    await whatsappMessageService.recordDeliveryStatus(
+    if (!result.privacy) await whatsappMessageService.recordDeliveryStatus(
       adaptedMessage,
       result.user?.userId,
       result.reply,

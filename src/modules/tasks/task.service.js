@@ -1,4 +1,5 @@
 const { crmAgentService } = require('../crm-agent');
+const privacyGuard = require('../privacy/privacy-guard');
 const notificationService = require('../notifications/notification.service');
 const { isOwnedBy, requireOwnerUserId, stripOwnerFields } = require('../../shared/recordOwner');
 const { withRecordLock } = require('../../shared/recordWriteLock');
@@ -256,6 +257,7 @@ async function createTask(input = {}, options = {}) {
   const errors = validateTask(task);
   if (errors.length) throw validationError(errors);
   refuseDemoWrite(task, SAMPLE_TASKS, ['taskId']);
+  await privacyGuard.assertUserAllowed(ownerUserId);
   try {
     const created = await taskRepository.createTask(task);
     await recordTaskEvent(null, created, 'Created');
@@ -272,6 +274,7 @@ async function updateTask(taskId, updates = {}, options = {}) {
   return withRecordLock(`task:${taskId}`, async () => {
     const existing = await getTaskById(taskId);
     if (!isOwnedBy(existing, ownerUserId) || isSampleTask(existing)) return null;
+    await privacyGuard.assertUserAllowed(ownerUserId);
     const eventType = TASK_HISTORY_EVENT_TYPES.includes(cleanText(updates.eventType)) ? cleanText(updates.eventType) : 'Updated';
     const cleanUpdates = stripOwnerFields(updates);
     delete cleanUpdates.eventType;
@@ -395,6 +398,7 @@ async function getOverdueTasks(userId) {
 }
 
 async function markOverdueTasks(userId) {
+  if (!(await privacyGuard.userAllowed(userId))) return [];
   const tasks = await readTasksWithFallback();
   if (tasks.catalogState === 'unavailable') return [];
   const overdue = tasks.filter((task) => task.userId === userId && !isSampleTask(task) && calculateTaskStatus(task) === 'Overdue' && task.status !== 'Overdue');
@@ -547,6 +551,7 @@ async function processTaskReminders(userId, profile = {}) {
   });
   const created = [];
   if (profile.taskRemindersEnabled === 'No') return created;
+  if (!(await privacyGuard.userAllowed(userId))) return created;
   for (const task of dueReminders.filter((item) => !isSampleTask(item))) {
     created.push(
       await notificationService.createNotification(
@@ -752,6 +757,8 @@ async function createTasksForAudience(profiles = [], input = {}) {
   const targets = profiles.filter((profile) => profileMatchesAudience(profile, audience));
   const created = [];
   for (const profile of targets) {
+    // Admin tasks are not created for workers without consent.
+    if (!(await privacyGuard.userAllowed(profile.userId))) continue;
     created.push(
       await createTask(
         {
