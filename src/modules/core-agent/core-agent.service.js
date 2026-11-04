@@ -2286,6 +2286,7 @@ async function processWebMessage(messageContext = {}) {
     try {
       const aiResult = await aiProviderService.generateReply({
         message: question,
+        budgetKey: getConversationKey(userContext),
         userLanguage,
         userProfile,
         relevantKnowledge: knowledgeResult.relevantKnowledge || [],
