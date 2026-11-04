@@ -1,0 +1,77 @@
+# Render Blueprint for the Gringo Telegram pilot. NO SECRETS IN THIS FILE.
+# Values marked `sync: false` are entered by Yehuda in the Render Dashboard
+# when the Blueprint is first applied (Render prompts for them).
+# Do not apply this Blueprint until hosting payment and deploy are approved.
+# Docs: https://render.com/docs/blueprint-spec  https://render.com/docs/disks
+services:
+  - type: web
+    name: gringo-pilot
+    runtime: node
+    plan: 0.5c-512mb          # "Starter": 0.5 CPU / 512 MB, $7/month (render.com/pricing, 4.11.2026)
+    region: frankfurt         # closest Render region to Israel
+    numInstances: 1           # PILOT REQUIREMENT: exactly one process. A disk also prevents scaling.
+    branch: main
+    autoDeployTrigger: "off"  # quoted: YAML 1.1 parsers read bare off as false. Replaces deprecated autoDeploy.
+    buildCommand: npx --yes pnpm@10.33.4 install --frozen-lockfile --prod
+    startCommand: node src/server.js
+    healthCheckPath: /health
+    disk:
+      name: gringo-data
+      mountPath: /var/data
+      sizeGB: 1               # $0.25/month; can grow later, never shrink
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      # PORT is set by Render; the app reads process.env.PORT.
+      - key: TRUST_PROXY_HOPS
+        value: "1"            # Render's proxy only. Re-check if Cloudflare is ever put in front (then 2).
+      # --- persistent state on the disk ---
+      - key: AI_BUDGET_STATE_FILE
+        value: /var/data/ai-budget.json
+      - key: GRINGO_PROCESS_LOCK_FILE
+        value: /var/data/gringo.lock
+      - key: TELEGRAM_STATE_FILE
+        value: /var/data/telegram-state.json
+      # --- channels: Telegram only ---
+      - key: TELEGRAM_BOT_ENABLED
+        value: "true"
+      - key: TELEGRAM_BOT_MODE
+        value: polling        # webhook mode is not implemented
+      - key: LINE_ENABLED
+        value: "false"
+      - key: WHATSAPP_ENABLED
+        value: "false"
+      # --- AI limits and kill switch (the primary cost guard) ---
+      - key: AI_PROVIDER
+        value: openai
+      - key: AI_MODEL
+        value: gpt-4.1-mini   # Yehuda confirms the model at setup
+      - key: AI_ENABLED
+        value: "true"         # set to "false" = kill switch (no OpenAI calls)
+      - key: AI_TIMEOUT_MS
+        value: "20000"
+      - key: AI_DAILY_USER_LIMIT
+        value: "30"
+      - key: AI_DAILY_GLOBAL_LIMIT
+        value: "300"
+      - key: AI_DAILY_TOKEN_LIMIT
+        value: "300000"
+      - key: TRANSLATION_PROVIDER
+        value: ""             # translation off for the pilot unless approved
+      # --- secrets: entered in the Dashboard, never in git ---
+      - key: ADMIN_API_KEY
+        sync: false
+      - key: WEB_SESSION_SECRET
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: AI_API_KEY
+        sync: false
+      - key: GOOGLE_SHEETS_SPREADSHEET_ID
+        sync: false
+      - key: GOOGLE_SHEETS_CLIENT_EMAIL
+        sync: false
+      - key: GOOGLE_SHEETS_PRIVATE_KEY
+        sync: false

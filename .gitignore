@@ -13,3 +13,4 @@ build/
 .pnpm-store/
 .codex-server.*.log
 *.log
+.env.production

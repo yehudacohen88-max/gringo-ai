@@ -26,14 +26,19 @@ function startBackgroundWork() {
   telegramLinkService.expireOldCodes().catch(() => {
     console.warn('[telegram] Link-code cleanup did not finish. Gringo web app is still running.');
   });
-  lineLinkService.expireOldCodes().catch(() => {
-    console.warn('[line] Link-code cleanup did not finish. Gringo web app is still running.');
-  });
-  const deliveries = [
-    ['telegram', () => telegramDeliveryService.processPendingTelegramDeliveries()],
-    ['whatsapp', () => whatsappDeliveryService.processPendingWhatsAppDeliveries()],
-    ['line', () => lineDeliveryService.processPendingLineDeliveries()],
-  ];
+  // Disabled channels (pilot: LINE_ENABLED=false, WHATSAPP_ENABLED=false)
+  // start no background work and touch none of their sheets.
+  const lineOn = env.line?.enabled === true;
+  const whatsappOn = env.whatsapp?.enabled === true;
+  if (lineOn) {
+    lineLinkService.expireOldCodes().catch(() => {
+      console.warn('[line] Link-code cleanup did not finish. Gringo web app is still running.');
+    });
+  }
+  const deliveries = [['telegram', () => telegramDeliveryService.processPendingTelegramDeliveries()]];
+  if (whatsappOn) deliveries.push(['whatsapp', () => whatsappDeliveryService.processPendingWhatsAppDeliveries()]);
+  if (lineOn) deliveries.push(['line', () => lineDeliveryService.processPendingLineDeliveries()]);
+  console.log(`[startup] Channels: telegram=${env.telegram?.enabled === true ? 'on' : 'off'} line=${lineOn ? 'on' : 'off'} whatsapp=${whatsappOn ? 'on' : 'off'}`);
   // PRV-03: retry stuck deletions and persist notification expiry in the
   // background (GET requests no longer write). Single process only.
   const privacyService = require('./modules/privacy/privacy.service');

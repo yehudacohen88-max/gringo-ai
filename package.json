@@ -16,7 +16,9 @@
     "setup:community": "node scripts/setupCommunitySheets.js",
     "setup:admin": "node scripts/setupAdminSheets.js",
     "setup:manager-agent": "node scripts/setupManagerAgentSheets.js",
-    "setup:content-agent": "node scripts/setupContentAgentSheets.js"
+    "setup:content-agent": "node scripts/setupContentAgentSheets.js",
+    "setup:pilot": "node scripts/setupPilotSheets.js",
+    "acceptance:telegram": "node scripts/acceptance-telegram.js"
   },
   "keywords": [
     "community",

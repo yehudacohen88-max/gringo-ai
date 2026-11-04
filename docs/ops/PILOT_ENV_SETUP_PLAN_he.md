@@ -96,7 +96,7 @@
 | UptimeRobot, Apps Script | ‏$0 | ‏$0 |
 | OpenAI (תקרה קשיחה) | עד $20; צפי ‏$2–8 | עד $20; צפי ‏$2–8 |
 | **סה"כ** | **≈$9–15 בפועל, תקרה ≈$27** | **≈$6–12 בפועל, תקרה ≈$24** |
-צפי OpenAI: ~10 משתמשים × עד 30 קריאות/יום עם max 350 טוקני פלט — תלוי במודל שייבחר; התקרה הקשיחה מגבילה את הסיכון.
+צפי OpenAI: ~10 משתמשים × עד 30 קריאות/יום עם max 350 טוקני פלט — תלוי במודל שייבחר; התקרה הקשיחה היא רשת ביטחון שנייה — האכיפה שלה **לא מיידית** וייתכן חריגה קלה; המגן הראשי הוא המכסות הפנימיות ו-`AI_ENABLED=false`.
 
 ## מקורות (נבדקו 4.11.2026)
 - Render: https://render.com/pricing , https://render.com/docs/disks
@@ -106,3 +106,7 @@
 - Oracle: https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm
 - OpenAI: https://developers.openai.com/api/docs/guides/spend-limits , https://developers.openai.com/api/docs/guides/your-data
 - UptimeRobot: https://uptimerobot.com/pricing/
+
+
+## עדכון 4.11.2026 — חבילת הקמה
+ההחלטות אושרו (Telegram בלבד, Render מועדף, פרויקט OpenAI $20). מזהה התוכנית ב-Blueprint: `0.5c-512mb`, אזור `frankfurt`. קבצים: `render.yaml`, `.env.production.example`, `docs/ops/PILOT_SETUP_INSTRUCTIONS_he.md` (עובדות + הוראות), `docs/ops/TELEGRAM_ACCEPTANCE_he.md`, `docs/ops/PILOT_FOUNDER_STEPS_he.md` (צעדים + אישור מרוכז).
