@@ -32,6 +32,16 @@ function startBackgroundWork() {
     ['whatsapp', () => whatsappDeliveryService.processPendingWhatsAppDeliveries()],
     ['line', () => lineDeliveryService.processPendingLineDeliveries()],
   ];
+  // PRV-03: retry stuck deletions and persist notification expiry in the
+  // background (GET requests no longer write). Single process only.
+  const privacyService = require('./modules/privacy/privacy.service');
+  const notificationService = require('./modules/notifications/notification.service');
+  deliveries.push(
+    ['privacy', () => privacyService.retryPendingDeletions().then((r) => {
+      if (r && (r.attempted || r.unresolved)) console.log(`[privacy] Deletion retry: attempted=${r.attempted} completed=${r.completed} stillPending=${r.stillPending} unresolved=${r.unresolved || 0}`);
+    })],
+    ['notifications', () => notificationService.expireOldNotifications()],
+  );
   for (const [channel, run] of deliveries) {
     const tick = () => run().catch(() => {
       console.warn(`[${channel}] Notification delivery did not finish. Gringo web app is still running.`);

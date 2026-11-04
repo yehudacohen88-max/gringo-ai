@@ -1,4 +1,7 @@
 const managerRepository = require('./manager-agent.repository');
+const { redactContactDetails } = require('../ai-provider/gringo-prompt.service');
+// Lazy: privacy.service loads CRM modules that load this one.
+const privacyService = { allowsProcessingForUser: (userId) => require('../privacy/privacy.service').allowsProcessingForUser(userId) };
 const notificationService = require('../notifications/notification.service');
 const taskService = require('../tasks/task.service');
 const { translationMetricsService } = require('../translation');
@@ -90,8 +93,38 @@ function getWeeklyRange(options = {}) {
   };
 }
 
+// Reports have no owner column, so deletion cannot reach them. To keep a
+// single worker's words out of them, question text is redacted and a
+// question is listed only when at least REPORT_MIN_QUESTION_COUNT
+// conversations asked it (default 2).
+const REPORT_MIN_QUESTION_COUNT = Math.max(1, Number(process.env.REPORT_MIN_QUESTION_COUNT || 2));
+
 function summarizeQuestions(conversations) {
-  return topCounts(countBy(conversations, (event) => event.question), 5);
+  const counts = countBy(conversations, (event) => redactContactDetails(String(event.question || '').trim().slice(0, 120)));
+  const shared = Object.fromEntries(Object.entries(counts).filter(([label, count]) => label && count >= REPORT_MIN_QUESTION_COUNT));
+  return topCounts(shared, 5);
+}
+
+// Only conversations and profiles of users who allow processing (consent,
+// not deletion_pending) are counted. Fails closed per user.
+async function filterByConsent(records) {
+  const decisions = new Map();
+  const kept = [];
+  for (const record of records) {
+    const userId = String(record.userId || '');
+    if (!userId) continue;
+    if (!decisions.has(userId)) {
+      let allowed = false;
+      try {
+        allowed = await privacyService.allowsProcessingForUser(userId);
+      } catch (error) {
+        allowed = false;
+      }
+      decisions.set(userId, allowed);
+    }
+    if (decisions.get(userId)) kept.push(record);
+  }
+  return kept;
 }
 
 function summarizeCategories(conversations) {
@@ -405,8 +438,8 @@ async function generateDailySummary(options = {}) {
   ) {
     throw unavailableReportError();
   }
-  const allConversations = conversationResult.records.filter((event) => event.userId !== 'usr_somchai');
-  const allUserProfiles = profileResult.records.filter((profile) => profile.userId !== 'usr_somchai' && profile.demo !== true);
+  const allConversations = await filterByConsent(conversationResult.records.filter((event) => event.userId !== 'usr_somchai'));
+  const allUserProfiles = await filterByConsent(profileResult.records.filter((profile) => profile.userId !== 'usr_somchai' && profile.demo !== true));
   const conversations = allConversations.filter((event) => isWithinDateRange(event.createdAt, startDate, endDate));
   const userProfiles = allUserProfiles.filter((profile) =>
     isWithinDateRange(profile.lastInteractionAt || profile.createdAt, startDate, endDate)
@@ -445,7 +478,7 @@ async function generateWeeklySummary(options = {}) {
   if (conversationResult.state === 'unavailable' || profileResult.state === 'unavailable') {
     throw unavailableReportError();
   }
-  const allConversations = conversationResult.records.filter((event) => event.userId !== 'usr_somchai');
+  const allConversations = await filterByConsent(conversationResult.records.filter((event) => event.userId !== 'usr_somchai'));
   const allUserProfiles = profileResult.records.filter((profile) => profile.userId !== 'usr_somchai' && profile.demo !== true);
   const conversations = allConversations.filter((event) => isWithinDateRange(event.createdAt, weekStart, weekEnd));
   const users = allUserProfiles.filter((profile) => isWithinDateRange(profile.createdAt, weekStart, weekEnd));
@@ -520,6 +553,9 @@ async function generateRecommendations(options = {}) {
 }
 
 module.exports = {
+  REPORT_MIN_QUESTION_COUNT,
+  filterByConsent,
+  summarizeQuestions,
   generateDailySummary,
   generateRecommendations,
   generateWeeklySummary,

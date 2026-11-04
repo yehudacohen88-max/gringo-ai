@@ -197,7 +197,45 @@ async function eraseSubject(subject) {
   return { ...sheets, memory };
 }
 
+// For retries of identities that no longer have a profile row (deleted
+// profile, or a user known only by a raw channel id): list every
+// (channel, id) pair found in the data sheets so the caller can match them
+// against the keyed hashes of pending deletions. Read-only.
+async function collectCandidatePairs() {
+  const pairs = new Map();
+  if (!sheetsAdapter.configured()) return [];
+  const add = (channel, id) => {
+    const ch = cleanText(channel).toLowerCase();
+    const value = cleanText(id);
+    if (ch && value) pairs.set(`${ch}:${value}`, { channel: ch, channelUserId: value });
+  };
+  for (const sheetName of sheetsAdapter.sheetNames()) {
+    const rows = await sheetsAdapter.readSheetRows(sheetName);
+    if (!rows || rows.length < 2) continue;
+    const header = rows[0].map((cell) => cleanText(cell));
+    const at = (row, column) => {
+      const index = header.indexOf(column);
+      return index >= 0 ? cleanText(row[index]) : '';
+    };
+    for (const row of rows.slice(1)) {
+      add('telegram', at(row, 'telegramUserId'));
+      add('line', at(row, 'lineUserId'));
+      add('whatsapp', at(row, 'whatsappPhone'));
+      const channelUserId = at(row, 'channelUserId');
+      const rowChannel = at(row, 'channel').toLowerCase();
+      if (channelUserId) {
+        for (const ch of rowChannel ? [rowChannel] : ['telegram', 'line', 'whatsapp', 'web']) add(ch, channelUserId);
+      }
+      // Legacy rows stored the raw channel id as userId.
+      const userId = at(row, 'userId');
+      if (userId && !userId.startsWith('usr_')) for (const ch of ['telegram', 'line', 'whatsapp']) add(ch, userId);
+    }
+  }
+  return [...pairs.values()];
+}
+
 module.exports = {
+  collectCandidatePairs,
   CHANNEL_COLUMNS,
   USER_ID_COLUMNS,
   buildSubject,
