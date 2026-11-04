@@ -20,7 +20,13 @@ test('render.yaml: one Starter web service with a /var/data disk and /health che
   assert.match(yaml, /numInstances: 1\b/);
   assert.match(yaml, /mountPath: \/var\/data/);
   assert.match(yaml, /healthCheckPath: \/health/);
-  assert.match(yaml, /autoDeployTrigger: off/);
+  assert.match(yaml, /autoDeployTrigger: "off"/);
+  assert.doesNotMatch(yaml, /^\s*autoDeploy:/m, "deprecated autoDeploy");
+  assert.match(yaml, /^\s*runtime: node$/m);
+  assert.match(yaml, /region: (oregon|ohio|virginia|frankfurt|singapore)\b/);
+  assert.match(yaml, /sizeGB: \d+/);
+  assert.match(yaml, /name: gringo-data/);
+  assert.doesNotMatch(yaml, /^\s*env: /m, "deprecated env (use runtime)");
   assert.match(yaml, /startCommand: node src\/server\.js/);
 });
 

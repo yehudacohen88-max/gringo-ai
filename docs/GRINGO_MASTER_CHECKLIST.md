@@ -15,11 +15,11 @@
 | INF-08 | P1 | ספר הפעלה: עלייה, תקלות, גיבוי, אירוע | ✅ PR #15 | Y | — | `docs/ops/PILOT_RUNBOOK_he.md` | N |
 | INF-09 | P1 | גיבוי שבועי לגיליון לתיקייה מוגבלת | ⏳ | N | INF-03 | גיבוי ראשון קיים | Y |
 | INF-10 | P1 | התראה על כשל אתחול/Sheets (uptime monitor על /health) | ⏳ | N | INF-01 | התראה נבדקה | Y (שירות חיצוני) |
-| INF-11 | P0 | `render.yaml` (Starter, Frankfurt, דיסק /var/data, מופע 1, auto-deploy כבוי, סודות sync:false) + `.env.production.example` | ✅ PR חבילת הקמה | Y | — | `test/pilot-deploy-config.test.js` | N |
-| INF-12 | P0 | יצירת לשוניות Telegram/התראות/משימות/מסמכים/שירותים/אנשי קשר — לא נוצרו ע"י שום סקריפט (`setup:pilot`) | ✅ PR חבילת הקמה | Y | INF-03 | `--dry-run` + בדיקה | N |
-| INF-13 | P1 | מצב כפילויות Telegram על הדיסק (`TELEGRAM_STATE_FILE`) | ✅ PR חבילת הקמה | Y | — | בדיקות | N |
-| INF-14 | P0 | הוראות הקמה מפורטות + צעדי מייסד + בקשת אישור מרוכזת | 📄 PR חבילת הקמה | Y | — | `docs/ops/PILOT_SETUP_INSTRUCTIONS_he.md`, `PILOT_FOUNDER_STEPS_he.md` | N |
 | INF-11 | P2 | אכיפה טכנית של תהליך יחיד (lock, אותו שרת בלבד) | ✅ PR #18 | Y | — | מופע שני מסרב לעלות | N |
+| INF-12 | P0 | `render.yaml` (Starter, Frankfurt, דיסק /var/data, מופע 1, auto-deploy כבוי, סודות sync:false) + `.env.production.example` | ✅ PR חבילת הקמה | Y | — | `test/pilot-deploy-config.test.js` | N |
+| INF-13 | P0 | יצירת לשוניות Telegram/התראות/משימות/מסמכים/שירותים/אנשי קשר — לא נוצרו ע"י שום סקריפט (`setup:pilot`) | ✅ PR חבילת הקמה | Y | INF-03 | `--dry-run` + בדיקה | N |
+| INF-14 | P1 | מצב כפילויות Telegram על הדיסק (`TELEGRAM_STATE_FILE`) | ✅ PR חבילת הקמה | Y | — | בדיקות | N |
+| INF-15 | P0 | הוראות הקמה מפורטות + צעדי מייסד + בקשת אישור מרוכזת | 📄 PR חבילת הקמה | Y | — | `docs/ops/PILOT_SETUP_INSTRUCTIONS_he.md`, `PILOT_FOUNDER_STEPS_he.md` | N |
 | **2. אבטחה** |
 | SEC-01 | P0 | צמצום שיתופי הגיליון לחשבון השירות + יהודה | ⛔ | N | INF-03 | רשימת שיתוף מתועדת | Y |
 | SEC-02 | P1 | בקרות נתונים בחשבון OpenAI (ללא אימון, שמירה) | ⛔ | N | — | צילום הגדרות | Y |
@@ -76,7 +76,7 @@
 ## Go/No-Go לפיילוט
 **No-Go עד שכל אלה ✅:** INF-01, INF-02, INF-03, SEC-01, AI-05, CH-01, LNG-01, LEG-01, LEG-02, LEG-03, QA-02, ~~ומיזוג PRs #15–#19~~ ✅ מוזגו.
 **Go-מומלץ (P1, לא חוסם בכתב אבל חשוב):** PRV-02, PRV-03, SEC-04, UX-01, INF-09, INF-10.
-**ספירה (4.11.2026):** 57 משימות — 30 ✅, 3 📄 (TD-01, TD-02, INF-14), 1 ⛔ החלטה לא לבצע (PRV-05), 18 ⛔ ממתינות ליהודה, 5 ⏳ (INF-09, INF-10, CH-01 — דורשות אישור; CH-03 אחרי הפיילוט; TD-03 עצמאי P2). בקשת האישור המרוכזת: `docs/ops/PILOT_FOUNDER_STEPS_he.md`.
+**ספירה (4.11.2026):** 57 משימות — 30 ✅, 3 📄 (TD-01, TD-02, INF-15), 1 ⛔ החלטה לא לבצע (PRV-05), 18 ⛔ ממתינות ליהודה, 5 ⏳ (INF-09, INF-10, CH-01 — דורשות אישור; CH-03 אחרי הפיילוט; TD-03 עצמאי P2). בקשת האישור המרוכזת: `docs/ops/PILOT_FOUNDER_STEPS_he.md`.
 **תוכנית הקמה:** docs/ops/PILOT_ENV_SETUP_PLAN_he.md.
 
 **סטטוס נוכחי: NO-GO** — חסימות שדורשות את יהודה (ספק, סודות, משפטי, תאית, תקציב OpenAI).

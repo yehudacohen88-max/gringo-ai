@@ -11,7 +11,7 @@ services:
     region: frankfurt         # closest Render region to Israel
     numInstances: 1           # PILOT REQUIREMENT: exactly one process. A disk also prevents scaling.
     branch: main
-    autoDeployTrigger: off    # deploys are manual and approved
+    autoDeployTrigger: "off"  # quoted: YAML 1.1 parsers read bare off as false. Replaces deprecated autoDeploy.
     buildCommand: npx --yes pnpm@10.33.4 install --frozen-lockfile --prod
     startCommand: node src/server.js
     healthCheckPath: /health
