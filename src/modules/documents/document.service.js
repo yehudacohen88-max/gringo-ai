@@ -10,6 +10,14 @@ const {
   REQUIRED_DOCUMENTS_BY_SECTOR,
 } = require('./document.model');
 const { SAMPLE_DOCUMENTS } = require('./sample-documents');
+const {
+  assistantCatalogReply,
+  catalogMeta,
+  isDemoRecord,
+  readPersonalCatalog,
+  refuseDemoWrite,
+  tagCatalog,
+} = require('../../shared/pilotCatalog');
 
 const memoryDocuments = [];
 const memoryHistory = [];
@@ -120,18 +128,22 @@ function validationError(details) {
   return error;
 }
 
+function isSampleDocument(document) {
+  return isDemoRecord(document, SAMPLE_DOCUMENTS, ['documentId']);
+}
+
+async function readDocumentCatalog() {
+  return readPersonalCatalog({
+    read: () => documentRepository.findAllDocuments(),
+    samples: SAMPLE_DOCUMENTS,
+    idFields: ['documentId'],
+    localRecords: memoryDocuments,
+  });
+}
+
 async function readDocumentsWithFallback() {
-  try {
-    const documents = await documentRepository.findAllDocuments();
-    const source = documents.length ? documents : SAMPLE_DOCUMENTS;
-    const byId = new Map(source.map((document) => [document.documentId, document]));
-    memoryDocuments.forEach((document) => byId.set(document.documentId, document));
-    return Array.from(byId.values());
-  } catch (error) {
-    const byId = new Map(SAMPLE_DOCUMENTS.map((document) => [document.documentId, document]));
-    memoryDocuments.forEach((document) => byId.set(document.documentId, document));
-    return Array.from(byId.values());
-  }
+  const catalog = await readDocumentCatalog();
+  return tagCatalog(catalog.records, catalog.state, catalog.demo);
 }
 
 function buildHistory(existing = {}, updated = {}, changeType = 'Updated') {
@@ -164,6 +176,7 @@ async function createDocument(input = {}, options = {}) {
   const document = buildDocument({ ...stripOwnerFields(input), userId: ownerUserId });
   const errors = validateDocument(document);
   if (errors.length) throw validationError(errors);
+  refuseDemoWrite(document, SAMPLE_DOCUMENTS, ['documentId']);
 
   try {
     const created = await documentRepository.createDocument(document);
@@ -180,7 +193,7 @@ async function updateDocument(documentId, updates = {}, options = {}) {
   const ownerUserId = requireOwnerUserId(options.ownerUserId);
   return withRecordLock(`document:${documentId}`, async () => {
     const existing = await getDocumentById(documentId);
-    if (!isOwnedBy(existing, ownerUserId)) return null;
+    if (!isOwnedBy(existing, ownerUserId) || isSampleDocument(existing)) return null;
     const safeUpdates = stripOwnerFields(updates);
     const changeType = cleanText(safeUpdates.changeType) || inferChangeType(existing, safeUpdates);
     const updated = buildDocument({
@@ -191,7 +204,7 @@ async function updateDocument(documentId, updates = {}, options = {}) {
       createdAt: existing.createdAt,
       updatedAt: new Date().toISOString(),
     });
-    if (updated.userId !== ownerUserId) return null;
+    if (updated.userId !== ownerUserId || isSampleDocument(updated)) return null;
 
     try {
       const saved = await documentRepository.updateDocument(documentId, updated, ownerUserId);
@@ -218,14 +231,22 @@ function inferChangeType(existing, updates = {}) {
 
 async function getUserDocuments(userId) {
   const documents = await readDocumentsWithFallback();
-  return documents
+  const owned = documents
     .filter((document) => document.userId === userId && document.status !== 'Archived')
     .map((document) => ({ ...document, status: calculateDocumentStatus(document) }));
+  const state = owned.length
+    ? (documents.catalogState === 'unavailable' ? 'ok' : documents.catalogState)
+    : (documents.catalogState === 'unavailable' ? 'unavailable' : 'empty');
+  return tagCatalog(owned, state, state === 'demo');
 }
 
 async function getAllDocuments() {
   const documents = await readDocumentsWithFallback();
-  return documents.map((document) => ({ ...document, status: calculateDocumentStatus(document) }));
+  return tagCatalog(
+    documents.map((document) => ({ ...document, status: calculateDocumentStatus(document) })),
+    documents.catalogState,
+    documents.catalogDemo
+  );
 }
 
 async function getDocumentById(documentId) {
@@ -419,22 +440,25 @@ function buildAdminDocumentWarnings(profiles = [], documents = []) {
   };
 }
 
-function formatDocumentsForChat(documents = [], summary = {}) {
-  if (!documents.length) {
-    return 'I do not have your document details yet. Please add the document type, last four characters if you want, and the expiry date.';
-  }
+function formatDocumentsForChat(documents = [], summary = {}, options = {}) {
+  const meta = catalogMeta(documents);
+  const state = options.state || meta.state;
+  const language = options.language || 'en';
+  if (state === 'unavailable' || state === 'disabled') return assistantCatalogReply(state, language);
+  if (!documents.length || state === 'empty') return assistantCatalogReply('empty', language);
 
   const lines = documents.map((document, index) => {
-    return `${index + 1}. ${document.documentType}: ${calculateDocumentStatus(document)}${
+    return `${index + 1}. ${document.demo ? 'Demo: ' : ''}${document.documentType}: ${calculateDocumentStatus(document)}${
       document.expiryDate ? `, expires ${document.expiryDate}` : ''
     }${document.documentNumber ? `, number ending ${document.documentNumber}` : ''}`;
   });
 
   return [
+    meta.demo || state === 'demo' ? assistantCatalogReply('demo', language) : '',
     'Here are your saved documents:',
     lines.join('\n'),
     summary.missingDocumentTypes ? `Missing required documents: ${summary.missingDocumentTypes}` : 'Required checklist: Complete',
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 
 function findDocumentByType(documents = [], type = '') {

@@ -566,7 +566,8 @@ test('profile update plus domain request handles update and domain result', asyn
   assert.equal(response.status, 'SUPERVISOR_MULTI_INTENT_SUCCESS');
   assert.equal(state.getProfile().city, 'Haifa');
   assert.match(response.reply, /I will remember/);
-  assert.match(response.reply, /jobs/i);
+  assert.match(response.reply, /unavailable right now|No results right now/);
+  assert.doesNotMatch(response.reply, /Aviv Construction/);
 });
 
 test('multi-intent pipeline failure falls back to legacy response safely', async () => {

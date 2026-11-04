@@ -6,6 +6,16 @@ const {
   COMMUNITY_POST_TYPES,
 } = require('./community-post.model');
 const { SAMPLE_COMMUNITY_POSTS } = require('./sample-community-posts');
+const {
+  assistantCatalogReply,
+  catalogMeta,
+  demoDataEnabled,
+  isDemoRecord,
+  labelDemoRecords,
+  moduleEnabled,
+  refuseDemoWrite,
+  tagCatalog,
+} = require('../../shared/pilotCatalog');
 
 const COMMUNITY_SAFETY_NOTICE = 'Community information may be user-generated. Verify important details before acting.';
 const MAX_COMMENT_LENGTH = 500;
@@ -66,13 +76,25 @@ function validationError(message, details = []) {
   return error;
 }
 
-async function readPostsWithFallback() {
+async function readPostCatalog() {
+  if (!moduleEnabled('community')) return { state: 'disabled', records: [], demo: false };
+
+  let sheetError = false;
+  let sheetPosts = [];
   try {
-    const posts = await communityRepository.findAllPosts();
-    return posts.length > 0 ? posts : [...SAMPLE_COMMUNITY_POSTS, ...memoryPosts];
+    const rows = await communityRepository.findAllPosts();
+    sheetPosts = Array.isArray(rows) ? rows : [];
   } catch (error) {
-    return [...SAMPLE_COMMUNITY_POSTS, ...memoryPosts];
+    sheetError = true;
   }
+
+  const realSheet = sheetPosts.filter((post) => !isDemoRecord(post, SAMPLE_COMMUNITY_POSTS, ['postId']));
+  if (!sheetError && realSheet.length) return { state: 'ok', records: realSheet, demo: false };
+
+  const localPosts = memoryPosts.filter((post) => !isDemoRecord(post, SAMPLE_COMMUNITY_POSTS, ['postId']));
+  if (localPosts.length) return { state: 'ok', records: localPosts.slice(), demo: false };
+  if (demoDataEnabled()) return { state: 'demo', records: labelDemoRecords(SAMPLE_COMMUNITY_POSTS), demo: true };
+  return { state: sheetError ? 'unavailable' : 'empty', records: [], demo: false };
 }
 
 async function readCommentsWithFallback() {
@@ -88,6 +110,7 @@ async function createPost(input = {}) {
   const post = buildPost(input);
   const errors = validatePost(post);
   if (errors.length > 0) throw validationError('Community post validation failed.', errors);
+  refuseDemoWrite(post, SAMPLE_COMMUNITY_POSTS, ['postId']);
 
   try {
     return await communityRepository.createPost(post);
@@ -98,8 +121,8 @@ async function createPost(input = {}) {
 }
 
 async function publishPost(postId) {
-  const posts = await readPostsWithFallback();
-  const existingPost = posts.find((post) => post.postId === postId);
+  const catalog = await readPostCatalog();
+  const existingPost = catalog.records.find((post) => post.postId === postId);
   if (!existingPost) return null;
 
   const now = new Date().toISOString();
@@ -109,6 +132,8 @@ async function publishPost(postId) {
     publishedAt: existingPost.publishedAt || now,
     updatedAt: now,
   };
+
+  if (isDemoRecord(existingPost, SAMPLE_COMMUNITY_POSTS, ['postId'])) return publishedPost;
 
   try {
     return (await communityRepository.updatePost(postId, publishedPost)) || publishedPost;
@@ -133,11 +158,12 @@ function postMatchesFilters(post, filters = {}) {
 }
 
 async function getPublishedPosts(filters = {}) {
-  const posts = await readPostsWithFallback();
-  return posts
+  const catalog = await readPostCatalog();
+  const posts = catalog.records
     .filter(isPublished)
     .filter((post) => postMatchesFilters(post, filters))
     .sort((a, b) => new Date(b.publishedAt || b.createdAt) - new Date(a.publishedAt || a.createdAt));
+  return tagCatalog(posts, catalog.state, catalog.demo);
 }
 
 function getUserInterests(userProfile = {}) {
@@ -227,17 +253,18 @@ function scorePost(post, userProfile = {}) {
 
 async function getRelevantPosts(userProfile = {}) {
   const posts = await getPublishedPosts();
-  return posts
+  const ranked = posts
     .map((post) => ({
       ...post,
       relevance: scorePost(post, userProfile),
     }))
     .sort((a, b) => b.relevance.score - a.relevance.score);
+  return tagCatalog(ranked, posts.catalogState, posts.catalogDemo);
 }
 
 async function getPostById(postId) {
-  const posts = await readPostsWithFallback();
-  return posts.find((post) => post.postId === postId) || null;
+  const catalog = await readPostCatalog();
+  return catalog.records.find((post) => post.postId === postId) || null;
 }
 
 function commentStatusForBody(body) {
@@ -264,6 +291,12 @@ async function addComment(input = {}) {
 
   if (!comment.postId) throw validationError('postId is required.');
   if (!COMMUNITY_COMMENT_STATUSES.includes(comment.status)) throw validationError('comment status is invalid.');
+
+  const post = await getPostById(comment.postId);
+  if (post && isDemoRecord(post, SAMPLE_COMMUNITY_POSTS, ['postId'])) {
+    memoryComments.push(comment);
+    return comment;
+  }
 
   try {
     return await communityRepository.addComment(comment);
@@ -353,16 +386,24 @@ async function publishApprovedDraft(draft) {
   });
 }
 
-function formatPostsForChat(posts = []) {
-  if (!posts.length) {
-    return `I do not see new community updates for you yet. ${COMMUNITY_SAFETY_NOTICE}`;
+function formatPostsForChat(posts = [], options = {}) {
+  const meta = catalogMeta(posts);
+  const state = options.state || meta.state;
+  const language = options.language || 'en';
+  const demo = options.demo === true || meta.demo || posts.some((post) => post && post.demo);
+
+  if (!posts.length || state === 'disabled' || state === 'unavailable') {
+    const resolved = !posts.length && (state === 'ok' || state === 'demo') ? 'empty' : state;
+    return `${assistantCatalogReply(resolved, language)} ${COMMUNITY_SAFETY_NOTICE}`;
   }
 
   const lines = posts.slice(0, 5).map((post, index) => {
-    return `${index + 1}. ${post.title} - ${post.category}. ${post.relevance?.reason || 'Community update'}.`;
+    const label = post.demo ? 'Demo: ' : '';
+    return `${index + 1}. ${label}${post.title} - ${post.category}. ${post.relevance?.reason || 'Community update'}.`;
   });
+  const notice = demo ? `${assistantCatalogReply('demo', language)}\n` : '';
 
-  return `Here are community updates that may help you:\n${lines.join('\n')}\n${COMMUNITY_SAFETY_NOTICE}`;
+  return `${notice}Here are community updates that may help you:\n${lines.join('\n')}\n${COMMUNITY_SAFETY_NOTICE}`;
 }
 
 module.exports = {

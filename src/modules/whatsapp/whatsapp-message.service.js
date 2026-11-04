@@ -11,6 +11,8 @@ const notificationService = require('../notifications/notification.service');
 const taskService = require('../tasks/task.service');
 const { communicationService } = require('../communication');
 const { safeWhatsAppWarning } = require('./whatsapp-errors');
+const { assistantCatalogReply, catalogListReply, catalogMessage, moduleEnabled } = require('../../shared/pilotCatalog');
+const { languageFromProfile } = require('../../shared/userFacingCopy');
 
 function cleanText(value) {
   return value === undefined || value === null ? '' : String(value).trim();
@@ -194,10 +196,14 @@ async function commandProfile(profile = {}) {
 }
 
 async function commandJobs(profile = {}) {
-  const matches = (await jobService.findMatchingJobs(profile)).slice(0, 3);
-  if (!matches.length) return { reply: 'I did not find matching active jobs yet.', status: 'WHATSAPP_JOBS_EMPTY' };
+  const language = languageFromProfile(profile);
+  const matched = await jobService.findMatchingJobs(profile);
+  const notice = catalogListReply(matched, language);
+  if (notice.blocked) return { reply: notice.blocked, status: 'WHATSAPP_JOBS_EMPTY' };
+  const matches = matched.slice(0, 3);
+  const prefix = notice.prefix ? `${notice.prefix}\n` : '';
   return {
-    reply: `Relevant jobs:\n${matches.map((job, index) => `${index + 1}. ${job.title} - ${job.city}`).join('\n')}`,
+    reply: `${prefix}Relevant jobs:\n${matches.map((job, index) => `${index + 1}. ${job.demo ? 'Demo: ' : ''}${job.title} - ${job.city}`).join('\n')}`,
     buttons: makeButtons([
       { title: 'View Jobs', id: actionId('view', 'jobs', matches[0].jobId) },
       { title: 'Apply Later', id: actionId('later', 'jobs', matches[0].jobId) },
@@ -208,10 +214,14 @@ async function commandJobs(profile = {}) {
 }
 
 async function commandHousing(profile = {}) {
-  const matches = (await housingService.findMatchingHousing(profile)).slice(0, 3);
-  if (!matches.length) return { reply: 'I did not find matching housing yet.', status: 'WHATSAPP_HOUSING_EMPTY' };
+  const language = languageFromProfile(profile);
+  const matched = await housingService.findMatchingHousing(profile);
+  const notice = catalogListReply(matched, language);
+  if (notice.blocked) return { reply: notice.blocked, status: 'WHATSAPP_HOUSING_EMPTY' };
+  const matches = matched.slice(0, 3);
+  const prefix = notice.prefix ? `${notice.prefix}\n` : '';
   return {
-    reply: `Relevant housing:\n${matches.map((listing, index) => `${index + 1}. ${listing.title} - ${listing.city}`).join('\n')}`,
+    reply: `${prefix}Relevant housing:\n${matches.map((listing, index) => `${index + 1}. ${listing.demo ? 'Demo: ' : ''}${listing.title} - ${listing.city}`).join('\n')}`,
     buttons: makeButtons([
       { title: 'View Housing', id: actionId('view', 'housing', matches[0].housingId) },
       { title: 'Found Housing', id: actionId('found', 'housing', 'goal') },
@@ -222,37 +232,48 @@ async function commandHousing(profile = {}) {
 }
 
 async function commandMoney(profile = {}) {
+  const language = languageFromProfile(profile);
   const targetCurrency = profile.preferredCurrency || 'THB';
   const amount = profile.lastMoneyTransferAmount || '2000';
-  const comparison = await moneyService.compareTransfers(amount, 'ILS', targetCurrency);
-  const best = comparison[0];
+  const described = await moneyService.resolveTransferComparison(amount, 'ILS', targetCurrency);
+  const notice = catalogListReply(described.results, language);
+  if (notice.blocked && !described.results.length) return { reply: notice.blocked, status: 'WHATSAPP_MONEY' };
+  const best = described.results[0];
   return {
     reply: [
-      moneyService.DEMO_NOTICE,
+      notice.prefix || '',
       `Saved currency: ${targetCurrency}`,
       best
-        ? `Best demo option for ${amount} ILS: ${best.providerName}, recipient gets about ${Math.round(best.finalAmountReceived)} ${targetCurrency}.`
-        : 'No demo transfer provider found.',
+        ? `${described.demo ? 'Demo: ' : ''}Best ${described.demo ? 'demo ' : ''}option for ${amount} ILS: ${best.providerName}, recipient gets about ${Math.round(best.finalAmountReceived)} ${targetCurrency}.`
+        : assistantCatalogReply('empty', language),
       moneyService.SAFETY_NOTICE,
-    ].join('\n'),
+    ].filter(Boolean).join('\n'),
     status: 'WHATSAPP_MONEY',
   };
 }
 
 async function commandCommunity(profile = {}) {
-  const posts = (await communityService.getRelevantPosts(profile)).slice(0, 3);
-  if (!posts.length) return { reply: 'No recent community posts matched yet.', status: 'WHATSAPP_COMMUNITY_EMPTY' };
+  const language = languageFromProfile(profile);
+  const matched = await communityService.getRelevantPosts(profile);
+  const notice = catalogListReply(matched, language);
+  if (notice.blocked) return { reply: notice.blocked, status: 'WHATSAPP_COMMUNITY_EMPTY' };
+  const posts = matched.slice(0, 3);
+  const prefix = notice.prefix ? `${notice.prefix}\n` : '';
   return {
-    reply: `Community updates:\n${posts.map((post, index) => `${index + 1}. ${post.title} (${post.category})`).join('\n')}`,
+    reply: `${prefix}Community updates:\n${posts.map((post, index) => `${index + 1}. ${post.demo ? 'Demo: ' : ''}${post.title} (${post.category})`).join('\n')}`,
     status: 'WHATSAPP_COMMUNITY',
   };
 }
 
 async function commandServices(profile = {}) {
-  const services = (await serviceService.findMatchingServices(profile)).slice(0, 3);
-  if (!services.length) return { reply: 'I did not find recommended services yet.', status: 'WHATSAPP_SERVICES_EMPTY' };
+  const language = languageFromProfile(profile);
+  const matched = await serviceService.findMatchingServices(profile, {});
+  const notice = catalogListReply(matched, language);
+  if (notice.blocked) return { reply: notice.blocked, status: 'WHATSAPP_SERVICES_EMPTY' };
+  const services = matched.slice(0, 3);
+  const prefix = notice.prefix ? `${notice.prefix}\n` : '';
   return {
-    reply: `Recommended services:\n${services.map((service, index) => `${index + 1}. ${service.title} - ${service.category}`).join('\n')}`,
+    reply: `${prefix}Recommended services:\n${services.map((service, index) => `${index + 1}. ${service.demo ? 'Demo: ' : ''}${service.title} - ${service.category}`).join('\n')}`,
     buttons: makeButtons([
       { title: 'View Service', id: actionId('view', 'services', services[0].id) },
       { title: 'Save Service', id: actionId('save', 'services', services[0].id) },
@@ -262,18 +283,26 @@ async function commandServices(profile = {}) {
 }
 
 async function commandDocuments(profile = {}) {
+  const language = languageFromProfile(profile);
   const documents = await documentService.getUserDocuments(profile.userId);
+  if (documents.catalogState === 'unavailable' || !documents.length) {
+    return {
+      reply: documentService.formatDocumentsForChat(documents, {}, { language }),
+      status: documents.catalogState === 'unavailable' ? 'WHATSAPP_DOCUMENTS_UNAVAILABLE' : 'WHATSAPP_DOCUMENTS_EMPTY',
+    };
+  }
   const summary = documentService.summarizeDocuments(profile, documents);
   const valid = documents.filter((document) => documentService.calculateDocumentStatus(document) === 'Valid').length;
   return {
     reply: [
+      documents.catalogDemo ? catalogMessage('demo', language) : '',
       'Documents summary:',
       `Valid: ${valid}`,
       `Missing: ${summary.missingDocumentTypes || 'None'}`,
       `Expiring soon: ${summary.expiringDocumentCount || '0'}`,
       `Expired: ${summary.expiredDocumentCount || '0'}`,
       'Document numbers are masked in Gringo.',
-    ].join('\n'),
+    ].filter(Boolean).join('\n'),
     buttons: documents[0]
       ? makeButtons([
           { title: 'View Docs', id: actionId('view', 'documents', documents[0].documentId) },
@@ -300,9 +329,14 @@ async function commandNotifications(profile = {}) {
 }
 
 async function commandTasks(profile = {}) {
+  const language = languageFromProfile(profile);
+  const owned = await taskService.getUserTasks(profile.userId);
+  if (owned.catalogState === 'unavailable') {
+    return { reply: taskService.formatTasksForChat(owned, { language }), status: 'WHATSAPP_TASKS_UNAVAILABLE' };
+  }
   const today = new Date().toISOString().slice(0, 10);
   const tasks = [...(await taskService.getOverdueTasks(profile.userId)), ...(await taskService.getDueTasks(profile.userId, today))].slice(0, 5);
-  if (!tasks.length) return { reply: 'You do not have open tasks for today.', status: 'WHATSAPP_TASKS_EMPTY' };
+  if (!tasks.length) return { reply: taskService.formatTasksForChat([], { language, state: 'empty' }), status: 'WHATSAPP_TASKS_EMPTY' };
   return {
     reply: `Tasks:\n${tasks.map((task, index) => `${index + 1}. ${task.title} - ${task.status}`).join('\n')}`,
     buttons: makeButtons([
@@ -377,17 +411,35 @@ async function processAction(message = {}) {
       reply = 'Done. Job alerts are stopped.';
     } else if (action === 'later') reply = 'Saved. You can apply later from Gringo.';
     else if (action === 'view') {
-      const job = await jobService.getJobById(recordId);
-      reply = job && job.status === 'Active' ? `Job: ${job.title}\nCity: ${job.city || '-'}\nEmployer: ${job.employerName || '-'}` : 'This job is not available.';
+      const language = languageFromProfile(profile);
+      if (!moduleEnabled('jobs')) reply = assistantCatalogReply('disabled', language);
+      else {
+        const jobs = await jobService.getActiveJobs();
+        if (jobs.catalogState === 'unavailable') reply = assistantCatalogReply('unavailable', language);
+        else {
+          const job = jobs.find((item) => item.jobId === recordId) || null;
+          const prefix = job && job.demo ? `${catalogMessage('demo', language)}\n` : '';
+          reply = job && job.status === 'Active' ? `${prefix}Job: ${job.title}\nCity: ${job.city || '-'}\nEmployer: ${job.employerName || '-'}` : 'This job is not available.';
+        }
+      }
     }
   } else if (moduleName === 'housing') {
     if (action === 'found') reply = await completeHousingGoal(user, profile);
     else if (action === 'stop') {
       await crmAgentService.updateUserProfile(user.userId, { housingNotifications: 'No' });
       reply = 'Done. Housing alerts are stopped.';
-    } else if (action === 'view') {
-      const listing = await housingService.getHousingById(recordId);
-      reply = listing && listing.status === 'Active' ? `Housing: ${listing.title}\nCity: ${listing.city || '-'}\nPrice: ${listing.monthlyPrice || '-'} NIS` : 'This housing is not available.';
+    }     else if (action === 'view') {
+      const language = languageFromProfile(profile);
+      if (!moduleEnabled('housing')) reply = assistantCatalogReply('disabled', language);
+      else {
+        const listings = await housingService.getActiveHousingListings();
+        if (listings.catalogState === 'unavailable') reply = assistantCatalogReply('unavailable', language);
+        else {
+          const listing = listings.find((item) => item.housingId === recordId) || null;
+          const prefix = listing && listing.demo ? `${catalogMessage('demo', language)}\n` : '';
+          reply = listing && listing.status === 'Active' ? `${prefix}Housing: ${listing.title}\nCity: ${listing.city || '-'}\nPrice: ${listing.monthlyPrice || '-'} NIS` : 'This housing is not available.';
+        }
+      }
     }
   } else if (moduleName === 'tasks') {
     if (recordId === 'list') return { ...(await commandTasks(profile)), user };
@@ -421,21 +473,32 @@ async function processAction(message = {}) {
     if (!document || document.userId !== user.userId) reply = 'I cannot update that document.';
     else if (action === 'view') {
       const safe = documentService.toSafeDocument(document);
-      reply = `Document: ${safe.documentType}\nStatus: ${safe.status}\nExpiry: ${safe.expiryDate || '-'}`;
+      const prefix = document.demo ? `${catalogMessage('demo', languageFromProfile(profile))}\n` : '';
+      reply = `${prefix}Document: ${safe.documentType}\nStatus: ${safe.status}\nExpiry: ${safe.expiryDate || '-'}`;
     } else if (action === 'renew') reply = 'Please send the new expiry date in YYYY-MM-DD format so Gringo can update it.';
     else if (action === 'later') reply = 'Done. I will keep this document reminder inside Gringo.';
   } else if (moduleName === 'services') {
-    const service = await serviceService.getServiceById(recordId);
-    if (!service) reply = 'This service is not available.';
-    else if (action === 'view') reply = `Service: ${service.title}\nCategory: ${service.category}\nPhone: ${service.phone || '-'}`;
-    else if (action === 'save') {
-      const existing = splitList(profile.lastViewedServices);
-      await crmAgentService.updateUserProfile(user.userId, {
-        lastViewedServices: joinList([...existing, service.id]),
-        lastServiceCategory: service.category,
-        lastServiceCity: service.city,
-      });
-      reply = 'Saved. I added this service to your recent services.';
+    const language = languageFromProfile(profile);
+    if (!moduleEnabled('services')) reply = assistantCatalogReply('disabled', language);
+    else {
+      const services = await serviceService.getServices({});
+      if (services.catalogState === 'unavailable') reply = assistantCatalogReply('unavailable', language);
+      else {
+        const service = services.find((item) => item.id === recordId) || null;
+        if (!service) reply = 'This service is not available.';
+        else if (action === 'view') {
+          const prefix = service.demo ? `${catalogMessage('demo', language)}\n` : '';
+          reply = `${prefix}Service: ${service.title}\nCategory: ${service.category}\nPhone: ${service.phone || '-'}`;
+        } else if (action === 'save') {
+          const existing = splitList(profile.lastViewedServices);
+          await crmAgentService.updateUserProfile(user.userId, {
+            lastViewedServices: joinList([...existing, service.id]),
+            lastServiceCategory: service.category,
+            lastServiceCity: service.city,
+          });
+          reply = 'Saved. I added this service to your recent services.';
+        }
+      }
     }
   }
 

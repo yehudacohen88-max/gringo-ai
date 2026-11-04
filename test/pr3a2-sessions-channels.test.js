@@ -55,7 +55,15 @@ test('job, housing, service, and money reads do not return another profile', asy
 
 test('a community comment is owned by the signed profile', async () => {
   await withUsers(async ({ ada, bo, api }) => {
-    const comment = await api(ada, 'POST', '/api/community/community_sample_construction_tel_aviv/comments', {
+    const post = await communityService.createPost({
+      title: 'Owned comment post',
+      body: 'A post created for this ownership check.',
+      category: 'Community',
+      postType: 'Discussion',
+      status: 'Published',
+      language: 'English',
+    });
+    const comment = await api(ada, 'POST', `/api/community/${encodeURIComponent(post.postId)}/comments`, {
       body: `${ada.fullName} note`,
       userId: bo.userId,
       ownerUserId: bo.userId,
@@ -65,7 +73,7 @@ test('a community comment is owned by the signed profile', async () => {
     assert.equal(comment.response.status, 201, JSON.stringify(comment.body));
     assert.equal(comment.body.comment.userId, ada.userId);
     assert.equal(comment.body.comment.userName, ada.fullName);
-    assert.equal(comment.body.comment.postId, 'community_sample_construction_tel_aviv');
+    assert.equal(comment.body.comment.postId, post.postId);
     const missing = await api(ada, 'POST', '/api/community/post_missing_3a2/comments', { body: 'nope' });
     assertHidden(assert, missing.response, missing.body, bo.fullName);
   });
@@ -157,7 +165,15 @@ test('public catalogs stay open and a channel owner can still complete its own t
       assert.equal(response.status, 200, urlPath);
       await readBody(response);
     }
-    const post = await fetch(`${server.base}/api/community/community_sample_rights_reminder`);
+    const createdPost = await communityService.createPost({
+      title: 'Public catalog post',
+      body: 'A published post used to check that community reads stay open.',
+      category: 'Community',
+      postType: 'Discussion',
+      status: 'Published',
+      language: 'English',
+    });
+    const post = await fetch(`${server.base}/api/community/${encodeURIComponent(createdPost.postId)}`);
     assert.equal(post.status, 200);
     await readBody(post);
     assert.equal(documentReads, 0);

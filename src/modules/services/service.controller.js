@@ -1,11 +1,16 @@
 const { coreAgentService } = require('../core-agent');
 const { loadWebProfile } = require('../../shared/webPersonalData');
+const { publicCatalogFields } = require('../../shared/pilotCatalog');
+const { languageFromRequest, responseLanguage } = require('../../shared/userFacingCopy');
 const serviceService = require('./service.service');
 
 async function getServices(req, res, next) {
   try {
     const services = await serviceService.getServices(req.query || {});
-    res.status(200).json({ services });
+    res.status(200).json({
+      services,
+      ...publicCatalogFields(services, languageFromRequest(req)),
+    });
   } catch (error) {
     next(error);
   }
@@ -38,7 +43,11 @@ async function getMatchingServices(req, res, next) {
       });
     }
 
-    res.status(200).json({ services, search });
+    res.status(200).json({
+      services,
+      search,
+      ...publicCatalogFields(services, responseLanguage(req, profile)),
+    });
   } catch (error) {
     next(error);
   }
@@ -46,13 +55,19 @@ async function getMatchingServices(req, res, next) {
 
 async function getService(req, res, next) {
   try {
-    const service = await serviceService.getServiceById(req.params.id);
+    const services = await serviceService.getServices({});
+    const fields = publicCatalogFields(services, languageFromRequest(req));
+    if (fields.availability === 'unavailable' || fields.availability === 'disabled') {
+      res.status(200).json({ service: null, ...fields });
+      return;
+    }
+    const service = services.find((item) => item.id === req.params.id) || null;
     if (!service) {
       res.status(404).json({ error: { message: 'Service not found.' } });
       return;
     }
 
-    res.status(200).json({ service });
+    res.status(200).json({ service, ...fields });
   } catch (error) {
     next(error);
   }

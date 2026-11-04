@@ -1,3 +1,4 @@
+process.env.GRINGO_DEMO_DATA = 'true';
 process.env.MULTI_AGENT_ENABLED = 'false';
 process.env.SUPERVISOR_ENABLED = 'false';
 process.env.AGENT_EXECUTION_ENABLED = 'false';

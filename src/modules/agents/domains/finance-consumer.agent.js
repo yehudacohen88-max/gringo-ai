@@ -1,5 +1,6 @@
 const { multiAgentConfig } = require('../../../config/agents');
 const moneyService = require('../../money/money.service');
+const { assistantCatalogReply } = require('../../../shared/pilotCatalog');
 const { normalizeUserSubmittedMoneyTransferQuote } = require('../../money/user-submitted-money-transfer-quote');
 const { compareUserSubmittedTransferQuotes } = require('../../money/user-submitted-transfer-quote-comparison');
 const { findProviderById } = require('../../money/money-transfer-provider-registry');
@@ -500,13 +501,13 @@ async function executeTransfer(task, input) {
   }, warnings);
 }
 
-function formatExchangeRateForChat(rate, sourceCurrency, targetCurrency, language = 'en') {
+function formatExchangeRateForChat(rate, sourceCurrency, targetCurrency, language = 'en', state = '') {
   const useHebrew = String(language || '').toLowerCase().startsWith('he');
+  const resolved = state || (rate ? (moneyService.isDemoRate(rate) ? 'demo' : 'ok') : 'empty');
 
-  if (!rate) {
-    return useHebrew
-      ? `לא נמצא שער המרה עבור ${sourceCurrency} ל-${targetCurrency}.`
-      : `No exchange rate found for ${sourceCurrency} to ${targetCurrency}.`;
+  if (!rate || resolved === 'disabled' || resolved === 'unavailable' || resolved === 'empty') {
+    const finalState = !rate && resolved === 'ok' ? 'empty' : resolved;
+    return assistantCatalogReply(finalState, useHebrew ? 'he' : language || 'en');
   }
 
   if (rate.rateType === 'reference') {
@@ -527,19 +528,27 @@ function formatExchangeRateForChat(rate, sourceCurrency, targetCurrency, languag
     ].join('\n');
   }
 
-  if (useHebrew) {
+  if (moneyService.isDemoRate(rate) || resolved === 'demo') {
+    if (useHebrew) {
+      return [
+        'זהו מידע הדגמה בלבד, לא שער חי, לא הצעת העברה חיה, ולא הצעת העברה מאושרת.',
+        `שער ההמרה להדגמה הוא 1 ${sourceCurrency} = ${rate.exchangeRate} ${targetCurrency}.`,
+        'שערים, עמלות, זמני מסירה, ספקים וזמינות עשויים להשתנות. לפני השליחה, אשר את הסכום הסופי ואת התנאים ישירות מול הספק. זה אינו ייעוץ פיננסי.',
+      ].join('\n');
+    }
+
     return [
-      'זהו מידע הדגמה בלבד, לא שער חי, לא הצעת העברה חיה, ולא הצעת העברה מאושרת.',
-      `שער ההמרה להדגמה הוא 1 ${sourceCurrency} = ${rate.exchangeRate} ${targetCurrency}.`,
-      'שערים, עמלות, זמני מסירה, ספקים וזמינות עשויים להשתנות. לפני השליחה, אשר את הסכום הסופי ואת התנאים ישירות מול הספק. זה אינו ייעוץ פיננסי.',
+      moneyService.DEMO_NOTICE,
+      `The demo exchange rate is 1 ${sourceCurrency} = ${rate.exchangeRate} ${targetCurrency}.`,
+      moneyService.SAFETY_NOTICE,
     ].join('\n');
   }
 
   return [
-    moneyService.DEMO_NOTICE,
-    `The demo exchange rate is 1 ${sourceCurrency} = ${rate.exchangeRate} ${targetCurrency}.`,
+    `The stored exchange rate is 1 ${sourceCurrency} = ${rate.exchangeRate} ${targetCurrency}.`,
+    rate.sourceName ? `Source: ${rate.sourceName}.` : '',
     moneyService.SAFETY_NOTICE,
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 
 async function executeExchangeRate(task, input) {
@@ -552,18 +561,28 @@ async function executeExchangeRate(task, input) {
     return blocked(task, 'missing_required_input', 'Which target currency should I check?');
   }
 
-  const rate = await moneyService.getExchangeRate(sourceCurrency, targetCurrency);
-  const message = formatExchangeRateForChat(rate, sourceCurrency, targetCurrency, responseLanguage);
+  const described = await moneyService.resolveExchangeRate(sourceCurrency, targetCurrency);
+  const message = formatExchangeRateForChat(
+    described.rate,
+    sourceCurrency,
+    targetCurrency,
+    responseLanguage,
+    described.state
+  );
+  const verified = Boolean(described.rate) && !['disabled', 'unavailable', 'empty'].includes(described.state);
 
-  return createResult(task, rate ? 'success' : 'partial', {
+  return createResult(task, verified ? 'success' : 'partial', {
     capability: 'finance.exchange_rate',
     sourceCurrency,
     targetCurrency,
-    rate,
+    rate: described.rate,
     message,
+    availability: described.state,
+    demo: described.demo === true,
+    responseLanguage,
     safetyNotice: moneyService.SAFETY_NOTICE,
     suppressGenericFollowUp: true,
-  });
+  }, described.demo ? [] : (verified ? [] : [`catalog_${described.state || 'empty'}`]));
 }
 
 function formatUserSubmittedQuoteForChat(result = {}, language = 'en', persistence = {}) {

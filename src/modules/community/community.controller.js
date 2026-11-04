@@ -1,6 +1,8 @@
 const { coreAgentService } = require('../core-agent');
 const { refusePersonalDataChannelUserId } = require('../../shared/blockPersonalDataRoute');
+const { carryCatalog, publicCatalogFields } = require('../../shared/pilotCatalog');
 const { loadWebProfile, stripClientIdentity } = require('../../shared/webPersonalData');
+const { languageFromRequest, responseLanguage } = require('../../shared/userFacingCopy');
 const communityService = require('./community.service');
 
 function splitList(value) {
@@ -13,7 +15,7 @@ function splitList(value) {
 function preferUnseen(items = [], idKey, seenValue = '') {
   const seenIds = new Set(splitList(seenValue));
   const unseen = items.filter((item) => !seenIds.has(item[idKey]));
-  return unseen.length ? unseen : items;
+  return carryCatalog(items, unseen.length ? unseen : items);
 }
 
 async function getPublishedPosts(req, res, next) {
@@ -22,6 +24,7 @@ async function getPublishedPosts(req, res, next) {
     res.status(200).json({
       posts,
       safetyNotice: communityService.COMMUNITY_SAFETY_NOTICE,
+      ...publicCatalogFields(posts, languageFromRequest(req)),
     });
   } catch (error) {
     next(error);
@@ -49,6 +52,7 @@ async function getRelevantPosts(req, res, next) {
     res.status(200).json({
       posts,
       safetyNotice: communityService.COMMUNITY_SAFETY_NOTICE,
+      ...publicCatalogFields(posts, responseLanguage(req, profile)),
     });
   } catch (error) {
     next(error);
@@ -57,7 +61,13 @@ async function getRelevantPosts(req, res, next) {
 
 async function getPost(req, res, next) {
   try {
-    const post = await communityService.getPostById(req.params.postId);
+    const posts = await communityService.getPublishedPosts({});
+    const fields = publicCatalogFields(posts, languageFromRequest(req));
+    if (fields.availability === 'unavailable' || fields.availability === 'disabled') {
+      res.status(200).json({ post: null, comments: [], ...fields, safetyNotice: communityService.COMMUNITY_SAFETY_NOTICE });
+      return;
+    }
+    const post = posts.find((item) => item.postId === req.params.postId) || await communityService.getPostById(req.params.postId);
     if (!post) {
       res.status(404).json({ error: { message: 'Community post not found.' } });
       return;

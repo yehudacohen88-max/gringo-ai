@@ -1,5 +1,7 @@
 const { coreAgentService } = require('../core-agent');
+const { carryCatalog, publicCatalogFields } = require('../../shared/pilotCatalog');
 const { loadWebProfile, sameOwner, sendNotFound, stripClientIdentity } = require('../../shared/webPersonalData');
+const { responseLanguage } = require('../../shared/userFacingCopy');
 const taskService = require('./task.service');
 
 const TASK_ACTIONS = {
@@ -20,7 +22,9 @@ async function ownedTask(userId, taskId) {
 }
 
 async function refreshSummary(context, userId) {
-  const tasks = (await taskService.getUserTasks(userId)).filter((task) => sameOwner(task, userId));
+  const loaded = await taskService.getUserTasks(userId);
+  const tasks = carryCatalog(loaded, loaded.filter((task) => sameOwner(task, userId)));
+  if (tasks.catalogState === 'unavailable') return { tasks, summary: emptySummary(), unavailable: true };
   const summary = taskService.summarizeTasks(tasks);
   await coreAgentService.updateUserProfile(context, summary);
   return { tasks, summary };
@@ -34,16 +38,23 @@ async function listTasks(req, res, next) {
       return;
     }
     await taskService.processTaskReminders(userId, profile);
-    const tasks = (await taskService.getUserTasks(userId, {
+    const loaded = await taskService.getUserTasks(userId, {
       view: req.query.view || '',
       status: req.query.status || '',
       category: req.query.category || '',
-    })).filter((task) => sameOwner(task, userId));
+    });
+    const tasks = carryCatalog(loaded, loaded.filter((task) => sameOwner(task, userId)));
+    const fields = publicCatalogFields(tasks, responseLanguage(req, profile));
+    if (tasks.catalogState === 'unavailable') {
+      res.status(200).json({ tasks: [], summary: emptySummary(), alerts: [], ...fields });
+      return;
+    }
     const { tasks: allTasks, summary } = await refreshSummary(context, userId);
     res.status(200).json({
       tasks,
       summary,
       alerts: taskService.createTaskAlerts(allTasks, 3),
+      ...fields,
     });
   } catch (error) {
     next(error);
@@ -66,14 +77,20 @@ async function getTask(req, res, next) {
 
 async function getSchedule(req, res, next) {
   try {
-    const { context, userId } = await loadWebProfile(req);
+    const { context, profile, userId } = await loadWebProfile(req);
     if (!userId) {
       res.status(200).json({ tasks: [], summary: emptySummary(), view: req.query.view || 'Today' });
       return;
     }
-    const tasks = (await taskService.getSchedule(userId, req.query.view || 'Today')).filter((task) => sameOwner(task, userId));
+    const loaded = await taskService.getSchedule(userId, req.query.view || 'Today');
+    const tasks = carryCatalog(loaded, loaded.filter((task) => sameOwner(task, userId)));
+    const fields = publicCatalogFields(tasks, responseLanguage(req, profile));
+    if (tasks.catalogState === 'unavailable') {
+      res.status(200).json({ tasks: [], summary: emptySummary(), view: req.query.view || 'Today', ...fields });
+      return;
+    }
     const { summary } = await refreshSummary(context, userId);
-    res.status(200).json({ tasks, summary, view: req.query.view || 'Today' });
+    res.status(200).json({ tasks, summary, view: req.query.view || 'Today', ...fields });
   } catch (error) {
     next(error);
   }
@@ -214,13 +231,18 @@ async function history(req, res, next) {
 
 async function listAlerts(req, res, next) {
   try {
-    const { context, userId } = await loadWebProfile(req);
+    const { context, profile, userId } = await loadWebProfile(req);
     if (!userId) {
       res.status(200).json({ alerts: [], summary: emptySummary() });
       return;
     }
-    const { tasks, summary } = await refreshSummary(context, userId);
-    res.status(200).json({ alerts: taskService.createTaskAlerts(tasks, 3), summary });
+    const { tasks, summary, unavailable } = await refreshSummary(context, userId);
+    const fields = publicCatalogFields(tasks, responseLanguage(req, profile));
+    res.status(200).json({
+      alerts: unavailable ? [] : taskService.createTaskAlerts(tasks, 3),
+      summary,
+      ...fields,
+    });
   } catch (error) {
     next(error);
   }

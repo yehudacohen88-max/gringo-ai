@@ -1,6 +1,13 @@
 const serviceRepository = require('./service.repository');
 const { SERVICE_CATEGORIES } = require('./service.model');
 const { SAMPLE_SERVICES } = require('./sample-services');
+const {
+  assistantCatalogReply,
+  catalogMeta,
+  readPilotCatalog,
+  refuseDemoWrite,
+  tagCatalog,
+} = require('../../shared/pilotCatalog');
 
 const STATIC_SERVICE_NOTICE = 'Service directory details may have changed. This is not confirmation that the service is currently available; check the provider or relevant official source before you go, pay, or rely on opening hours.';
 const GOVERNMENT_SERVICE_NOTICE = 'Government and public-service requirements may have changed. Check the relevant official source before acting.';
@@ -96,13 +103,13 @@ function generateId(prefix) {
   return `${prefix}_${timestamp}_${random}`;
 }
 
-async function readServicesWithFallback() {
-  try {
-    const services = await serviceRepository.findAllServices();
-    return services.length ? services : SAMPLE_SERVICES;
-  } catch (error) {
-    return SAMPLE_SERVICES;
-  }
+async function readServiceCatalog() {
+  return readPilotCatalog({
+    moduleName: 'services',
+    read: () => serviceRepository.findAllServices(),
+    samples: SAMPLE_SERVICES,
+    idFields: ['id'],
+  });
 }
 
 function buildService(input = {}) {
@@ -144,6 +151,7 @@ async function createService(input = {}) {
   const service = buildService(input);
   const errors = validateService(service);
   if (errors.length) throw validationError('Service validation failed.', errors);
+  refuseDemoWrite(service, SAMPLE_SERVICES, ['id']);
   try {
     return serviceRepository.createService(service);
   } catch (error) {
@@ -152,17 +160,19 @@ async function createService(input = {}) {
 }
 
 async function getServices(filters = {}) {
-  const services = await readServicesWithFallback();
+  const catalog = await readServiceCatalog();
+  const services = catalog.records;
   const category = normalize(filters.category);
   const city = normalize(filters.city);
   const language = normalize(filters.language);
 
-  return services.filter((service) => {
+  const filtered = services.filter((service) => {
     if (category && normalize(service.category) !== category) return false;
     if (city && normalize(service.city) !== city) return false;
     if (language && !normalize(service.languages).includes(language)) return false;
     return true;
   });
+  return tagCatalog(filtered, catalog.state, catalog.demo);
 }
 
 function scoreService(service, userProfile = {}, search = {}) {
@@ -228,8 +238,8 @@ function scoreService(service, userProfile = {}, search = {}) {
 }
 
 async function findMatchingServices(userProfile = {}, search = {}) {
-  const services = await readServicesWithFallback();
-  return services
+  const services = await getServices({});
+  const matches = services
     .filter((service) => hasPositiveServiceRelevance(service, search))
     .map((service) => ({
       ...service,
@@ -237,21 +247,30 @@ async function findMatchingServices(userProfile = {}, search = {}) {
     }))
     .filter((service) => service.match.score > 0)
     .sort((a, b) => b.match.score - a.match.score);
+  return tagCatalog(matches, services.catalogState, services.catalogDemo);
 }
 
 async function getServiceById(id) {
-  const services = await readServicesWithFallback();
+  const services = await getServices({});
   return services.find((service) => service.id === id) || null;
 }
 
-function formatServicesForChat(services = []) {
-  if (!services.length) {
-    return 'I did not find a matching trusted service yet. Which city or language should I search for?';
+function formatServicesForChat(services = [], options = {}) {
+  const meta = catalogMeta(services);
+  const state = options.state || meta.state;
+  const language = options.language || 'en';
+  const demo = options.demo === true || meta.demo || services.some((service) => service && service.demo);
+
+  if (!services.length || state === 'disabled' || state === 'unavailable') {
+    const resolved = !services.length && (state === 'ok' || state === 'demo') ? 'empty' : state;
+    return assistantCatalogReply(resolved, language);
   }
+
+  const notice = demo ? `${assistantCatalogReply('demo', language)}\n` : '';
 
   const lines = services.slice(0, 5).map((service, index) => {
     return [
-      `${index + 1}. ${service.title}`,
+      `${index + 1}. ${service.demo ? 'Demo: ' : ''}${service.title}`,
       `${service.category} | Rating: ${service.rating || '-'} | ${formatVerificationLabel(service)}`,
       `Phone: ${service.phone || '-'}`,
       `Address: ${service.address || service.city || '-'}`,
@@ -261,7 +280,7 @@ function formatServicesForChat(services = []) {
     ].join('\n');
   });
 
-  return `I found services that may help you:\n${lines.join('\n\n')}\n${formatFreshnessNotice(services)}`;
+  return `${notice}I found services that may help you:\n${lines.join('\n\n')}\n${formatFreshnessNotice(services)}`;
 }
 
 function inferServiceSearch(message = '', userProfile = {}) {

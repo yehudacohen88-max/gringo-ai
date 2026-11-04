@@ -1,3 +1,5 @@
+process.env.GRINGO_DEMO_DATA = 'true';
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
