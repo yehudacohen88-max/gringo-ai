@@ -192,12 +192,27 @@ function notificationPassesFilters(notification, filters = {}) {
   return true;
 }
 
+// Read path: no writes. Expiry is shown here and persisted only by the
+// background job (expireOldNotifications in server.js), so a GET never
+// changes stored data.
+function withDisplayExpiry(notification, now) {
+  if (
+    notification.expiresAt &&
+    notification.status !== 'Expired' &&
+    notification.status !== 'Dismissed' &&
+    new Date(notification.expiresAt) < now
+  ) {
+    return { ...notification, status: 'Expired' };
+  }
+  return notification;
+}
+
 async function getUserNotifications(userId, filters = {}) {
-  await expireOldNotifications(userId);
   const notifications = await readNotificationsWithFallback();
   const now = new Date();
   return notifications
     .filter((notification) => notification.userId === userId)
+    .map((notification) => withDisplayExpiry(notification, now))
     .filter((notification) => filters.includeScheduled || isDue(notification, now))
     .filter((notification) => notificationPassesFilters(notification, filters))
     .sort((a, b) => {

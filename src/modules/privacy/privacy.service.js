@@ -297,8 +297,34 @@ async function retryPendingDeletions() {
     subject.pairs.forEach((item) => done.add(store.subjectKey(item.channel, item.channelUserId)));
     if (outcome.complete) completed += 1;
   }
+  // Pending identities without a profile row: find their raw channel ids in
+  // the data sheets by matching keyed hashes. A key with no matching row
+  // anywhere stays pending (its data may still be in a sheet that could not
+  // be read) and is counted as unresolved for a human to review.
+  const remaining = [...wanted].filter((key) => !done.has(key));
+  let unresolved = 0;
+  if (remaining.length) {
+    let candidates = [];
+    try {
+      candidates = await erasure.collectCandidatePairs();
+    } catch (error) {
+      candidates = [];
+    }
+    const byKey = new Map(candidates.map((pair) => [store.subjectKey(pair.channel, pair.channelUserId), pair]));
+    for (const key of remaining) {
+      const pair = byKey.get(key);
+      if (!pair) {
+        unresolved += 1;
+        continue;
+      }
+      attempted += 1;
+      const outcome = await runDeletion(pair, 'delete_retry_admin');
+      done.add(key);
+      if (outcome.complete) completed += 1;
+    }
+  }
   const stillPending = (await store.listConsentsByStatus(DELETION_PENDING)).length;
-  return { attempted, completed, stillPending };
+  return { attempted, completed, stillPending, unresolved };
 }
 
 function resetForTests() {
