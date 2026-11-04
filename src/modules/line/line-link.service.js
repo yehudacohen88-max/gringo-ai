@@ -297,7 +297,12 @@ async function getLinkHistory(userId) {
   }
 }
 
+function forgetPendingUnlink(lineUserId) {
+  return pendingUnlinks.delete(cleanText(lineUserId));
+}
+
 module.exports = {
+  forgetPendingUnlink,
   confirmSelfUnlink,
   createLinkCode,
   disconnectLine,

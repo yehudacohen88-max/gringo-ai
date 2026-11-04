@@ -15,6 +15,7 @@ const { chatRoutes } = require('./modules/chat');
 const { telegramRoutes } = require('./modules/telegram');
 const { whatsappRoutes } = require('./modules/whatsapp');
 const { lineRoutes } = require('./modules/line');
+const { privacyRoutes } = require('./modules/privacy');
 const { errorHandler } = require('./shared/errorHandler');
 const { blockPersonalDataVariants } = require('./shared/blockPersonalDataRoute');
 
@@ -61,6 +62,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/telegram', telegramRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/line', lineRoutes);
+app.use('/api/privacy', privacyRoutes);
 
 app.use(errorHandler);
 

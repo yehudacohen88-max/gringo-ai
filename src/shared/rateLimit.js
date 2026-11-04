@@ -25,6 +25,7 @@ const DEFAULT_SWEEP_INTERVAL = 64;
 const DEFAULT_POLICIES = Object.freeze({
   chat: Object.freeze({ ipLimit: 20, sessionLimit: 10, windowMs: MINUTE }),
   publicRead: Object.freeze({ ipLimit: 120, sessionLimit: 120, windowMs: MINUTE }),
+  privacy: Object.freeze({ ipLimit: 20, sessionLimit: 10, windowMs: MINUTE }),
   linkGenerate: Object.freeze({ ipLimit: 10, sessionLimit: 5, windowMs: 60 * MINUTE }),
   webhookSigned: Object.freeze({ ipLimit: 600, sessionLimit: 0, windowMs: MINUTE }),
   webhookUnsigned: Object.freeze({ ipLimit: 60, sessionLimit: 0, windowMs: MINUTE }),
@@ -201,6 +202,7 @@ module.exports = {
   guard,
   limitChat: guard('chat'),
   limitLinkGenerate: guard('linkGenerate'),
+  limitPrivacy: guard('privacy'),
   limitPublicRead: guard('publicRead'),
   limitSignedWebhook,
   noteUnsignedWebhook,

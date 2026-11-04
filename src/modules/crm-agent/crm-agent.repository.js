@@ -178,7 +178,39 @@ async function createConversationHistory(event) {
   return event;
 }
 
+// Privacy erasure for the development fallback. Rows keep their slot so
+// rowNumber stays stable; the blank profile matches no lookup.
+function purgeLocalUser(userId) {
+  const id = String(userId || '').trim();
+  if (!id) return { profiles: 0, conversations: 0 };
+  let profiles = 0;
+  for (const record of localUserProfileRecords) {
+    if (record.profile && record.profile.userId === id) {
+      record.profile = USER_PROFILE_FIELDS.reduce((blank, field) => ({ ...blank, [field]: '' }), {});
+      profiles += 1;
+    }
+  }
+  let conversations = 0;
+  for (let index = localConversationHistory.length - 1; index >= 0; index -= 1) {
+    if (localConversationHistory[index].userId === id) {
+      localConversationHistory.splice(index, 1);
+      conversations += 1;
+    }
+  }
+  return { profiles, conversations };
+}
+
+function localRecordsForUser(userId) {
+  const id = String(userId || '').trim();
+  return {
+    profiles: localUserProfileRecords.filter((record) => record.profile && record.profile.userId === id).map((record) => ({ ...record.profile })),
+    conversations: localConversationHistory.filter((event) => event.userId === id).map((event) => ({ ...event })),
+  };
+}
+
 module.exports = {
+  localRecordsForUser,
+  purgeLocalUser,
   createConversationHistory,
   createUserProfile,
   findUserProfileRecordByChannel,

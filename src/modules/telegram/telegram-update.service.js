@@ -1,3 +1,6 @@
+const { handleChannelPrivacy } = require('../privacy/privacy-channel');
+const privacyService = require('../privacy/privacy.service');
+const privacyNotice = require('../privacy/privacy-notice');
 const fs = require('fs');
 const path = require('path');
 const telegramClient = require('./telegram-client.service');
@@ -77,6 +80,19 @@ function getOffset() {
   return Number(state.lastProcessedUpdateId || 0) + 1;
 }
 
+async function sendConsentNotice(callback = {}) {
+  if (!callback.channelChatId) return;
+  try {
+    await communicationService.sendMessage({
+      channel: 'telegram',
+      to: callback.channelChatId,
+      text: `${privacyNotice.reply(callback.languageCode, 'consentRequired')}\n\n${privacyNotice.channelNoticeText(callback.languageCode)}`,
+    });
+  } catch (error) {
+    safeTelegramWarning('Telegram delivery failed for the consent notice.');
+  }
+}
+
 async function processUpdate(update = {}) {
   if (wasProcessed(update.update_id)) {
     return { processed: false, duplicate: true, updateId: update.update_id };
@@ -89,6 +105,12 @@ async function processUpdate(update = {}) {
   try {
     if (callback) {
       const adaptedCallback = communicationService.receiveMessage('telegram', callback);
+      if (!(await privacyService.allowsPersonalProcessing({ channel: 'telegram', channelUserId: adaptedCallback.channelUserId }))) {
+        await sendConsentNotice(adaptedCallback);
+        markCallbackProcessed(callback);
+        markProcessed(callback.updateId);
+        return { processed: true, updateId: callback.updateId, type: 'callback', consentRequired: true };
+      }
       const result = await telegramMessageService.processCallback(adaptedCallback, {
         duplicate: wasCallbackProcessed(callback),
       });
@@ -99,7 +121,9 @@ async function processUpdate(update = {}) {
 
     if (mapped) {
       const adaptedMessage = communicationService.receiveMessage('telegram', mapped);
-      const result = await telegramMessageService.processTelegramMessage(adaptedMessage);
+      // Consent and privacy commands run first. Without consent nothing personal is stored.
+      const privacyResult = await handleChannelPrivacy('telegram', adaptedMessage);
+      const result = privacyResult || (await telegramMessageService.processTelegramMessage(adaptedMessage));
       try {
         await communicationService.sendInteractiveMessage({
           channel: 'telegram',
@@ -107,9 +131,9 @@ async function processUpdate(update = {}) {
           text: result.reply,
           options: { replyMarkup: result.replyMarkup },
         });
-        await telegramMessageService.recordDeliveryStatus(adaptedMessage, result.user?.userId, result.reply, result.status || 'TELEGRAM_DELIVERED', 'delivered');
+        if (!result.privacy) await telegramMessageService.recordDeliveryStatus(adaptedMessage, result.user?.userId, result.reply, result.status || 'TELEGRAM_DELIVERED', 'delivered');
       } catch (deliveryError) {
-        await telegramMessageService.recordDeliveryStatus(adaptedMessage, result.user?.userId, result.reply, 'TELEGRAM_DELIVERY_FAILED', 'failed');
+        if (!result.privacy) await telegramMessageService.recordDeliveryStatus(adaptedMessage, result.user?.userId, result.reply, 'TELEGRAM_DELIVERY_FAILED', 'failed');
         safeTelegramWarning('Telegram delivery failed for one reply.');
       }
       markProcessed(mapped.updateId);
@@ -145,7 +169,10 @@ async function processUpdate(update = {}) {
       } catch (deliveryError) {
         safeTelegramWarning('Telegram delivery failed for safe error reply.');
       }
-      await telegramMessageService.recordDeliveryStatus(
+      const consented = await privacyService
+        .allowsPersonalProcessing({ channel: 'telegram', channelUserId: mapped.channelUserId })
+        .catch(() => false);
+      if (consented) await telegramMessageService.recordDeliveryStatus(
         mapped,
         mapped.channelUserId,
         'Sorry, Gringo had a temporary problem. Please try again soon.',

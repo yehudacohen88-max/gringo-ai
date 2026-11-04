@@ -21,6 +21,28 @@ function buildDeveloperInstructions() {
   ].join('\n');
 }
 
+// Channel ids, phone numbers and internal ids are not needed to write an
+// answer, so they are not sent to the AI provider.
+const PROMPT_OMITTED_PROFILE_FIELDS = [
+  'userId',
+  'channelUserId',
+  'telegramUserId',
+  'telegramChatId',
+  'telegramUsername',
+  'whatsappPhone',
+  'lineUserId',
+  'lineDisplayName',
+  'webId',
+  'ownerKey',
+];
+
+function promptSafeProfile(profile) {
+  if (!profile || typeof profile !== 'object' || Array.isArray(profile)) return {};
+  const copy = { ...profile };
+  for (const field of PROMPT_OMITTED_PROFILE_FIELDS) delete copy[field];
+  return copy;
+}
+
 function buildUserPrompt(context = {}) {
   const knowledge = formatList(context.relevantKnowledge, (item) => {
     return `- ${item.title} (${item.category}): ${item.answer}`;
@@ -32,7 +54,7 @@ function buildUserPrompt(context = {}) {
   return [
     `Current user message: ${context.message}`,
     `User language: ${context.userLanguage || 'unknown'}`,
-    `User profile and memory: ${JSON.stringify(context.userProfile || {})}`,
+    `User profile and memory: ${JSON.stringify(promptSafeProfile(context.userProfile))}`,
     `Relevant internal knowledge:\n${knowledge}`,
     `Recent conversation context:\n${recentConversation}`,
     'Write the final response Gringo should send to the user.',
@@ -40,6 +62,8 @@ function buildUserPrompt(context = {}) {
 }
 
 module.exports = {
+  PROMPT_OMITTED_PROFILE_FIELDS,
+  promptSafeProfile,
   buildDeveloperInstructions,
   buildUserPrompt,
 };

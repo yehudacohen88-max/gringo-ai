@@ -1,3 +1,4 @@
+const { handleChannelPrivacy } = require('../privacy/privacy-channel');
 const crypto = require('crypto');
 const express = require('express');
 const { env } = require('../../config/env');
@@ -70,7 +71,9 @@ async function processMappedMessage(message = {}, handler) {
   rememberMessageId(message.messageId);
 
   const adaptedMessage = communicationService.receiveMessage('line', message);
-  const result = await handler(adaptedMessage);
+  // Consent and privacy commands run first. Without consent nothing personal is stored.
+  const privacyResult = await handleChannelPrivacy('line', adaptedMessage);
+  const result = privacyResult || (await handler(adaptedMessage));
   try {
     const delivery = await lineMessageService.sendReply(
       {
@@ -79,7 +82,7 @@ async function processMappedMessage(message = {}, handler) {
       },
       result.reply
     );
-    await lineMessageService.recordDeliveryStatus(
+    if (!result.privacy) await lineMessageService.recordDeliveryStatus(
       adaptedMessage,
       result.user?.userId,
       result.reply,
@@ -87,7 +90,7 @@ async function processMappedMessage(message = {}, handler) {
       'delivered'
     );
   } catch (deliveryError) {
-    await lineMessageService.recordDeliveryStatus(
+    if (!result.privacy) await lineMessageService.recordDeliveryStatus(
       adaptedMessage,
       result.user?.userId,
       result.reply,

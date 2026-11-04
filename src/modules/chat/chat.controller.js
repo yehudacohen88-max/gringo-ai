@@ -1,6 +1,7 @@
 const { coreAgentService } = require('../core-agent');
 const { crmAgentService } = require('../crm-agent');
 const { resolveWebUserContext } = require('../../shared/requireWebIdentity');
+const { assertWebConsent } = require('../privacy/privacy.controller');
 
 function splitGoals(value) {
   return String(value || '')
@@ -130,6 +131,7 @@ async function sendMessage(req, res, next) {
     }
 
     const userContext = resolveWebUserContext(req);
+    await assertWebConsent(userContext);
     const result = await coreAgentService.processWebMessage({
       message,
       channel: userContext.channel,
@@ -220,6 +222,7 @@ async function updateProfile(req, res, next) {
   try {
     const body = req.body || {};
     const userContext = resolveWebUserContext(req);
+    await assertWebConsent(userContext);
     const existingStatus = await coreAgentService.getOnboardingStatus(userContext);
     const existingProfile = existingStatus.profile || {};
     const updateFields = [

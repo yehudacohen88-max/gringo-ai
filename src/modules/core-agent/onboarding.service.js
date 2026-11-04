@@ -281,7 +281,16 @@ async function handleMessage(message, userContext = {}) {
   };
 }
 
+function forgetUser(userContext = {}) {
+  try {
+    return onboardingStateByUser.delete(getStateKey(userContext));
+  } catch (error) {
+    return false;
+  }
+}
+
 module.exports = {
+  forgetUser,
   ONBOARDING_FIELDS,
   WORK_SECTORS,
   buildProfileSummary,
