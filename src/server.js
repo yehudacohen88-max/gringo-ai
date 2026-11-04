@@ -6,6 +6,8 @@ const { whatsappDeliveryService } = require('./modules/whatsapp');
 const { lineDeliveryService, lineLinkService } = require('./modules/line');
 const { isProductionRuntime } = require('./shared/pilotCatalog');
 const { verifyPrivacyStorage } = require('./modules/privacy/privacy-storage-check');
+const processLock = require('./shared/processLock');
+let lock = null;
 
 // PILOT REQUIREMENT: run exactly ONE Gringo process (one instance, no
 // cluster, no autoscaling). Google Sheets reads are cached in process memory
@@ -64,6 +66,9 @@ async function startServer(options = {}) {
     console.log('[startup] Durable privacy storage verified (PrivacyConsents, PrivacyAudit).');
   }
   console.log(SINGLE_PROCESS_NOTICE);
+  if (options.lockFile) {
+    lock = processLock.acquire(options.lockFile);
+  }
   await crmAgentRepository.initializeMvpCrmSheets();
   await new Promise((resolve, reject) => {
     server = app.listen(options.port ?? env.port, () => resolve());
@@ -75,6 +80,7 @@ async function startServer(options = {}) {
 }
 
 function shutdown() {
+  if (lock) lock.release();
   telegramUpdateService.stopPolling();
   intervals.forEach(clearInterval);
   if (!server) {
@@ -85,8 +91,11 @@ function shutdown() {
 }
 
 if (require.main === module) {
-  startServer().catch((error) => {
-    const reason = error && error.name === 'PrivacyStorageError' ? error.message : 'CRM Google Sheets initialization failed.';
+  const lockFile = process.env.GRINGO_PROCESS_LOCK === 'off' ? null : processLock.defaultLockPath(env.port);
+  startServer({ lockFile }).catch((error) => {
+    if (lock) lock.release();
+    const known = error && (error.name === 'PrivacyStorageError' || error.name === 'ProcessLockError');
+    const reason = known ? error.message : 'CRM Google Sheets initialization failed.';
     console.error(`[startup] Refusing to start: ${reason}`);
     process.exit(1);
   });
