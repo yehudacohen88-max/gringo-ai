@@ -8,10 +8,79 @@
 // AI_DAILY_USER_LIMIT=30      calls per user per UTC day (0 = no calls).
 // AI_DAILY_GLOBAL_LIMIT=1000  calls per UTC day for the whole process.
 // AI_DAILY_TOKEN_LIMIT=0      total tokens per UTC day (0 = not enforced).
+// AI_BUDGET_STATE_FILE        today's counters are saved here so a restart
+//                             does not reset them (AI-06). Default:
+//                             <tmpdir>/gringo-ai-budget.json; "off" disables.
+//                             Off under NODE_ENV=test unless set. User keys
+//                             are stored only as truncated SHA-256 hashes.
+
+const crypto = require('crypto');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
 const DEFAULTS = { userLimit: 30, globalLimit: 1000, tokenLimit: 0 };
+const SAVE_DELAY_MS = 1000;
 
 let state = freshState();
+let loaded = false;
+let saveTimer = null;
+
+function stateFile() {
+  const raw = String(process.env.AI_BUDGET_STATE_FILE ?? '').trim();
+  if (raw.toLowerCase() === 'off') return '';
+  if (raw) return raw;
+  if (process.env.NODE_ENV === 'test') return '';
+  return path.join(os.tmpdir(), 'gringo-ai-budget.json');
+}
+
+function hashKey(userKey) {
+  return crypto.createHash('sha256').update(String(userKey)).digest('hex').slice(0, 24);
+}
+
+function ensureLoaded() {
+  if (loaded) return;
+  loaded = true;
+  const file = stateFile();
+  if (!file) return;
+  try {
+    const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (saved && saved.day === currentDay()) {
+      state = {
+        day: saved.day,
+        global: Number(saved.global) || 0,
+        tokens: Number(saved.tokens) || 0,
+        denied: Number(saved.denied) || 0,
+        perUser: new Map((saved.perUser || []).filter((e) => Array.isArray(e) && e.length === 2)),
+      };
+    }
+  } catch (error) {
+    if (error.code !== 'ENOENT') console.warn('[ai-budget] Could not read saved counters; starting from zero.');
+  }
+}
+
+function flush() {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  const file = stateFile();
+  if (!file) return;
+  const body = JSON.stringify({ day: state.day, global: state.global, tokens: state.tokens, denied: state.denied, perUser: [...state.perUser] });
+  try {
+    const tmp = `${file}.${process.pid}.tmp`;
+    fs.writeFileSync(tmp, body, { mode: 0o600 });
+    fs.renameSync(tmp, file);
+  } catch (_) {
+    console.warn('[ai-budget] Could not save counters.');
+  }
+}
+
+function scheduleSave() {
+  if (saveTimer || !stateFile()) return;
+  saveTimer = setTimeout(flush, SAVE_DELAY_MS);
+  if (saveTimer.unref) saveTimer.unref();
+}
 
 function freshState(day = currentDay()) {
   return { day, global: 0, tokens: 0, perUser: new Map(), denied: 0 };
@@ -38,6 +107,7 @@ function config() {
 }
 
 function roll(now) {
+  ensureLoaded();
   const day = currentDay(now);
   if (state.day !== day) state = freshState(day);
 }
@@ -51,8 +121,9 @@ class AiBudgetError extends Error {
 }
 
 // Reserve one call. Throws AiBudgetError (no network call should follow).
-function reserve(userKey, now = new Date()) {
+function reserve(rawUserKey, now = new Date()) {
   roll(now);
+  const userKey = rawUserKey ? hashKey(rawUserKey) : '';
   const cfg = config();
   let reason = '';
   if (!cfg.enabled) reason = 'disabled';
@@ -64,15 +135,20 @@ function reserve(userKey, now = new Date()) {
     if (reason !== 'user_daily_limit' && state.denied === 1) {
       console.warn(`[ai-budget] AI calls blocked for today: ${reason}.`);
     }
+    scheduleSave();
     throw new AiBudgetError(reason);
   }
   state.global += 1;
   if (userKey) state.perUser.set(userKey, (state.perUser.get(userKey) || 0) + 1);
+  scheduleSave();
 }
 
 function recordUsage(usage) {
   const total = Number(usage && (usage.total_tokens ?? (Number(usage.input_tokens || 0) + Number(usage.output_tokens || 0))));
-  if (Number.isFinite(total) && total > 0) state.tokens += total;
+  if (Number.isFinite(total) && total > 0) {
+    state.tokens += total;
+    scheduleSave();
+  }
 }
 
 // No user keys in the snapshot: safe for an admin endpoint or logs.
@@ -90,8 +166,12 @@ function snapshot(now = new Date()) {
   };
 }
 
-function reset() {
+// Tests only: forget in-memory state; next use reloads from the state file.
+function reset({ reload = false } = {}) {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = null;
   state = freshState();
+  loaded = !reload;
 }
 
-module.exports = { AiBudgetError, reserve, recordUsage, snapshot, reset, currentDay };
+module.exports = { AiBudgetError, reserve, recordUsage, snapshot, reset, flush, currentDay };

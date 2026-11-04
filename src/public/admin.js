@@ -799,10 +799,32 @@ function renderDashboard() {
   renderRecommendations(dashboard.recommendations);
 }
 
+function renderAiUsage(usage = {}) {
+  const grid = document.querySelector('#aiUsageGrid');
+  if (!grid) return;
+  const limits = usage.limits || {};
+  const pct = limits.global ? Math.round((Number(usage.calls || 0) / limits.global) * 100) : 0;
+  const cards = [
+    ['AI enabled', usage.enabled === false ? 'No (kill switch)' : 'Yes'],
+    ['Calls today', `${usage.calls ?? 0} / ${limits.global ?? '?'} (${pct}%)`],
+    ['Tokens today', limits.tokens ? `${usage.tokens ?? 0} / ${limits.tokens}` : String(usage.tokens ?? 0)],
+    ['Blocked requests', String(usage.denied ?? 0)],
+    ['Active users', String(usage.users ?? 0)],
+    ['Per-user daily limit', String(limits.perUser ?? '?')],
+  ];
+  grid.innerHTML = cards.map(([label, value]) => `<div class="admin-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('');
+}
+
+async function loadAiUsage() {
+  const body = await adminFetch('/ai-usage');
+  renderAiUsage(body.data || {});
+}
+
 async function loadDashboard() {
   hideError();
   dashboard = await adminFetch('/dashboard');
   renderDashboard();
+  loadAiUsage().catch(() => {});
 }
 
 document.querySelectorAll('[data-admin-section]').forEach((button) => {

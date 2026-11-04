@@ -34,6 +34,7 @@
           <button class="button button-secondary button-small" data-admin-section="documentsSection" type="button">Documents</button>
           <button class="button button-secondary button-small" data-admin-section="notificationsSection" type="button">Notifications</button>
           <button class="button button-secondary button-small" data-admin-section="translationSection" type="button">Translation</button>
+          <button class="button button-secondary button-small" data-admin-section="aiUsageSection" type="button">AI Usage</button>
           <button class="button button-secondary button-small" data-admin-section="whatsappSection" type="button">WhatsApp</button>
           <button class="button button-secondary button-small" data-admin-section="lineSection" type="button">LINE</button>
           <button class="button button-secondary button-small" data-admin-section="tasksSection" type="button">Tasks</button>
@@ -110,6 +111,11 @@
             <button class="button" type="submit">Create Notification</button>
           </form>
           <div id="adminNotificationsList" class="admin-list"></div>
+        </section>
+
+        <section id="aiUsageSection" class="admin-section" hidden>
+          <h2>AI Usage (today, UTC)</h2>
+          <div id="aiUsageGrid" class="admin-grid"></div>
         </section>
 
         <section id="translationSection" class="admin-section" hidden>
