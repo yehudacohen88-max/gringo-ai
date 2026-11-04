@@ -96,6 +96,7 @@ function createOpenAiTranslationProvider(options = {}) {
               },
             ],
             max_output_tokens: 600,
+            store: false,
           }),
           signal: controller.signal,
         });

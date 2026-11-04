@@ -54,6 +54,7 @@ async function createResponse(context = {}) {
           },
         ],
         max_output_tokens: 350,
+        store: false,
       }),
       signal: controller.signal,
     });
