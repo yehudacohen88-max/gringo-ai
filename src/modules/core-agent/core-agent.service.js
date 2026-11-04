@@ -627,12 +627,33 @@ function shouldUseAiProvider(question, knowledgeResult) {
   return false;
 }
 
-function createFriendlyFallback(language) {
-  if (String(language).toLowerCase().startsWith('he')) {
-    return 'אני לא בטוח בתשובה כרגע, אבל גרינגו יבדוק ויחזור אליך עם תשובה.';
-  }
+const FRIENDLY_FALLBACK = {
+  he: 'אני לא בטוח בתשובה כרגע, אבל גרינגו יבדוק ויחזור אליך עם תשובה.',
+  th: 'ตอนนี้ฉันยังไม่แน่ใจในคำตอบ แต่ Gringo จะตรวจสอบและกลับมาตอบคุณ',
+  en: "I'm not fully sure yet, but Gringo will check and come back with an answer.",
+};
 
-  return "I'm not fully sure yet, but Gringo will check and come back with an answer.";
+// Shown when the daily AI limit is reached or AI is switched off. It does not
+// promise a follow-up, because nothing is queued.
+const AI_PAUSED_REPLY = {
+  he: 'הגעת למגבלת השאלות היומית לתשובות חכמות. אפשר להמשיך לשאול על עבודה, דיור, מסמכים וכסף, ומחר המגבלה מתאפסת.',
+  th: 'วันนี้คุณใช้คำตอบอัจฉริยะครบตามจำนวนแล้ว คุณยังถามเรื่องงาน ที่พัก เอกสาร และการเงินได้ และจะรีเซ็ตใหม่พรุ่งนี้',
+  en: "You've reached today's limit for smart answers. You can still ask about jobs, housing, documents and money, and the limit resets tomorrow.",
+};
+
+function replyLanguageKey(language) {
+  const code = String(language || '').toLowerCase();
+  if (code.startsWith('he')) return 'he';
+  if (code.startsWith('th')) return 'th';
+  return 'en';
+}
+
+function createFriendlyFallback(language) {
+  return FRIENDLY_FALLBACK[replyLanguageKey(language)];
+}
+
+function createAiPausedReply(language) {
+  return AI_PAUSED_REPLY[replyLanguageKey(language)];
 }
 
 function isJobSearchMessage(message) {
@@ -2302,8 +2323,9 @@ async function processWebMessage(messageContext = {}) {
       ai.provider = aiResult.provider;
       ai.model = aiResult.model;
     } catch (error) {
-      reply = createFriendlyFallback(userLanguage);
+      reply = error && error.name === 'AiBudgetError' ? createAiPausedReply(userLanguage) : createFriendlyFallback(userLanguage);
       ai.error = error.message;
+      if (error && error.name === 'AiBudgetError') ai.budget = error.reason;
     }
   }
 
@@ -2363,6 +2385,10 @@ function forgetConversation(userContext = {}) {
 }
 
 module.exports = {
+  AI_PAUSED_REPLY,
+  FRIENDLY_FALLBACK,
+  createAiPausedReply,
+  createFriendlyFallback,
   forgetConversation,
   coordinateAgents,
   getOnboardingStatus: onboardingService.getStatus,
