@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { env } = require('../../config/env');
 const googleSheets = require('../../config/googleSheets');
+const { isProductionRuntime } = require('../../shared/pilotCatalog');
 
 // Consent and audit rows hold a keyed hash of the channel identity, never the
 // raw phone number, Telegram id, LINE id or web id.
@@ -34,8 +35,17 @@ function sheetsConfigured() {
   return Boolean(env.googleSheets.spreadsheetId && env.googleSheets.clientEmail && env.googleSheets.privateKey);
 }
 
+// The in-memory store is for local dev and tests only. In production and
+// hosted runtimes it is refused (defense in depth behind the startup check),
+// so privacy state is never kept only in memory and lost on restart.
 function useLocal() {
-  return !sheetsConfigured();
+  if (sheetsConfigured()) return false;
+  if (isProductionRuntime()) {
+    const error = new Error('Durable privacy storage is not configured.');
+    error.code = 'PRIVACY_STORAGE_UNAVAILABLE';
+    throw error;
+  }
+  return true;
 }
 
 function rowToObject(fields, row = []) {

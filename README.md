@@ -492,3 +492,10 @@ Possible next steps:
 - Add restore archived contact endpoint
 
 Milestone 6 should only begin after Milestone 5 is approved.
+
+## Production privacy storage and single-process pilot requirement
+
+- In production (`NODE_ENV=production` or a hosted runtime such as Vercel, Render, Railway or Fly), Gringo checks at startup that Google Sheets is fully configured and that the `PrivacyConsents` and `PrivacyAudit` tabs can be read and written. The write probe is an idempotent header write that is read back. It adds no rows and no personal data, and it never overwrites an unexpected header. If the check fails, the process exits with code 1 before it listens or starts Telegram polling, webhooks or schedulers. The log names only the reason and the missing variable names, never secrets.
+- Transient Sheets errors (HTTP 429, 5xx, network resets) are retried 4 times with backoff (0.5 s, 1 s, 2 s), then startup fails. Config, permission (401/403) and not-found errors fail at once.
+- The in-memory privacy store is only for local dev and tests. In production it refuses to work, so consent and deletion state is never kept only in memory.
+- **Run exactly one Gringo process during the pilot** (one instance, no cluster, no autoscaling). Sheets reads are cached in memory for 45 seconds per process and only that process's writes invalidate the cache. Delete codes, rate limits and Telegram polling state are also per process. A second instance could act on a stale consent or `deletion_pending` state.
