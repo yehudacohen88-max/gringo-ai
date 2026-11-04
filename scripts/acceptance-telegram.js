@@ -82,6 +82,52 @@ async function telegramChecks() {
   }
 }
 
+// Onboarding in he/en/th with the static copy (no AI, no translation
+// provider). The Telegram app language is Hebrew in every case, like the
+// founder's phone, and the user then picks the language in step 1.
+async function onboardingChecks() {
+  const privacyNotice = require('../src/modules/privacy/privacy-notice');
+  const telegramUpdateService = require('../src/modules/telegram/telegram-update.service');
+  const { STRINGS } = require('../src/modules/core-agent/onboarding.i18n');
+  const R = privacyNotice.REPLIES;
+  const HEBREW_FAILURE = /לא הצלחתי (לתרגם|להבין)/;
+  const flows = [
+    { lang: 'th', pick: 'ไทย', accept: 'ยอมรับ', name: 'Somchai Jaidee', country: 'ไทย', sector: 'ก่อสร้าง', yes: 'ใช่', no: 'ไม่', skip: 'ข้าม' },
+    { lang: 'he', pick: 'עברית', accept: 'מסכים', name: 'Somchai Jaidee', country: 'תאילנד', sector: 'בניין', yes: 'כן', no: 'לא', skip: 'דלג' },
+    { lang: 'en', pick: 'English', accept: 'accept', name: 'Somchai Jaidee', country: 'Thailand', sector: 'Construction', yes: 'Yes', no: 'No', skip: 'skip' },
+  ];
+  let updateId = Number(telegramUpdateService.getStatus().lastProcessedUpdateId) || 0;
+  for (const [i, f] of flows.entries()) {
+    const chatId = 7100000 + i;
+    const S = STRINGS[f.lang];
+    const say = async (text) => {
+      const before = sent.length;
+      await telegramUpdateService.processUpdate({ update_id: (updateId += 1), message: { message_id: updateId, date: Math.floor(Date.now() / 1000), text, chat: { id: chatId, type: 'private' }, from: { id: chatId, language_code: 'he' } } });
+      return sent.slice(before).filter((m) => String(m.chat_id) === String(chatId)).map((m) => m.text).join('\n');
+    };
+    await say('hello');
+    await say(f.accept);
+    const replies = [];
+    const step = async (text) => { const r = await say(text); replies.push(r); return r; };
+    check(`[onboarding ${f.lang}] language choice → name question in ${f.lang}`, (await step(f.pick)).includes(S.questions.fullName));
+    check(`[onboarding ${f.lang}] name → country question in ${f.lang}`, (await step(f.name)).includes(S.questions.country));
+    const bad = await step('אתה יכול לכתוב בתאית?');
+    check(`[onboarding ${f.lang}] question as country → rejected and re-asked in ${f.lang}`, bad.includes(S.invalid.country) && bad.includes(S.questions.country));
+    check(`[onboarding ${f.lang}] valid country → sector question`, (await step(f.country)).includes(S.questions.workSector));
+    check(`[onboarding ${f.lang}] sector → profession question`, (await step(f.sector)).includes(S.questions.profession));
+    await step(f.skip);
+    await step('Tel Aviv');
+    await step(f.yes);
+    await step('THB');
+    const done = await step(f.no);
+    check(`[onboarding ${f.lang}] completion summary in ${f.lang}`, done.includes(S.done) && done.includes(S.summaryTitle));
+    check(`[onboarding ${f.lang}] country saved as Thailand, not the question`, done.includes(`${S.labels.country}: ${S.values.Thailand || 'Thailand'}`) && !done.includes('אתה יכול'));
+    if (f.lang !== 'he') check(`[onboarding ${f.lang}] no Hebrew translation-failure message`, replies.every((r) => !HEBREW_FAILURE.test(r)));
+    if (f.lang !== 'en') check(`[onboarding ${f.lang}] no English onboarding question leaked`, replies.every((r) => !Object.values(STRINGS.en.questions).some((q) => r.includes(q))));
+    void R;
+  }
+}
+
 const sent = [];
 async function main() {
   if (!local) {
@@ -112,6 +158,7 @@ async function main() {
     try {
       await httpChecks(`http://127.0.0.1:${server.address().port}`);
       await telegramChecks();
+      await onboardingChecks();
     } finally {
       server.close();
     }

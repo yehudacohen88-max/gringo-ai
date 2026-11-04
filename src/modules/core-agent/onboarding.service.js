@@ -1,64 +1,31 @@
 const { crmAgentService } = require('../crm-agent');
+const {
+  SKIPPED,
+  cleanText,
+  isSkipAnswer,
+  looksLikeQuestion,
+  normalizeFieldValue,
+} = require('./onboarding.validation');
+const { languageDetectionService } = require('../language');
+const { copyFor, normalizeOnboardingLanguage } = require('./onboarding.i18n');
 
 const WORK_SECTORS = ['Construction', 'Agriculture', 'Caregiving', 'Other'];
 const onboardingStateByUser = new Map();
 
+// The language is asked first, so every later question is shown in the
+// language the user chose. All copy is static (onboarding.i18n.js).
 const ONBOARDING_FIELDS = [
-  {
-    key: 'fullName',
-    label: 'Name',
-    question: 'What is your full name?',
-  },
-  {
-    key: 'country',
-    label: 'Country',
-    question: 'Which country are you from?',
-  },
-  {
-    key: 'preferredLanguage',
-    label: 'Language',
-    question: 'What language do you prefer for Gringo replies?',
-  },
-  {
-    key: 'workSector',
-    label: 'Work sector',
-    question: 'What work sector are you in? You can answer: Construction, Agriculture, Caregiving, or Other.',
-  },
-  {
-    key: 'profession',
-    label: 'Profession',
-    optional: true,
-    question: 'What is your profession? You can type skip if you prefer.',
-  },
-  {
-    key: 'city',
-    label: 'City',
-    optional: true,
-    question: 'What city are you living in now? You can type skip if you prefer.',
-  },
-  {
-    key: 'wantsJobAlerts',
-    label: 'Job alerts',
-    optional: true,
-    question: 'Would you like job alerts? Please answer Yes or No. You can type skip if you prefer.',
-  },
-  {
-    key: 'preferredCurrency',
-    label: 'Preferred currency',
-    optional: true,
-    question: 'What currency do you prefer for money and exchange-rate help? For example: THB, USD, ILS. You can type skip if you prefer.',
-  },
-  {
-    key: 'wantsExchangeRateAlerts',
-    label: 'Exchange-rate alerts',
-    optional: true,
-    question: 'Would you like exchange-rate alerts? Please answer Yes or No. You can type skip if you prefer.',
-  },
-];
+  { key: 'preferredLanguage', label: 'Language' },
+  { key: 'fullName', label: 'Name' },
+  { key: 'country', label: 'Country' },
+  { key: 'workSector', label: 'Work sector' },
+  { key: 'profession', label: 'Profession', optional: true },
+  { key: 'city', label: 'City', optional: true },
+  { key: 'wantsJobAlerts', label: 'Job alerts', optional: true },
+  { key: 'preferredCurrency', label: 'Preferred currency', optional: true },
+  { key: 'wantsExchangeRateAlerts', label: 'Exchange-rate alerts', optional: true },
+].map((field) => Object.freeze({ ...field, question: copyFor('en').questions[field.key] }));
 
-function cleanText(value) {
-  return value === undefined || value === null ? '' : String(value).trim();
-}
 
 function getStateKey(userContext = {}) {
   const channelUserId = userContext.channelUserId === undefined || userContext.channelUserId === null
@@ -72,20 +39,17 @@ function getStateKey(userContext = {}) {
   return `${userContext.channel || 'web'}:${channelUserId}`;
 }
 
-function normalizeBooleanAnswer(value) {
-  const answer = cleanText(value).toLowerCase();
-  if (['yes', 'y', 'true', 'כן'].includes(answer)) return 'Yes';
-  if (['no', 'n', 'false', 'לא'].includes(answer)) return 'No';
-  return '';
+function fieldByKey(key) {
+  return ONBOARDING_FIELDS.find((field) => field.key === key) || null;
 }
 
-function normalizeWorkSector(value) {
-  const answer = cleanText(value).toLowerCase();
-  return WORK_SECTORS.find((sector) => sector.toLowerCase() === answer) || '';
-}
-
+// A stored value only counts when it is still valid, so a bad value saved
+// before validation existed (e.g. a question saved as the country) is asked again.
 function getProfileValue(profile, field) {
-  return cleanText(profile?.[field.key]);
+  const raw = cleanText(profile?.[field.key]);
+  if (!raw) return '';
+  if (field.key === 'preferredLanguage') return languageDetectionService.normalizeLanguageCode(raw);
+  return normalizeFieldValue(field.key, raw, { optional: field.optional, strict: false });
 }
 
 function getCompletedCount(profile = {}) {
@@ -100,29 +64,36 @@ function isComplete(profile = {}) {
   return !getNextField(profile);
 }
 
-function buildProgress(profile = {}, nextField) {
-  const completed = getCompletedCount(profile);
-  const progress = `Profile setup: ${completed} of ${ONBOARDING_FIELDS.length}`;
-  return nextField ? `${progress}\n${nextField.question}` : progress;
+// The language used for onboarding copy: the saved choice first, otherwise
+// the language resolved for this message (Telegram language_code or text).
+function displayLanguage(profile = {}, userContext = {}) {
+  return normalizeOnboardingLanguage(profile.preferredLanguage)
+    || normalizeOnboardingLanguage(userContext.language)
+    || 'en';
 }
 
-function buildProfileSummary(profile = {}) {
+function buildProgress(profile = {}, nextField, language = 'en') {
+  const copy = copyFor(language);
+  const progress = copy.progress(getCompletedCount(profile), ONBOARDING_FIELDS.length);
+  return nextField ? `${progress}\n${copy.questions[nextField.key]}` : progress;
+}
+
+function displayValue(value, copy) {
+  const text = cleanText(value);
+  if (!text) return '-';
+  return copy.values[text] || text;
+}
+
+function buildProfileSummary(profile = {}, language = 'en') {
+  const copy = copyFor(language);
+  const keys = ['fullName', 'country', 'preferredLanguage', 'workSector', 'profession', 'city', 'wantsJobAlerts', 'preferredCurrency', 'wantsExchangeRateAlerts'];
   return [
-    'Your profile:',
-    `Name: ${profile.fullName || '-'}`,
-    `Country: ${profile.country || '-'}`,
-    `Language: ${profile.preferredLanguage || profile.language || '-'}`,
-    `Work sector: ${profile.workSector || '-'}`,
-    `Profession: ${profile.profession || '-'}`,
-    `City: ${profile.city || '-'}`,
-    `Job alerts: ${profile.wantsJobAlerts || '-'}`,
-    `Preferred currency: ${profile.preferredCurrency || '-'}`,
-    `Exchange-rate alerts: ${profile.wantsExchangeRateAlerts || '-'}`,
+    copy.summaryTitle,
+    ...keys.map((key) => {
+      const value = key === 'preferredLanguage' ? (profile.preferredLanguage || profile.language) : profile[key];
+      return `${copy.labels[key]}: ${displayValue(value, copy)}`;
+    }),
   ].join('\n');
-}
-
-function isSkip(message) {
-  return ['skip', 'דלג'].includes(cleanText(message).toLowerCase());
 }
 
 function isRestart(message) {
@@ -134,10 +105,8 @@ function isCorrectPrevious(message) {
 }
 
 function normalizeAnswer(field, message) {
-  if (field.key === 'workSector') return normalizeWorkSector(message);
-  if (field.key === 'wantsJobAlerts' || field.key === 'wantsExchangeRateAlerts') return normalizeBooleanAnswer(message);
-  if (field.key === 'preferredCurrency') return cleanText(message).toUpperCase();
-  return cleanText(message);
+  if (field.key === 'preferredLanguage') return normalizeOnboardingLanguage(message);
+  return normalizeFieldValue(field.key, message, { optional: field.optional });
 }
 
 function buildFieldUpdate(field, value) {
@@ -153,6 +122,33 @@ function buildFieldUpdate(field, value) {
   };
 }
 
+function invalidValueError(key) {
+  const error = new Error(`Invalid value for ${key}.`);
+  error.statusCode = 400;
+  error.code = 'INVALID_PROFILE_VALUE';
+  error.field = key;
+  return error;
+}
+
+// Last guard before anything reaches the profile store (Google Sheets):
+// onboarding fields are normalized, and an invalid non-empty value is refused.
+function sanitizeProfileUpdates(updates = {}) {
+  const sanitized = { ...updates };
+  for (const field of ONBOARDING_FIELDS) {
+    if (!Object.prototype.hasOwnProperty.call(sanitized, field.key)) continue;
+    const raw = cleanText(sanitized[field.key]);
+    if (!raw) {
+      sanitized[field.key] = '';
+      continue;
+    }
+    if (field.key === 'preferredLanguage') continue; // checked by the language service
+    const normalized = normalizeFieldValue(field.key, raw, { optional: field.optional, strict: false });
+    if (!normalized) throw invalidValueError(field.key);
+    sanitized[field.key] = normalized;
+  }
+  return sanitized;
+}
+
 async function getUserProfile(userContext = {}) {
   const user = await crmAgentService.findOrCreateUser(userContext);
   const profile = await crmAgentService.getUserMemory(user.userId);
@@ -160,8 +156,9 @@ async function getUserProfile(userContext = {}) {
 }
 
 async function updateUserProfile(userContext = {}, updates = {}) {
+  const safeUpdates = sanitizeProfileUpdates(updates);
   const user = await crmAgentService.findOrCreateUser(userContext);
-  return crmAgentService.updateUserProfile(user.userId, updates);
+  return crmAgentService.updateUserProfile(user.userId, safeUpdates);
 }
 
 async function restartOnboarding(userContext = {}) {
@@ -178,17 +175,23 @@ async function restartOnboarding(userContext = {}) {
 async function getStatus(userContext = {}) {
   const profile = await getUserProfile(userContext);
   const nextField = getNextField(profile);
+  const language = displayLanguage(profile, userContext);
 
   return {
     complete: !nextField,
     profile,
-    prompt: nextField ? buildProgress(profile, nextField) : '',
+    language,
+    prompt: nextField ? buildProgress(profile, nextField, language) : '',
     progress: {
       completed: getCompletedCount(profile),
       total: ONBOARDING_FIELDS.length,
     },
-    summary: buildProfileSummary(profile),
+    summary: buildProfileSummary(profile, language),
   };
+}
+
+function reply(fields) {
+  return { handled: true, ...fields };
 }
 
 async function handleMessage(message, userContext = {}) {
@@ -201,63 +204,71 @@ async function handleMessage(message, userContext = {}) {
     state = {};
   }
 
+  let language = displayLanguage(profile, userContext);
+  let copy = copyFor(language);
+
   if (isCorrectPrevious(message) && state.lastFieldKey) {
-    const lastField = ONBOARDING_FIELDS.find((field) => field.key === state.lastFieldKey);
+    const lastField = fieldByKey(state.lastFieldKey);
     profile = await updateUserProfile(userContext, buildFieldUpdate(lastField, ''));
     onboardingStateByUser.set(stateKey, {
       currentFieldKey: lastField.key,
       lastFieldKey: '',
     });
+    language = displayLanguage(profile, userContext);
+    copy = copyFor(language);
 
-    return {
-      handled: true,
+    return reply({
       complete: false,
-      reply: `No problem, let's correct that.\n${buildProgress(profile, lastField)}`,
+      language,
+      reply: `${copy.correct}\n${buildProgress(profile, lastField, language)}`,
       profile,
-    };
+    });
   }
 
-  const currentField = ONBOARDING_FIELDS.find((field) => field.key === state.currentFieldKey) || getNextField(profile);
+  const stateField = fieldByKey(state.currentFieldKey);
+  const currentField = stateField && !getProfileValue(profile, stateField) ? stateField : getNextField(profile);
 
   if (!currentField) {
     return {
       handled: false,
       complete: true,
+      language,
       profile,
     };
   }
 
-  if (isSkip(message)) {
+  if (isSkipAnswer(message)) {
     if (!currentField.optional) {
-      return {
-        handled: true,
+      return reply({
         complete: false,
-        reply: `${buildProgress(profile, currentField)}\nThis one is needed so Gringo can personalize your help.`,
+        language,
+        reply: `${buildProgress(profile, currentField, language)}\n${copy.required}`,
         profile,
-      };
+      });
     }
 
-    profile = await updateUserProfile(userContext, buildFieldUpdate(currentField, 'Skipped'));
+    profile = await updateUserProfile(userContext, buildFieldUpdate(currentField, SKIPPED));
   } else {
     const normalizedAnswer = normalizeAnswer(currentField, message);
 
     if (!normalizedAnswer) {
-      const help =
-        currentField.key === 'workSector'
-          ? `Please choose one: ${WORK_SECTORS.join(', ')}.`
-          : 'Please answer Yes or No.';
-
-      return {
-        handled: true,
+      // Nothing is saved: re-ask in the user's language.
+      const notes = [copy.invalid[currentField.key]];
+      if (looksLikeQuestion(message)) notes.push(copy.questionDuringOnboarding);
+      return reply({
         complete: false,
-        reply: `${buildProgress(profile, currentField)}\n${help}`,
+        invalid: true,
+        language,
+        reply: `${buildProgress(profile, currentField, language)}\n${notes.join('\n')}`,
         profile,
-      };
+      });
     }
 
     profile = await updateUserProfile(userContext, buildFieldUpdate(currentField, normalizedAnswer));
   }
 
+  language = displayLanguage(profile, userContext);
+  copy = copyFor(language);
   const nextField = getNextField(profile);
   onboardingStateByUser.set(stateKey, {
     currentFieldKey: nextField?.key || '',
@@ -265,20 +276,20 @@ async function handleMessage(message, userContext = {}) {
   });
 
   if (!nextField) {
-    return {
-      handled: true,
+    return reply({
       complete: true,
-      reply: `Thank you. I now know you better and can give you more relevant help.\n\n${buildProfileSummary(profile)}`,
+      language,
+      reply: `${copy.done}\n\n${buildProfileSummary(profile, language)}`,
       profile,
-    };
+    });
   }
 
-  return {
-    handled: true,
+  return reply({
     complete: false,
-    reply: buildProgress(profile, nextField),
+    language,
+    reply: buildProgress(profile, nextField, language),
     profile,
-  };
+  });
 }
 
 function forgetUser(userContext = {}) {
@@ -298,5 +309,6 @@ module.exports = {
   handleMessage,
   isComplete,
   restartOnboarding,
+  sanitizeProfileUpdates,
   updateUserProfile,
 };

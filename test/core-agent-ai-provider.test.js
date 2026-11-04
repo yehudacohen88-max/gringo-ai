@@ -114,7 +114,8 @@ test('Core Agent returns friendly fallback and still saves conversation when AI 
 
   assert.equal(result.ai.attempted, true);
   assert.equal(result.ai.used, false);
-  assert.match(result.reply, /Gringo will check/);
+  assert.match(result.reply, /verified answer/);
+  assert.doesNotMatch(result.reply, /will check|come back|get back/i);
   assert.equal(savedEvents.length, 1);
   assert.equal(savedEvents[0].answer, result.reply);
 });
