@@ -91,22 +91,30 @@ async function saveConsent(record) {
   return { ...record };
 }
 
+// A read error is thrown, never treated as "no rows": the caller must not
+// report a complete deletion when it could not even see the consent rows.
+// Write failures are counted so the caller can report a partial deletion.
 async function removeConsents(keys = []) {
   const wanted = new Set(keys.filter(Boolean));
   let removed = 0;
+  let failed = 0;
   if (useLocal()) {
     for (const key of wanted) if (localConsents.delete(key)) removed += 1;
-    return removed;
+    return { removed, failed };
   }
   const sheetName = env.googleSheets.sheets.privacyConsents;
-  const rows = await googleSheets.readSheetRows(sheetName).catch(() => []);
+  const rows = await googleSheets.readSheetRows(sheetName);
   for (let index = 1; index < rows.length; index += 1) {
     if (wanted.has(rowToObject(CONSENT_FIELDS, rows[index]).subjectKey)) {
-      await googleSheets.updateSheetRow(sheetName, index + 1, CONSENT_FIELDS.map(() => ''));
-      removed += 1;
+      try {
+        await googleSheets.updateSheetRow(sheetName, index + 1, CONSENT_FIELDS.map(() => ''));
+        removed += 1;
+      } catch (error) {
+        failed += 1;
+      }
     }
   }
-  return removed;
+  return { removed, failed };
 }
 
 // Audit rows carry no message text, names or raw ids. They prove that a

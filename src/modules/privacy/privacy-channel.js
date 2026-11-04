@@ -55,6 +55,7 @@ function dataSummary(language, data) {
 // Full success is shown only when every store was erased.
 function deletionReply(language, outcome) {
   const limits = notice.getNotice(language).limits;
+  if (outcome.code === 'DELETION_NOT_STARTED') return result(notice.reply(language, 'deleteNotStarted'), 'PRIVACY_DELETE_NOT_STARTED');
   if (!outcome.ok) return result(notice.reply(language, 'noPendingDeletion'), 'PRIVACY_DELETE_REJECTED');
   if (outcome.status === 'partial') return result(`${notice.reply(language, 'deletePartial')}\n\n${limits}`, 'PRIVACY_DELETE_PARTIAL');
   const text = outcome.status === 'complete' ? notice.reply(language, 'deleteDone') : notice.reply(language, 'deleteNothing');
@@ -68,7 +69,18 @@ function result(reply, status) {
 // Runs before any channel handler. Returns null when the message may go on to
 // normal processing. The identity comes from a signature-verified webhook or
 // the Telegram bot API, never from message text.
+// Fails closed: if consent or pending-deletion state cannot be read (for
+// example a Sheets outage), the message is not processed.
 async function handleChannelPrivacy(channel, message = {}) {
+  try {
+    return await handleChannelPrivacyUnsafe(channel, message);
+  } catch (error) {
+    const language = notice.noticeLanguage(message.languageCode || message.language) || notice.guessLanguageFromText(message.messageText);
+    return result(notice.reply(language, 'privacyUnavailable'), 'PRIVACY_UNAVAILABLE');
+  }
+}
+
+async function handleChannelPrivacyUnsafe(channel, message = {}) {
   const identity = { channel, channelUserId: String(message.channelUserId || '').trim() };
   if (!identity.channelUserId) return null;
   const language = notice.noticeLanguage(message.languageCode || message.language) || notice.guessLanguageFromText(message.messageText);
@@ -104,6 +116,7 @@ async function handleChannelPrivacy(channel, message = {}) {
       }
       case 'deleteConfirm': {
         const outcome = await privacyService.confirmDeletion(identity, parsed.code);
+        if (outcome.code === 'DELETION_NOT_STARTED') return deletionReply(language, outcome);
         if (!outcome.ok) return result(notice.reply(language, 'deleteBadCode'), 'PRIVACY_DELETE_REJECTED');
         return deletionReply(language, outcome);
       }

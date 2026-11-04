@@ -88,6 +88,10 @@ async function postDelete(req, res, next) {
       return;
     }
     const outcome = await privacyService.confirmDeletion(context, body.confirmationCode);
+    if (outcome.code === 'DELETION_NOT_STARTED') {
+      sendNotStarted(res, notice.noticeLanguage(body.language) || 'en');
+      return;
+    }
     if (!outcome.ok) {
       res.status(400).json({ error: { code: outcome.code, message: 'The confirmation code is wrong or expired.', details: [] } });
       return;
@@ -115,10 +119,27 @@ function sendDeletionOutcome(res, outcome, language) {
   });
 }
 
+// The block could not be saved durably, so nothing was deleted and no
+// block is promised. The worker is told to try again.
+function sendNotStarted(res, language) {
+  res.set('Cache-Control', 'no-store');
+  res.status(503).json({
+    status: 'not_started',
+    deleted: false,
+    complete: false,
+    retryAvailable: true,
+    error: { code: 'DELETION_NOT_STARTED', message: notice.reply(language, 'deleteNotStarted'), details: [] },
+  });
+}
+
 async function postDeleteRetry(req, res, next) {
   try {
     const context = resolveWebUserContext(req);
     const outcome = await privacyService.retryDeletion(context);
+    if (outcome.code === 'DELETION_NOT_STARTED') {
+      sendNotStarted(res, notice.noticeLanguage((req.body || {}).language) || 'en');
+      return;
+    }
     if (!outcome.ok) {
       res.status(409).json({ error: { code: outcome.code, message: 'There is no unfinished deletion.', details: [] } });
       return;

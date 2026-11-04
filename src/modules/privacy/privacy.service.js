@@ -1,3 +1,4 @@
+const { env } = require('../../config/env');
 const crypto = require('crypto');
 const crmAgentRepository = require('../crm-agent/crm-agent.repository');
 const store = require('./privacy-store');
@@ -199,26 +200,42 @@ function deletionOutcome(result) {
 // identity and every linked identity move to deletion_pending: nothing more
 // is processed or created for them, and the deletion can be retried without
 // a new consent. Sheet names are not personal data, so the audit lists them.
+//
+// Order matters: the durable deletion_pending block is written BEFORE any
+// data is erased. If it cannot be saved, nothing is deleted and the caller
+// gets "not_started", so there is never a half-deleted user without a
+// durable block. The block is removed only after every store is erased.
 async function runDeletion(identity, event) {
   const key = identityKey(identity);
   const subject = await resolveSubject(identity);
-  const result = await erasure.eraseSubject(subject);
-  const { rows, memory, pendingSheets, complete } = deletionOutcome(result);
   const consentKeys = [...new Set([key, ...subject.pairs.map((pair) => store.subjectKey(pair.channel, pair.channelUserId))].filter(Boolean))];
-  let persisted = true;
-  if (complete) {
-    await store.removeConsents(consentKeys);
-  } else {
-    persisted = await markDeletionPending(consentKeys, identity.channel);
-  }
   for (const consentKey of consentKeys) pendingDeletes.delete(consentKey);
+  if (!(await markDeletionPending(consentKeys, identity.channel))) {
+    await store.appendAudit({ event, subjectKey: key, channel: identity.channel, outcome: 'not_started', detail: 'pendingStateNotSaved' });
+    return { ok: false, status: 'not_started', code: 'DELETION_NOT_STARTED', deleted: false, complete: false, erasedRows: {}, failedSheets: [] };
+  }
+  const result = await erasure.eraseSubject(subject);
+  const { rows, memory, pendingSheets } = deletionOutcome(result);
+  let { complete } = deletionOutcome(result);
+  if (complete) {
+    let cleared = false;
+    try {
+      cleared = (await store.removeConsents(consentKeys)).failed === 0;
+    } catch (error) {
+      cleared = false;
+    }
+    if (!cleared) {
+      complete = false;
+      pendingSheets.push(env.googleSheets.sheets.privacyConsents);
+    }
+  }
   await store.appendAudit({
     event,
     subjectKey: key,
     channel: identity.channel,
     outcome: complete ? 'ok' : 'partial',
-    detail: `rows=${rows};memory=${memory};pending=${pendingSheets.join('|') || 'none'}${persisted ? '' : ';pendingStateNotSaved'}`,
-  });
+    detail: `rows=${rows};memory=${memory};pending=${pendingSheets.join('|') || 'none'}`,
+  })
   return {
     ok: true,
     status: complete ? (rows + memory > 0 ? 'complete' : 'nothing') : 'partial',
