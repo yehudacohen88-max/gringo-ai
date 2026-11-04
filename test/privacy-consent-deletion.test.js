@@ -405,6 +405,39 @@ describe('P0-2 privacy, consent and deletion', { concurrency: false }, () => {
     }
   });
 
+  test('Telegram: partial deletion reply is sent and nothing reaches the message handler while pending', async () => {
+    const sent = [];
+    mock.method(communicationService, 'sendMessage', async (payload) => { sent.push(payload); return { ok: true }; });
+    mock.method(communicationService, 'sendInteractiveMessage', async (payload) => { sent.push(payload); return { ok: true }; });
+    const handler = mock.method(telegramMessageService, 'processTelegramMessage', async () => ({ reply: 'core', status: 'OK', user: { userId: 'x' } }));
+    mock.method(telegramMessageService, 'recordDeliveryStatus', async () => null);
+    try {
+      const tgId = String(800000000 + crypto.randomInt(1000000));
+      let updateId = Date.now() * 10 + 5000;
+      const update = (text) => ({ update_id: (updateId += 1), message: { message_id: 1, date: Math.floor(Date.now() / 1000), text, chat: { id: tgId, type: 'private' }, from: { id: tgId, language_code: 'en' } } });
+      await telegramUpdateService.processUpdate(update('accept'));
+      await crmAgentRepository.createUserProfile({ userId: `usr_tg_${tgId}`, channel: 'telegram', channelUserId: tgId, telegramUserId: tgId, telegramChatId: tgId });
+      const { failing } = { failing: new Set(['UserTasks']) };
+      const tgSheets = { UserTasks: [['taskId', 'userId'], ['t1', `usr_tg_${tgId}`]] };
+      erasure.setSheetsAdapterForTests({
+        configured: () => true,
+        sheetNames: () => Object.keys(tgSheets),
+        readSheetRows: async (name) => tgSheets[name].map((row) => [...row]),
+        updateSheetRow: async (name) => { if (failing.has(name)) throw new Error('quota'); },
+      });
+      await telegramUpdateService.processUpdate(update('delete my data'));
+      const code = sent.at(-1).text.match(/(\d{6})/)[1];
+      await telegramUpdateService.processUpdate(update(`delete my data ${code}`));
+      assert.ok(sent.at(-1).text.startsWith(privacyNotice.REPLIES.en.deletePartial));
+      await telegramUpdateService.processUpdate(update('hello'));
+      assert.equal(handler.mock.calls.length, 0);
+      assert.ok(sent.at(-1).text.startsWith(privacyNotice.REPLIES.en.deletePartial));
+    } finally {
+      erasure.setSheetsAdapterForTests(null);
+      mock.restoreAll();
+    }
+  });
+
   test('WhatsApp: unsigned forged delete is rejected; signed unconsented message is not processed or stored', async () => {
     const APP_SECRET = 'test-only-whatsapp-app-secret';
     const snapshot = { ...env.whatsapp };

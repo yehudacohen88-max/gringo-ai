@@ -106,9 +106,18 @@ function rowToObject(header, row) {
 }
 
 async function scanSheets(subject, { erase }) {
-  const result = { sheets: {}, failedSheets: [] };
+  const result = { sheets: {}, failedSheets: [], deferredSheets: [] };
   if (!sheetsAdapter.configured()) return result;
-  for (const sheetName of sheetsAdapter.sheetNames()) {
+  // The profile row is erased last, and only when every other sheet worked.
+  // It holds the channel ids a retry needs to find the remaining rows.
+  const profileSheet = env.googleSheets.sheets.userProfiles;
+  const names = sheetsAdapter.sheetNames();
+  const ordered = [...names.filter((name) => name !== profileSheet), ...names.filter((name) => name === profileSheet)];
+  for (const sheetName of ordered) {
+    if (erase && sheetName === profileSheet && result.failedSheets.length) {
+      result.deferredSheets.push(sheetName);
+      continue;
+    }
     let rows;
     try {
       rows = await sheetsAdapter.readSheetRows(sheetName);
@@ -143,7 +152,7 @@ async function scanSheets(subject, { erase }) {
   return result;
 }
 
-function forgetInProcessState(subject) {
+function forgetInProcessState(subject, options = {}) {
   // Lazy requires avoid load-order cycles with the channel modules.
   const { coreAgentService } = require('../core-agent');
   const notificationService = require('../notifications/notification.service');
@@ -159,7 +168,7 @@ function forgetInProcessState(subject) {
   for (const userId of subject.ids.userId) {
     memory.notifications += notificationService.forgetUserNotifications(userId);
     memory.quotes += quoteRepository.purgeLocalQuotesForUser(userId);
-    const local = crmAgentRepository.purgeLocalUser(userId);
+    const local = options.keepLocalProfile ? { profiles: 0, conversations: 0 } : crmAgentRepository.purgeLocalUser(userId);
     memory.profiles += local.profiles;
     memory.conversationHistory += local.conversations;
   }
@@ -184,7 +193,7 @@ async function exportSubject(subject) {
 
 async function eraseSubject(subject) {
   const sheets = await scanSheets(subject, { erase: true });
-  const memory = forgetInProcessState(subject);
+  const memory = forgetInProcessState(subject, { keepLocalProfile: sheets.failedSheets.length > 0 });
   return { ...sheets, memory };
 }
 

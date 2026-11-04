@@ -3,10 +3,13 @@ const notificationController = require('./notification.controller');
 const { attachWebIdentity } = require('../../shared/webIdentity');
 const { requireSameOrigin } = require('../../shared/requireSameOrigin');
 
+const { requirePersonalConsent } = require('../../shared/requirePersonalConsent');
+
 const router = express.Router();
 
 router.use(requireSameOrigin);
 router.use(attachWebIdentity);
+router.use(requirePersonalConsent);
 
 router.get('/', notificationController.listNotifications);
 router.get('/summary', notificationController.getSummary);

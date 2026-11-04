@@ -33,7 +33,10 @@ function parsePrivacyCommand(text) {
   return null;
 }
 
-function exportSummary(language, data) {
+// Messaging channels get a short data summary, not a full export: a chat
+// message is the wrong place for every stored row. The reply says so and
+// points to the full export.
+function dataSummary(language, data) {
   const lines = [notice.reply(language, 'exportTitle')];
   const profile = (data.sheets[env.googleSheets.sheets.userProfiles] || [])[0] || data.local.profiles[0];
   if (profile) {
@@ -45,7 +48,17 @@ function exportSummary(language, data) {
   if (data.local.conversations.length) lines.push(`ConversationHistory: ${data.local.conversations.length}`);
   if (data.local.quotes.length) lines.push(`UserSubmittedTransferQuotes: ${data.local.quotes.length}`);
   if (lines.length === 1) return notice.reply(language, 'exportEmpty');
+  lines.push('', notice.reply(language, 'exportFullHint'));
   return lines.join('\n');
+}
+
+// Full success is shown only when every store was erased.
+function deletionReply(language, outcome) {
+  const limits = notice.getNotice(language).limits;
+  if (!outcome.ok) return result(notice.reply(language, 'noPendingDeletion'), 'PRIVACY_DELETE_REJECTED');
+  if (outcome.status === 'partial') return result(`${notice.reply(language, 'deletePartial')}\n\n${limits}`, 'PRIVACY_DELETE_PARTIAL');
+  const text = outcome.status === 'complete' ? notice.reply(language, 'deleteDone') : notice.reply(language, 'deleteNothing');
+  return result(`${text}\n\n${limits}`, 'PRIVACY_DELETED');
 }
 
 function result(reply, status) {
@@ -61,6 +74,15 @@ async function handleChannelPrivacy(channel, message = {}) {
   const language = notice.noticeLanguage(message.languageCode || message.language) || notice.guessLanguageFromText(message.messageText);
   const parsed = parsePrivacyCommand(message.messageText);
 
+  // An unfinished deletion blocks everything else. Any message, including
+  // "delete my data", retries it for this verified identity; no new consent
+  // or code is needed. Reading the notice stays possible.
+  const current = await privacyService.getStatus(identity);
+  if (current.deletionPending && !(parsed && parsed.command === 'privacy')) {
+    const outcome = await privacyService.retryDeletion(identity);
+    return deletionReply(language, outcome);
+  }
+
   if (parsed) {
     switch (parsed.command) {
       case 'privacy':
@@ -75,7 +97,7 @@ async function handleChannelPrivacy(channel, message = {}) {
         await privacyService.withdrawConsent(identity, language);
         return result(notice.reply(language, 'withdrawn'), 'PRIVACY_CONSENT_WITHDRAWN');
       case 'export':
-        return result(exportSummary(language, await privacyService.exportData(identity)), 'PRIVACY_EXPORT');
+        return result(dataSummary(language, await privacyService.exportData(identity)), 'PRIVACY_DATA_SUMMARY');
       case 'delete': {
         const { confirmationCode } = privacyService.requestDeletion(identity);
         return result(`${notice.getNotice(language).limits}\n\n${notice.reply(language, 'deleteConfirm', confirmationCode)}`, 'PRIVACY_DELETE_CONFIRMATION_REQUIRED');
@@ -83,8 +105,7 @@ async function handleChannelPrivacy(channel, message = {}) {
       case 'deleteConfirm': {
         const outcome = await privacyService.confirmDeletion(identity, parsed.code);
         if (!outcome.ok) return result(notice.reply(language, 'deleteBadCode'), 'PRIVACY_DELETE_REJECTED');
-        const text = outcome.deleted ? notice.reply(language, 'deleteDone') : notice.reply(language, 'deleteNothing');
-        return result(`${text}\n\n${notice.getNotice(language).limits}`, 'PRIVACY_DELETED');
+        return deletionReply(language, outcome);
       }
       default:
         break;

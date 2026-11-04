@@ -92,13 +92,47 @@ async function postDelete(req, res, next) {
       res.status(400).json({ error: { code: outcome.code, message: 'The confirmation code is wrong or expired.', details: [] } });
       return;
     }
-    const language = notice.noticeLanguage(body.language) || 'en';
-    res.status(200).json({
-      deleted: outcome.deleted,
-      complete: outcome.complete,
-      message: notice.reply(language, outcome.deleted ? 'deleteDone' : 'deleteNothing'),
-      notDeleted: notice.getNotice(language).limits,
-    });
+    sendDeletionOutcome(res, outcome, notice.noticeLanguage(body.language) || 'en');
+  } catch (error) {
+    next(error);
+  }
+}
+
+// 200 only when every store was erased. A partial deletion answers 202 with
+// status "partial": processing is blocked and POST /delete-retry continues it.
+function sendDeletionOutcome(res, outcome, language) {
+  const partial = outcome.status === 'partial';
+  const messageKey = partial ? 'deletePartial' : outcome.status === 'complete' ? 'deleteDone' : 'deleteNothing';
+  res.set('Cache-Control', 'no-store');
+  res.status(partial ? 202 : 200).json({
+    status: outcome.status,
+    deleted: outcome.deleted,
+    complete: outcome.complete,
+    retryAvailable: partial,
+    pendingStores: partial ? outcome.failedSheets.length : 0,
+    message: notice.reply(language, messageKey),
+    notDeleted: notice.getNotice(language).limits,
+  });
+}
+
+async function postDeleteRetry(req, res, next) {
+  try {
+    const context = resolveWebUserContext(req);
+    const outcome = await privacyService.retryDeletion(context);
+    if (!outcome.ok) {
+      res.status(409).json({ error: { code: outcome.code, message: 'There is no unfinished deletion.', details: [] } });
+      return;
+    }
+    sendDeletionOutcome(res, outcome, notice.noticeLanguage((req.body || {}).language) || 'en');
+  } catch (error) {
+    next(error);
+  }
+}
+
+// Admin: retries every pending deletion. Returns counts only.
+async function postAdminRetryDeletions(req, res, next) {
+  try {
+    res.status(200).json(await privacyService.retryPendingDeletions());
   } catch (error) {
     next(error);
   }
@@ -111,6 +145,8 @@ module.exports = {
   getStatus,
   postConsent,
   postDelete,
+  postAdminRetryDeletions,
   postDeleteRequest,
+  postDeleteRetry,
   postWithdraw,
 };

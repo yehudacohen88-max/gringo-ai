@@ -6,7 +6,10 @@ const googleSheets = require('../../config/googleSheets');
 // raw phone number, Telegram id, LINE id or web id.
 const CONSENT_FIELDS = ['subjectKey', 'channel', 'status', 'consentVersion', 'language', 'acceptedAt', 'updatedAt'];
 const AUDIT_FIELDS = ['eventId', 'event', 'subjectKey', 'channel', 'outcome', 'detail', 'at'];
-const CONSENT_STATUSES = ['accepted', 'declined', 'withdrawn'];
+// deletion_pending: the worker confirmed deletion but at least one store
+// failed. Processing stays blocked and the deletion can be retried. It is
+// kept in the PrivacyConsents sheet so it survives a restart.
+const CONSENT_STATUSES = ['accepted', 'declined', 'withdrawn', 'deletion_pending'];
 
 const localConsents = new Map();
 const localAudit = [];
@@ -131,6 +134,18 @@ async function appendAudit(event = {}) {
   return record;
 }
 
+async function listConsentsByStatus(status) {
+  if (useLocal()) return [...localConsents.values()].filter((record) => record.status === status).map((record) => ({ ...record }));
+  await ensureSheet(env.googleSheets.sheets.privacyConsents, CONSENT_FIELDS);
+  const rows = await googleSheets.readSheetRows(env.googleSheets.sheets.privacyConsents);
+  return rows.slice(1).map((row) => rowToObject(CONSENT_FIELDS, row)).filter((record) => record.status === status);
+}
+
+function resetLocalForTests() {
+  localConsents.clear();
+  localAudit.length = 0;
+}
+
 function localAuditEntries() {
   return localAudit.map((item) => ({ ...item }));
 }
@@ -140,6 +155,8 @@ module.exports = {
   CONSENT_FIELDS,
   appendAudit,
   getConsent,
+  listConsentsByStatus,
+  resetLocalForTests,
   localAuditEntries,
   removeConsents,
   saveConsent,

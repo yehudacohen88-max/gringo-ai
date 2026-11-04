@@ -1,4 +1,5 @@
 const communityService = require('../community/community.service');
+const privacyGuard = require('../privacy/privacy-guard');
 const documentService = require('../documents/document.service');
 const housingService = require('../housing/housing.service');
 const jobService = require('../jobs/job.service');
@@ -166,10 +167,10 @@ async function createNotification(input = {}, options = {}) {
     );
   }
 
-  // A worker who withdrew or never gave consent gets no Telegram, WhatsApp or LINE messages.
-  const channelsAllowed = await require('../privacy/privacy.service')
-    .allowsProcessingForUser(ownerUserId)
-    .catch(() => false);
+  // A worker who withdrew, never gave consent, or has a pending deletion
+  // gets no new notification at all (in Gringo or on any channel).
+  if (!(await privacyGuard.userAllowed(ownerUserId))) return null;
+  const channelsAllowed = true;
   try {
     const saved = await notificationRepository.createNotification(notification);
     await recordNotificationEvent(saved, 'created');
@@ -324,7 +325,7 @@ async function rescheduleNotification(notificationId, days = 1, options = {}) {
     },
     { ownerUserId }
   );
-  await recordNotificationEvent(reminder, 'rescheduled');
+  if (reminder) await recordNotificationEvent(reminder, 'rescheduled');
   return { current, reminder };
 }
 

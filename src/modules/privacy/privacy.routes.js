@@ -17,5 +17,6 @@ router.post('/consent', limitPrivacy, controller.postConsent);
 router.post('/withdraw', limitPrivacy, controller.postWithdraw);
 router.post('/delete-request', limitPrivacy, controller.postDeleteRequest);
 router.post('/delete', limitPrivacy, controller.postDelete);
+router.post('/delete-retry', limitPrivacy, controller.postDeleteRetry);
 
 module.exports = router;

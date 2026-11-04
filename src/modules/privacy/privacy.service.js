@@ -8,6 +8,7 @@ const { isProductionRuntime } = require('../../shared/pilotCatalog');
 const DELETE_CODE_TTL_MS = 10 * 60 * 1000;
 const MAX_PENDING_DELETES = 5000;
 const pendingDeletes = new Map();
+const DELETION_PENDING = 'deletion_pending';
 
 
 function cleanText(value) {
@@ -51,28 +52,44 @@ async function getStatus(identity) {
     acceptedAt: record && record.status === 'accepted' ? record.acceptedAt : '',
     accepted,
     needsConsent: !accepted,
+    deletionPending: Boolean(record && record.status === DELETION_PENDING),
   };
 }
 
+// A pending deletion blocks processing even when the gate is off locally.
 async function allowsPersonalProcessing(identity) {
+  const status = await getStatus(identity);
+  if (status.deletionPending) return false;
   if (!consentGateEnabled()) return true;
-  return (await getStatus(identity)).accepted;
+  return status.accepted;
 }
 
 // For outbound messages keyed by userId: every channel identity of the
 // profile must not be withdrawn, and at least one must be accepted.
 async function allowsProcessingForUser(userId) {
-  if (!consentGateEnabled()) return true;
-  const record = await crmAgentRepository.findUserProfileRecordByUserId(cleanText(userId));
-  if (!record) return false;
+  const id = cleanText(userId);
+  const record = id ? await crmAgentRepository.findUserProfileRecordByUserId(id) : null;
+  if (!record) return !consentGateEnabled() && !(await pendingKeyIncludes(id));
   const subject = erasure.buildSubject(record.profile);
   let accepted = false;
   for (const pair of subject.pairs) {
     const status = await getStatus(pair);
+    if (status.deletionPending) return false;
     if (status.status === 'withdrawn' || status.status === 'declined') return false;
     if (status.accepted) accepted = true;
   }
-  return accepted;
+  return consentGateEnabled() ? accepted : true;
+}
+
+// Rows written under a raw channel id (legacy Telegram error path) have no
+// profile; they are blocked when that id itself has a pending deletion.
+async function pendingKeyIncludes(rawId) {
+  if (!rawId) return false;
+  for (const channel of ['telegram', 'line', 'whatsapp', 'web']) {
+    const record = await store.getConsent(store.subjectKey(channel, rawId));
+    if (record && record.status === DELETION_PENDING) return true;
+  }
+  return false;
 }
 
 async function setConsent(identity, status, language) {
@@ -84,6 +101,8 @@ async function setConsent(identity, status, language) {
   }
   const now = new Date().toISOString();
   const existing = await store.getConsent(key);
+  // Consent changes cannot reopen processing while a deletion is unfinished.
+  if (existing && existing.status === DELETION_PENDING) return getStatus(identity);
   const record = {
     subjectKey: key,
     channel: cleanText(identity.channel).toLowerCase(),
@@ -113,6 +132,8 @@ async function exportData(identity) {
   const consent = await getStatus(identity);
   await store.appendAudit({ event: 'export', subjectKey: identityKey(identity), channel: identity.channel, outcome: 'ok' });
   return {
+    exportType: 'full_stored_records',
+    scope: 'Every row Gringo stores for your verified identity in its own sheets and server memory. Copies held by Telegram, LINE, WhatsApp, OpenAI, Google backups and host logs are not included.',
     generatedAt: new Date().toISOString(),
     consent,
     sheets: data.sheets,
@@ -163,28 +184,104 @@ async function confirmDeletion(identity, suppliedCode) {
     return { ok: false, code: 'DELETE_CODE_INVALID' };
   }
   pendingDeletes.delete(key);
-  const subject = await resolveSubject(identity);
-  const result = await erasure.eraseSubject(subject);
-  const consentKeys = subject.pairs.map((pair) => store.subjectKey(pair.channel, pair.channelUserId));
-  await store.removeConsents(consentKeys);
-  for (const consentKey of consentKeys) pendingDeletes.delete(consentKey);
+  return runDeletion(identity, 'delete');
+}
+
+function deletionOutcome(result) {
   const rows = Object.values(result.sheets).reduce((sum, count) => sum + count, 0);
   const memory = Object.values(result.memory).reduce((sum, count) => sum + count, 0);
-  const complete = result.failedSheets.length === 0;
+  const pendingSheets = [...result.failedSheets, ...result.deferredSheets];
+  const complete = pendingSheets.length === 0;
+  return { rows, memory, pendingSheets, complete };
+}
+
+// Erases every store for the verified identity. When a store fails, the
+// identity and every linked identity move to deletion_pending: nothing more
+// is processed or created for them, and the deletion can be retried without
+// a new consent. Sheet names are not personal data, so the audit lists them.
+async function runDeletion(identity, event) {
+  const key = identityKey(identity);
+  const subject = await resolveSubject(identity);
+  const result = await erasure.eraseSubject(subject);
+  const { rows, memory, pendingSheets, complete } = deletionOutcome(result);
+  const consentKeys = [...new Set([key, ...subject.pairs.map((pair) => store.subjectKey(pair.channel, pair.channelUserId))].filter(Boolean))];
+  let persisted = true;
+  if (complete) {
+    await store.removeConsents(consentKeys);
+  } else {
+    persisted = await markDeletionPending(consentKeys, identity.channel);
+  }
+  for (const consentKey of consentKeys) pendingDeletes.delete(consentKey);
   await store.appendAudit({
-    event: 'delete',
+    event,
     subjectKey: key,
     channel: identity.channel,
     outcome: complete ? 'ok' : 'partial',
-    detail: `rows=${rows};memory=${memory};failedSheets=${result.failedSheets.length}`,
+    detail: `rows=${rows};memory=${memory};pending=${pendingSheets.join('|') || 'none'}${persisted ? '' : ';pendingStateNotSaved'}`,
   });
   return {
     ok: true,
-    deleted: rows + memory > 0,
+    status: complete ? (rows + memory > 0 ? 'complete' : 'nothing') : 'partial',
+    deleted: complete && rows + memory > 0,
     complete,
     erasedRows: result.sheets,
-    failedSheets: result.failedSheets,
+    failedSheets: pendingSheets,
   };
+}
+
+async function markDeletionPending(keys, channel) {
+  const now = new Date().toISOString();
+  let saved = true;
+  for (const subjectKey of keys) {
+    try {
+      await store.saveConsent({
+        subjectKey,
+        channel: cleanText(channel).toLowerCase(),
+        status: DELETION_PENDING,
+        consentVersion: notice.PRIVACY_NOTICE_VERSION,
+        language: '',
+        acceptedAt: '',
+        updatedAt: now,
+      });
+    } catch (error) {
+      saved = false;
+    }
+  }
+  return saved;
+}
+
+// Retry for the verified identity only. No new consent and no new code are
+// needed: the worker already confirmed. Erasing is idempotent and nothing is
+// re-created because processing stays blocked while the state is pending.
+async function retryDeletion(identity) {
+  const status = await getStatus(identity);
+  if (!status.deletionPending) return { ok: false, code: 'NO_PENDING_DELETION' };
+  return runDeletion(identity, 'delete_retry');
+}
+
+// Admin or scheduled retry: finds pending identities through the profile
+// rows that were kept for this purpose, then retries each one.
+async function retryPendingDeletions() {
+  const pending = await store.listConsentsByStatus(DELETION_PENDING);
+  const wanted = new Set(pending.map((record) => record.subjectKey));
+  if (!wanted.size) return { attempted: 0, completed: 0, stillPending: 0 };
+  const profiles = (await crmAgentRepository.findAllUserProfileRecords()).map((record) => record.profile);
+  let attempted = 0;
+  let completed = 0;
+  const done = new Set();
+  for (const profile of profiles) {
+    const subject = erasure.buildSubject(profile);
+    const pair = subject.pairs.find((item) => wanted.has(store.subjectKey(item.channel, item.channelUserId)));
+    if (!pair) continue;
+    const pairKey = store.subjectKey(pair.channel, pair.channelUserId);
+    if (done.has(pairKey)) continue;
+    attempted += 1;
+    const outcome = await runDeletion(pair, 'delete_retry_admin');
+    subject.pairs.forEach((item) => done.add(store.subjectKey(item.channel, item.channelUserId)));
+    if (outcome.complete) completed += 1;
+  }
+  const stillPending = (await store.listConsentsByStatus(DELETION_PENDING)).length;
+  return { attempted, completed, stillPending };
 }
 
 function resetForTests() {
@@ -197,6 +294,9 @@ module.exports = {
   allowsPersonalProcessing,
   allowsProcessingForUser,
   confirmDeletion,
+  retryDeletion,
+  retryPendingDeletions,
+  DELETION_PENDING,
   consentGateEnabled,
   declineConsent,
   exportData,

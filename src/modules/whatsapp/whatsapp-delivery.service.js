@@ -1,4 +1,5 @@
 const { env } = require('../../config/env');
+const privacyGuard = require('../privacy/privacy-guard');
 const crmAgentRepository = require('../crm-agent/crm-agent.repository');
 const { crmAgentService } = require('../crm-agent');
 const notificationRepository = require('../notifications/notification.repository');
@@ -253,6 +254,8 @@ async function canDeliverNotification(notification = {}) {
   if (BLOCKED_STATUSES.includes(notification.status)) return { ok: false, reason: 'notification_closed' };
   const profile = await getProfileForNotification(notification);
   if (!profile) return { ok: false, reason: 'profile_missing' };
+  // Checked again at send time: consent may be withdrawn after queueing.
+  if (!(await privacyGuard.userAllowed(profile.userId))) return { ok: false, reason: 'privacy_consent_missing' };
   if (!cleanText(profile.whatsappPhone)) return { ok: false, reason: 'whatsapp_not_connected' };
   if (!isYes(profile.whatsappNotificationsEnabled)) return { ok: false, reason: 'whatsapp_notifications_disabled' };
   if (!respectsPreference(profile, notification.type)) return { ok: false, reason: 'preference_disabled' };
@@ -647,6 +650,7 @@ async function getAllWhatsAppDeliveryHistory() {
 }
 
 module.exports = {
+  canDeliverNotification,
   cancelWhatsAppDelivery,
   createWhatsAppDelivery,
   getAllWhatsAppDeliveries,

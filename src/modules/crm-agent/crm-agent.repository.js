@@ -213,6 +213,7 @@ module.exports = {
   purgeLocalUser,
   createConversationHistory,
   createUserProfile,
+  findAllUserProfileRecords,
   findUserProfileRecordByChannel,
   findUserProfileRecordByLineUserId,
   findUserProfileRecordByTelegramUserId,
