@@ -9,7 +9,8 @@ const { communicationService } = require('../communication');
 const { safeTelegramWarning } = require('./telegram-errors');
 const { getUnsupportedPrivateChat, mapCallbackQuery, mapPrivateTextUpdate } = require('./telegram-message.mapper');
 
-const STATE_FILE = path.join(process.cwd(), '.tools', 'telegram-state.json');
+// TELEGRAM_STATE_FILE lets hosted deploys keep the duplicate guard on a persistent disk.
+const STATE_FILE = process.env.TELEGRAM_STATE_FILE || path.join(process.cwd(), '.tools', 'telegram-state.json');
 
 let memoryState = {
   lastProcessedUpdateId: 0,

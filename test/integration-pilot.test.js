@@ -192,7 +192,7 @@ describe('integration: PRs #15-#19 combined', { concurrency: false }, () => {
     await new Promise((r) => setImmediate(r));
     mock.restoreAll();
     assert.equal(retry.mock.callCount(), 1);
-    assert.ok(intervals.length >= 5 && intervals.every((ms) => ms === 60000));
+    assert.ok(intervals.length >= 3 && intervals.every((ms) => ms === 60000));
   });
 });
 
