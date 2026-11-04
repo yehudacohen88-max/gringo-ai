@@ -1,4 +1,5 @@
 const { TRANSLATION_FAILURE_TYPES } = require('../translation.constants');
+const aiBudget = require('../../ai-provider/ai-budget.service');
 
 function createProviderError(message, failureType, status = 0) {
   const error = new Error(message);
@@ -52,6 +53,13 @@ function createOpenAiTranslationProvider(options = {}) {
           'Translation provider is not configured.',
           TRANSLATION_FAILURE_TYPES.UNAVAILABLE_PROVIDER
         );
+      }
+
+      // Translations count against the same global daily AI budget.
+      try {
+        aiBudget.reserve('');
+      } catch (budgetError) {
+        throw createProviderError('Translation provider is paused by the AI budget.', TRANSLATION_FAILURE_TYPES.UNAVAILABLE_PROVIDER);
       }
 
       const controller = new AbortController();
@@ -109,6 +117,7 @@ function createOpenAiTranslationProvider(options = {}) {
           );
         }
 
+        aiBudget.recordUsage(body.usage);
         return {
           translatedText,
         };

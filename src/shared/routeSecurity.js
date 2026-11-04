@@ -10,6 +10,7 @@ function route(method, path, classification, reason) {
 
 const ADMIN_ROUTES = [
   ['GET', '/api/admin/dashboard'],
+  ['GET', '/api/admin/ai-usage'],
   ['GET', '/api/admin/translation'],
   ['PUT', '/api/admin/translation/settings'],
   ['POST', '/api/admin/reports/daily'],

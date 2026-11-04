@@ -30,6 +30,7 @@ router.post('/whatsapp/deliveries/:deliveryId/cancel', adminController.cancelWha
 router.get('/whatsapp/deliveries/:deliveryId/failure', adminController.getWhatsAppFailureReason);
 router.post('/tasks', adminController.assignTask);
 router.put('/tasks/:taskId', adminController.updateTask);
+router.get('/ai-usage', (req, res) => res.json({ success: true, data: require('../ai-provider/ai-budget.service').snapshot() }));
 router.post('/privacy/retry-deletions', privacyController.postAdminRetryDeletions);
 
 module.exports = router;

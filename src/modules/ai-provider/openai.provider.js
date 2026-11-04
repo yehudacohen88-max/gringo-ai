@@ -22,7 +22,7 @@ async function createResponse(context = {}) {
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
+  const timeout = setTimeout(() => controller.abort(), Number(process.env.AI_TIMEOUT_MS || 20000));
 
   try {
     const response = await fetch('https://api.openai.com/v1/responses', {
@@ -77,6 +77,7 @@ async function createResponse(context = {}) {
       provider: 'openai',
       model: env.ai.model,
       text,
+      usage: body.usage || null,
     };
   } catch (error) {
     if (error.name === 'AbortError') {

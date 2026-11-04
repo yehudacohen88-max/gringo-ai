@@ -1,5 +1,6 @@
 const { env } = require('../../config/env');
 const openAiProvider = require('./openai.provider');
+const aiBudget = require('./ai-budget.service');
 
 const providers = {
   openai: openAiProvider,
@@ -18,7 +19,10 @@ function getProvider() {
 
 async function generateReply(context = {}) {
   const provider = getProvider();
-  return provider.createResponse(context);
+  aiBudget.reserve(context.budgetKey ? String(context.budgetKey) : '');
+  const result = await provider.createResponse(context);
+  if (result && result.usage) aiBudget.recordUsage(result.usage);
+  return result;
 }
 
 module.exports = {
