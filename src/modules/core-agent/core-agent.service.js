@@ -47,14 +47,35 @@ const INCOMING_TRANSLATION_INCOMPLETE_WARNING = 'incoming_translation_incomplete
 const TRANSLATION_UNCERTAINTY_NOTICE = Object.freeze({
   he: 'ייתכן שחלק מההודעה לא הובן בגלל בעיה זמנית בעיבוד השפה. אפשר לשלוח שוב או לנסח את החלק הזה מחדש.',
   en: 'Part of your message may not have been understood because of a temporary language-processing problem. Please resend or rephrase that part.',
+  th: 'ข้อความบางส่วนของคุณอาจไม่ได้รับการเข้าใจ เพราะปัญหาชั่วคราวในการประมวลผลภาษา กรุณาส่งใหม่หรือเขียนส่วนนั้นใหม่',
 });
-const INCOMING_LANGUAGE_FAILURE_REPLY = 'לא הצלחתי להבין את כל ההודעה בגלל בעיה זמנית בעיבוד השפה. אפשר לשלוח אותה שוב או לנסח אותה מחדש.';
-const OUTGOING_HEBREW_TRANSLATION_NOTICE = 'לא הצלחתי לתרגם כרגע את התשובה לעברית, אז היא מוצגת באנגלית.';
+// Shown in the user's own language (he/th/en), never Hebrew to a Thai or English user.
+const INCOMING_LANGUAGE_FAILURE_REPLIES = Object.freeze({
+  he: 'לא הצלחתי להבין את כל ההודעה בגלל בעיה זמנית בעיבוד השפה. אפשר לשלוח אותה שוב או לנסח אותה מחדש.',
+  th: 'ฉันไม่เข้าใจข้อความทั้งหมด เพราะปัญหาชั่วคราวในการประมวลผลภาษา กรุณาส่งอีกครั้งหรือเขียนใหม่',
+  en: "I couldn't understand your whole message because of a temporary language-processing problem. Please send it again or rephrase it.",
+});
+const INCOMING_LANGUAGE_FAILURE_REPLY = INCOMING_LANGUAGE_FAILURE_REPLIES.he;
+const OUTGOING_TRANSLATION_NOTICES = Object.freeze({
+  he: 'לא הצלחתי לתרגם כרגע את התשובה לעברית, אז היא מוצגת באנגלית.',
+});
+const OUTGOING_HEBREW_TRANSLATION_NOTICE = OUTGOING_TRANSLATION_NOTICES.he;
+
+function noticeLanguageKey(userLanguage = '') {
+  const primary = languagePrimary(userLanguage);
+  return ['he', 'th'].includes(primary) ? primary : 'en';
+}
 
 function translationUncertaintyNotice(userLanguage = '') {
-  return languagePrimary(userLanguage) === 'he'
-    ? TRANSLATION_UNCERTAINTY_NOTICE.he
-    : TRANSLATION_UNCERTAINTY_NOTICE.en;
+  return TRANSLATION_UNCERTAINTY_NOTICE[noticeLanguageKey(userLanguage)];
+}
+
+function incomingLanguageFailureReply(userLanguage = '') {
+  return INCOMING_LANGUAGE_FAILURE_REPLIES[noticeLanguageKey(userLanguage)];
+}
+
+function isIncomingLanguageFailureReply(text = '') {
+  return Object.values(INCOMING_LANGUAGE_FAILURE_REPLIES).includes(text);
 }
 
 function incomingTranslationIsUncertain(metadata = {}, originalQuestion = '', languages = {}) {
@@ -353,9 +374,10 @@ async function buildActiveSupervisorResponse({
         };
         plan.updatedAt = new Date().toISOString();
         storeSupervisorPlan(plan, 'storeIncomingLanguageFailure');
+        const failureLanguage = noticeLanguageKey(userLanguage || userContext?.language);
         return {
-          reply: INCOMING_LANGUAGE_FAILURE_REPLY,
-          replyLanguage: 'he',
+          reply: incomingLanguageFailureReply(failureLanguage),
+          replyLanguage: failureLanguage,
           skipOutgoingTranslation: true,
           category: 'Supervisor',
           status: 'SUPERVISOR_PARTIAL',
@@ -627,10 +649,12 @@ function shouldUseAiProvider(question, knowledgeResult) {
   return false;
 }
 
+// Shown when Gringo has no verified answer. There is no workflow that sends
+// a later answer back to the user, so this must never promise a follow-up.
 const FRIENDLY_FALLBACK = {
-  he: 'אני לא בטוח בתשובה כרגע, אבל גרינגו יבדוק ויחזור אליך עם תשובה.',
-  th: 'ตอนนี้ฉันยังไม่แน่ใจในคำตอบ แต่ Gringo จะตรวจสอบและกลับมาตอบคุณ',
-  en: "I'm not fully sure yet, but Gringo will check and come back with an answer.",
+  he: 'אין לי כרגע תשובה מאומתת לשאלה הזו, ואני לא רוצה לנחש. למידע רשמי אפשר לפנות לקו לעובד (kavlaoved.org.il), לרשות האוכלוסין וההגירה (gov.il) או למשרד העבודה.',
+  th: 'ตอนนี้ฉันยังไม่มีคำตอบที่ยืนยันได้สำหรับคำถามนี้ และไม่อยากเดา สำหรับข้อมูลทางการ ติดต่อ Kav LaOved (kavlaoved.org.il), สำนักงานประชากรและการเข้าเมืองของอิสราเอล (gov.il) หรือกระทรวงแรงงานอิสราเอล',
+  en: "I don't have a verified answer to this right now, and I don't want to guess. For official information, contact Kav LaOved (kavlaoved.org.il), the Population and Immigration Authority (gov.il) or the Ministry of Labor.",
 };
 
 // Shown when the daily AI limit is reached or AI is switched off. It does not
@@ -1235,15 +1259,17 @@ async function applyOutgoingTranslation(response = {}, targetLanguage = CORE_AGE
   }
 
   const outgoingDelivered = metadata.translated && !metadata.fallbackUsed;
-  const showHebrewTranslationNotice = metadata.targetLanguage !== CORE_AGENT_RESPONSE_LANGUAGE
-    && languagePrimary(metadata.targetLanguage) === 'he'
+  const targetNoticeLanguage = languagePrimary(metadata.targetLanguage);
+  const outgoingNotice = OUTGOING_TRANSLATION_NOTICES[targetNoticeLanguage] || '';
+  const showTranslationNotice = Boolean(outgoingNotice)
+    && metadata.targetLanguage !== CORE_AGENT_RESPONSE_LANGUAGE
     && !outgoingDelivered
     && !deliveredTextAlreadyInLanguage(finalized.reply, metadata.targetLanguage)
-    && !finalized.reply.includes(OUTGOING_HEBREW_TRANSLATION_NOTICE)
-    && !finalized.reply.includes(TRANSLATION_UNCERTAINTY_NOTICE.he)
-    && !finalized.reply.includes(INCOMING_LANGUAGE_FAILURE_REPLY);
-  if (showHebrewTranslationNotice) {
-    finalized.reply = `${OUTGOING_HEBREW_TRANSLATION_NOTICE}\n\n${finalized.reply}`;
+    && !finalized.reply.includes(outgoingNotice)
+    && !finalized.reply.includes(TRANSLATION_UNCERTAINTY_NOTICE[targetNoticeLanguage])
+    && !Object.values(INCOMING_LANGUAGE_FAILURE_REPLIES).some((text) => finalized.reply.includes(text));
+  if (showTranslationNotice) {
+    finalized.reply = `${outgoingNotice}\n\n${finalized.reply}`;
     finalized.responseTranslation = {
       fallbackUsed: true,
       errorCode: String(metadata.errorCode || '').trim(),
@@ -1526,7 +1552,7 @@ async function processWebMessage(messageContext = {}) {
     delete finalized.replyLanguage;
     if (response.skipOutgoingTranslation || responseAlreadyMatchesUserLanguage(response, userLanguage)) {
       delete finalized.skipOutgoingTranslation;
-      if (response.skipOutgoingTranslation && finalized.reply === INCOMING_LANGUAGE_FAILURE_REPLY) {
+      if (response.skipOutgoingTranslation && isIncomingLanguageFailureReply(finalized.reply)) {
         Object.defineProperty(finalized, OUTGOING_TRANSLATION_METADATA, {
           value: {
             sourceLanguage: CORE_AGENT_RESPONSE_LANGUAGE,
@@ -1558,8 +1584,11 @@ async function processWebMessage(messageContext = {}) {
     const onboardingResult = await onboardingService.handleMessage(originalQuestion, userContext);
 
     if (onboardingResult.handled) {
+      // Onboarding copy is static and already in the user's language, so it
+      // never goes through the AI translation provider.
       return deliverResponse({
         reply: onboardingResult.reply,
+        skipOutgoingTranslation: true,
         category: 'Onboarding',
         status: onboardingResult.complete ? 'ONBOARDING_COMPLETE' : 'ONBOARDING',
         onboarding: {
