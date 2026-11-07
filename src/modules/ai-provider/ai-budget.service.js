@@ -12,12 +12,20 @@
 //                             does not reset them (AI-06). Default:
 //                             <tmpdir>/gringo-ai-budget.json; "off" disables.
 //                             Off under NODE_ENV=test unless set. User keys
-//                             are stored only as truncated SHA-256 hashes.
+//                             are stored only as truncated HMAC-SHA256 keyed
+//                             with WEB_SESSION_SECRET. Older files may still
+//                             hold an unsalted truncated SHA-256; the next
+//                             reserve or a privacy erasure folds that entry
+//                             into the HMAC and keeps the count. Erasure never
+//                             deletes a counter: a delete-and-retry must not
+//                             reset the daily cap. The whole per-user map is
+//                             dropped when the UTC day changes.
 
 const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { env } = require('../../config/env');
 
 const DEFAULTS = { userLimit: 30, globalLimit: 1000, tokenLimit: 0 };
 const SAVE_DELAY_MS = 1000;
@@ -34,8 +42,79 @@ function stateFile() {
   return path.join(os.tmpdir(), 'gringo-ai-budget.json');
 }
 
-function hashKey(userKey) {
+function legacyUnsaltedKey(userKey) {
   return crypto.createHash('sha256').update(String(userKey)).digest('hex').slice(0, 24);
+}
+
+// A known fallback key would make the counter linkable by anyone who can
+// guess the user id. Production already refuses to boot without a secret;
+// this refuses again rather than hashing with a published constant.
+function keyedHashWith(secret, userKey) {
+  return crypto.createHmac('sha256', secret).update(`ai-budget:${userKey}`).digest('hex').slice(0, 24);
+}
+
+function keyedHash(userKey) {
+  const secret = env.webSessionSecret;
+  if (!secret) {
+    const error = new Error('WEB_SESSION_SECRET is required to key AI budget counters.');
+    error.code = 'PRIVACY_KEY_UNAVAILABLE';
+    throw error;
+  }
+  return keyedHashWith(secret, userKey);
+}
+
+function priorKeys(rawUserKey) {
+  const keys = [legacyUnsaltedKey(rawUserKey)];
+  if (env.webSessionSecretPrevious) keys.push(keyedHashWith(env.webSessionSecretPrevious, rawUserKey));
+  return keys;
+}
+
+function foldLegacyKey(rawUserKey) {
+  const next = keyedHash(rawUserKey);
+  let changed = false;
+  for (const old of priorKeys(rawUserKey)) {
+    if (old === next || !state.perUser.has(old)) continue;
+    state.perUser.set(next, (state.perUser.get(next) || 0) + state.perUser.get(old));
+    state.perUser.delete(old);
+    changed = true;
+  }
+  return changed;
+}
+
+function countFor(rawUserKey) {
+  if (!rawUserKey) return 0;
+  const next = keyedHash(rawUserKey);
+  let total = state.perUser.get(next) || 0;
+  for (const old of priorKeys(rawUserKey)) {
+    if (old !== next) total += state.perUser.get(old) || 0;
+  }
+  return total;
+}
+
+// Move this user's unsalted counter onto the HMAC key and keep the count.
+// Other users' entries are not read or written. Nothing is deleted.
+function rekeyUserCounters(rawKeys = []) {
+  ensureLoaded();
+  const snapshot = new Map(state.perUser);
+  let rekeyed = 0;
+  try {
+    for (const raw of rawKeys) {
+      if (!raw) continue;
+      if (foldLegacyKey(raw)) rekeyed += 1;
+    }
+  } catch (error) {
+    state.perUser = snapshot;
+    console.error('[ai-budget] REFUSING to rekey counters without WEB_SESSION_SECRET. A known fallback key is not used.');
+    return { ok: false, rekeyed: 0, persisted: false };
+  }
+  if (!rekeyed) return { ok: true, rekeyed: 0, persisted: Boolean(stateFile()) };
+  if (!stateFile()) return { ok: true, rekeyed, persisted: false };
+  const persisted = flush();
+  if (!persisted) {
+    state.perUser = snapshot;
+    return { ok: false, rekeyed: 0, persisted: false };
+  }
+  return { ok: true, rekeyed, persisted: true };
 }
 
 function ensureLoaded() {
@@ -65,14 +144,16 @@ function flush() {
     saveTimer = null;
   }
   const file = stateFile();
-  if (!file) return;
+  if (!file) return true;
   const body = JSON.stringify({ day: state.day, global: state.global, tokens: state.tokens, denied: state.denied, perUser: [...state.perUser] });
   try {
     const tmp = `${file}.${process.pid}.tmp`;
     fs.writeFileSync(tmp, body, { mode: 0o600 });
     fs.renameSync(tmp, file);
+    return true;
   } catch (_) {
     console.warn('[ai-budget] Could not save counters.');
+    return false;
   }
 }
 
@@ -121,15 +202,17 @@ class AiBudgetError extends Error {
 }
 
 // Reserve one call. Throws AiBudgetError (no network call should follow).
+// A missing WEB_SESSION_SECRET throws before any counter is written. There is
+// no fallback that stores an unsalted hash or the raw user id.
 function reserve(rawUserKey, now = new Date()) {
   roll(now);
-  const userKey = rawUserKey ? hashKey(rawUserKey) : '';
+  const userKey = rawUserKey ? String(rawUserKey) : '';
   const cfg = config();
   let reason = '';
   if (!cfg.enabled) reason = 'disabled';
   else if (state.global >= cfg.globalLimit) reason = 'global_daily_limit';
   else if (cfg.tokenLimit > 0 && state.tokens >= cfg.tokenLimit) reason = 'global_token_limit';
-  else if (userKey && (state.perUser.get(userKey) || 0) >= cfg.userLimit) reason = 'user_daily_limit';
+  else if (userKey && countFor(userKey) >= cfg.userLimit) reason = 'user_daily_limit';
   if (reason) {
     state.denied += 1;
     if (reason !== 'user_daily_limit' && state.denied === 1) {
@@ -139,7 +222,11 @@ function reserve(rawUserKey, now = new Date()) {
     throw new AiBudgetError(reason);
   }
   state.global += 1;
-  if (userKey) state.perUser.set(userKey, (state.perUser.get(userKey) || 0) + 1);
+  if (userKey) {
+    foldLegacyKey(userKey);
+    const stored = keyedHash(userKey);
+    state.perUser.set(stored, (state.perUser.get(stored) || 0) + 1);
+  }
   scheduleSave();
 }
 
@@ -174,4 +261,4 @@ function reset({ reload = false } = {}) {
   loaded = !reload;
 }
 
-module.exports = { AiBudgetError, reserve, recordUsage, snapshot, reset, flush, currentDay };
+module.exports = { AiBudgetError, reserve, recordUsage, snapshot, reset, flush, currentDay, rekeyUserCounters, legacyUnsaltedKey };

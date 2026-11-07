@@ -201,12 +201,24 @@ async function readContactRows() {
   return readSheetRows(env.googleSheets.sheets.contacts);
 }
 
+async function listSheetTitles() {
+  const sheets = createGoogleSheetsClient();
+  const spreadsheet = await sheets.spreadsheets.get({
+    spreadsheetId: env.googleSheets.spreadsheetId,
+    fields: 'sheets.properties.title',
+  });
+  return (spreadsheet.data.sheets || [])
+    .map((sheet) => String(sheet.properties && sheet.properties.title || '').trim())
+    .filter(Boolean);
+}
+
 module.exports = {
   appendSheetRow,
   clearReadCache,
   createGoogleSheetsClient,
   ensureSheetWithHeader,
   invalidateReadCacheForSheet,
+  listSheetTitles,
   readContactRows,
   readSheetRows,
   updateSheetRow,

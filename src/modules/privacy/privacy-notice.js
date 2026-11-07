@@ -1,7 +1,7 @@
 // DRAFT privacy notice. The wording, retention periods, and legal basis need
 // review by an Israeli privacy lawyer before real workers see it. Change
 // PRIVACY_NOTICE_VERSION whenever the text changes, so users accept again.
-const PRIVACY_NOTICE_VERSION = '2026-11-draft-1';
+const PRIVACY_NOTICE_VERSION = '2026-11-draft-2';
 const PRIVACY_NOTICE_STATUS = 'DRAFT_PENDING_LEGAL_REVIEW';
 const NOTICE_LANGUAGES = ['he', 'en', 'th'];
 
@@ -20,7 +20,7 @@ const NOTICES = {
       'Send "withdraw consent" to stop. Gringo will stop using your data.',
       'Send "delete my data" to delete it. You will be asked to confirm.',
     ],
-    limits: 'Deletion removes your data from Gringo. It cannot remove: copies kept by Telegram, LINE or WhatsApp in your chat app; Google Sheets version history and Google backups; data OpenAI keeps for a limited time; and server logs until they expire.',
+    limits: 'Gringo deletes the active records it stores for you (sheet rows tied to you, server memory, and your raw id in the disk files it controls). It does not promise that every copy is already gone, and it cannot confirm deletion of: messages still held by Telegram, LINE, or WhatsApp; Google Sheets version history or manual spreadsheet copies (Sheets has no fixed expiry Gringo can apply); Render disk snapshots (automatic, kept at least 7 days); Render logs (7, 14, or 30 days, depending on the workspace plan); OpenAI abuse-monitoring logs (up to 30 days, or longer if the law or safety requires it — asking OpenAI not to store the response does not remove those logs); a pseudonymous AI usage counter until the UTC day ends, so the daily spending limit still applies; anonymized Telegram replay keys, so an old tap is not processed again; and a privacy audit row that stores a keyed hash, not your raw id, until an operator deletes it. Gringo does not auto-expire that audit row. This notice is a draft and is not a legal determination.',
     acceptPrompt: 'Reply "accept" to agree, or "decline" to say no.',
     accept: 'accept',
     decline: 'decline',
@@ -39,7 +39,7 @@ const NOTICES = {
       'שלח "ביטול הסכמה" כדי להפסיק. גרינגו יפסיק להשתמש במידע שלך.',
       'שלח "מחק את המידע שלי" כדי למחוק אותו. תתבקש לאשר.',
     ],
-    limits: 'המחיקה מסירה את המידע שלך מגרינגו. היא לא יכולה להסיר: עותקים ש-Telegram, LINE או WhatsApp שומרים באפליקציה שלך; היסטוריית גרסאות וגיבויים של Google Sheets; מידע ש-OpenAI שומרת לזמן מוגבל; ולוגים של השרת עד שתוקפם יפוג.',
+    limits: 'גרינגו מוחק את הרשומות הפעילות שהוא שומר עבורך (שורות בגיליון שקשורות אליך, זיכרון השרת, והמזהה הגולמי בקבצי הדיסק שבשליטתו). אין הבטחה שכל עותק כבר נעלם, ואי אפשר לאשר מחיקה של: הודעות שעדיין אצל Telegram, LINE או WhatsApp; היסטוריית גרסאות של Google Sheets או עותקים ידניים של הגיליון (אין תאריך תפוגה קבוע שגרינגו יכול להחיל); צילומי דיסק של Render (אוטומטיים, נשמרים לפחות 7 ימים); לוגים של Render (7, 14 או 30 ימים, לפי תוכנית סביבת העבודה); לוגי ניטור שימוש לרעה של OpenAI (עד 30 ימים, או יותר אם החוק או הבטיחות מחייבים — בקשה מ-OpenAI לא לשמור את התשובה לא מוחקת את הלוגים האלה); מונה שימוש ב-AI בלי מזהה גולמי עד סוף יום UTC, כדי שמגבלת ההוצאה היומית תמשיך לחול; מפתחות מניעת כפילויות של Telegram אחרי הסרת המזהה הגולמי, כדי שלחיצה ישנה לא תעובד שוב; ושורת ביקורת פרטיות עם hash ממופתח, לא המזהה הגולמי, עד שמפעיל מוחק אותה. גרינגו לא מוחק את שורת הביקורת אוטומטית. זו טיוטה ואינה קביעה משפטית.',
     acceptPrompt: 'השב "מסכים" כדי לאשר, או "לא מסכים" כדי לסרב.',
     accept: 'מסכים',
     decline: 'לא מסכים',
@@ -58,7 +58,7 @@ const NOTICES = {
       'ส่ง "ถอนความยินยอม" เพื่อหยุด Gringo จะหยุดใช้ข้อมูลของคุณ',
       'ส่ง "ลบข้อมูล" เพื่อลบข้อมูล ระบบจะขอให้คุณยืนยัน',
     ],
-    limits: 'การลบจะลบข้อมูลของคุณออกจาก Gringo แต่ไม่สามารถลบ: สำเนาที่ Telegram, LINE หรือ WhatsApp เก็บไว้ในแอปของคุณ; ประวัติเวอร์ชันและข้อมูลสำรองของ Google Sheets; ข้อมูลที่ OpenAI เก็บไว้ในระยะเวลาจำกัด; และบันทึกของเซิร์ฟเวอร์จนกว่าจะหมดอายุ',
+    limits: 'Gringo ลบระเบียนที่ใช้งานอยู่ซึ่งเก็บไว้ให้คุณ (แถวในชีตที่เกี่ยวกับคุณ หน่วยความจำของเซิร์ฟเวอร์ และตัวระบุดิบในไฟล์ดิสก์ที่ Gringo ควบคุม) ไม่ได้รับประกันว่าสำเนาทุกชุดหายไปแล้ว และยืนยันการลบสิ่งต่อไปนี้ไม่ได้: ข้อความที่ Telegram, LINE หรือ WhatsApp ยังเก็บไว้; ประวัติเวอร์ชันของ Google Sheets หรือสำเนาสเปรดชีตที่ทำด้วยมือ (Sheets ไม่มีวันหมดอายุตายตัวที่ Gringo ใช้ได้); สแนปชอตดิสก์ของ Render (อัตโนมัติ เก็บอย่างน้อย 7 วัน); บันทึกของ Render (7, 14 หรือ 30 วัน ตามแผนของเวิร์กสเปซ); บันทึกตรวจสอบการใช้งานในทางที่ผิดของ OpenAI (สูงสุด 30 วัน หรือนานกว่านั้นถ้ากฎหมายหรือความปลอดภัยกำหนด — การขอให้ OpenAI ไม่เก็บคำตอบไม่ได้ลบบันทึกเหล่านั้น); ตัวนับการใช้ AI ที่ไม่ใช่ตัวระบุดิบจนสิ้นวัน UTC เพื่อให้เพดานค่าใช้จ่ายรายวันยังมีผล; คีย์ป้องกันการประมวลผลซ้ำของ Telegram หลังเอาตัวระบุดิบออก เพื่อไม่ให้การแตะเก่าถูกประมวลผลอีก; และแถวตรวจสอบความเป็นส่วนตัวที่เก็บแฮชที่มีกุญแจ ไม่ใช่ตัวระบุดิบ จนกว่าผู้ดูแลจะลบ Gringo ไม่ได้ลบแถวตรวจสอบนั้นเอง ประกาศนี้เป็นฉบับร่างและไม่ใช่ข้อสรุปทางกฎหมาย',
     acceptPrompt: 'ตอบ "ยอมรับ" เพื่อยินยอม หรือ "ไม่ยอมรับ" เพื่อปฏิเสธ',
     accept: 'ยอมรับ',
     decline: 'ไม่ยอมรับ',
@@ -72,8 +72,8 @@ const REPLIES = {
     withdrawn: 'Your consent was withdrawn. Gringo stopped using your data. It is still stored until you send "delete my data".',
     consentRequired: 'Before we continue, please read this:',
     deleteConfirm: (code) => `To delete your data, send: delete my data ${code}\nThe code works for 10 minutes.`,
-    deleteDone: 'Your data was deleted from Gringo.',
-    deleteNothing: 'Gringo has no stored data for you.',
+    deleteDone: 'Gringo deleted the active records it stores for you and removed your raw identifier from the server files it controls.',
+    deleteNothing: 'Gringo found no active personal records for you in the stores it controls.',
     deleteBadCode: 'That code is wrong or expired. Send "delete my data" to get a new one.',
     exportTitle: 'Summary of your data (selected fields and record counts only). This is not a full export:',
     exportFullHint: 'For a full copy of every stored record, open Gringo on the web (link this chat to your web account) and use Privacy → Export, or ask the Gringo team for a full copy.',
@@ -90,8 +90,8 @@ const REPLIES = {
     withdrawn: 'ההסכמה שלך בוטלה. גרינגו הפסיק להשתמש במידע שלך. המידע עדיין שמור עד שתשלח "מחק את המידע שלי".',
     consentRequired: 'לפני שממשיכים, קרא בבקשה:',
     deleteConfirm: (code) => `כדי למחוק את המידע שלך, שלח: מחק את המידע שלי ${code}\nהקוד תקף ל-10 דקות.`,
-    deleteDone: 'המידע שלך נמחק מגרינגו.',
-    deleteNothing: 'אין בגרינגו מידע שמור עליך.',
+    deleteDone: 'גרינגו מחק את הרשומות הפעילות שהוא שומר עבורך, והסיר את המזהה הגולמי שלך מקבצי השרת שבשליטתו.',
+    deleteNothing: 'גרינגו לא מצא רשומות אישיות פעילות שלך במאגרים שבשליטתו.',
     deleteBadCode: 'הקוד שגוי או שפג תוקפו. שלח "מחק את המידע שלי" כדי לקבל קוד חדש.',
     exportTitle: 'סיכום המידע שלך (שדות נבחרים וספירת רשומות בלבד). זה לא ייצוא מלא:',
     exportFullHint: 'לעותק מלא של כל הרשומות השמורות, פתח את גרינגו באתר (קשר את הצ\'אט הזה לחשבון באתר) ובחר פרטיות ← ייצוא, או בקש עותק מלא מצוות גרינגו.',
@@ -108,8 +108,8 @@ const REPLIES = {
     withdrawn: 'ถอนความยินยอมแล้ว Gringo หยุดใช้ข้อมูลของคุณแล้ว ข้อมูลยังถูกเก็บไว้จนกว่าคุณจะส่ง "ลบข้อมูล"',
     consentRequired: 'ก่อนเริ่ม โปรดอ่านข้อความนี้:',
     deleteConfirm: (code) => `หากต้องการลบข้อมูล ให้ส่ง: ลบข้อมูล ${code}\nรหัสนี้ใช้ได้ 10 นาที`,
-    deleteDone: 'ลบข้อมูลของคุณออกจาก Gringo แล้ว',
-    deleteNothing: 'Gringo ไม่มีข้อมูลของคุณที่บันทึกไว้',
+    deleteDone: 'Gringo ลบระเบียนที่ใช้งานอยู่ซึ่งเก็บไว้ให้คุณ และนำตัวระบุดิบของคุณออกจากไฟล์เซิร์ฟเวอร์ที่ Gringo ควบคุม',
+    deleteNothing: 'Gringo ไม่พบระเบียนส่วนตัวที่ใช้งานอยู่ของคุณในที่ที่ Gringo ควบคุม',
     deleteBadCode: 'รหัสไม่ถูกต้องหรือหมดอายุ ส่ง "ลบข้อมูล" เพื่อรับรหัสใหม่',
     exportTitle: 'สรุปข้อมูลของคุณ (เฉพาะบางช่องและจำนวนรายการ) นี่ไม่ใช่การส่งออกข้อมูลทั้งหมด:',
     exportFullHint: 'หากต้องการสำเนาข้อมูลที่บันทึกไว้ทั้งหมด เปิด Gringo บนเว็บ (เชื่อมแชทนี้กับบัญชีเว็บ) แล้วเลือก ความเป็นส่วนตัว → ส่งออก หรือขอสำเนาทั้งหมดจากทีม Gringo',

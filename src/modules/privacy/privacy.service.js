@@ -134,7 +134,7 @@ async function exportData(identity) {
   await store.appendAudit({ event: 'export', subjectKey: identityKey(identity), channel: identity.channel, outcome: 'ok' });
   return {
     exportType: 'full_stored_records',
-    scope: 'Every row Gringo stores for your verified identity in its own sheets and server memory. Copies held by Telegram, LINE, WhatsApp, OpenAI, Google backups and host logs are not included.',
+    scope: 'Every row Gringo stores for your verified identity in its own sheets and server memory, plus free-text cells that contain your identifier. Copies held by Telegram, LINE, WhatsApp, OpenAI, Google Sheets version history, manual spreadsheet copies, Render disk snapshots and host logs are not included. A pseudonymous daily AI counter and anonymized Telegram replay keys may remain until they expire.',
     generatedAt: new Date().toISOString(),
     consent,
     sheets: data.sheets,

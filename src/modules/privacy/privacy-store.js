@@ -20,8 +20,25 @@ function cleanText(value) {
   return value === undefined || value === null ? '' : String(value).trim();
 }
 
+let warnedMissingSecret = false;
+
+// Never HMAC with a published constant. A known key would let anyone who
+// knows a channel id recompute the PrivacyAudit subjectKey. Production
+// already refuses to start without WEB_SESSION_SECRET; this is the same
+// refusal if that secret is missing later.
 function hashSecret() {
-  return env.webSessionSecret || 'gringo-local-privacy-key';
+  if (env.webSessionSecret) return env.webSessionSecret;
+  if (!warnedMissingSecret) {
+    warnedMissingSecret = true;
+    console.error(
+      isProductionRuntime()
+        ? '[privacy] REFUSING subject keys: WEB_SESSION_SECRET is absent in production. A known fallback key is not used.'
+        : '[privacy] REFUSING subject keys: WEB_SESSION_SECRET is absent. A known fallback key is not used.'
+    );
+  }
+  const error = new Error('WEB_SESSION_SECRET is required to derive privacy subject keys.');
+  error.code = 'PRIVACY_KEY_UNAVAILABLE';
+  throw error;
 }
 
 function subjectKey(channel, channelUserId) {

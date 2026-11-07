@@ -10,7 +10,17 @@ const { safeTelegramWarning } = require('./telegram-errors');
 const { getUnsupportedPrivateChat, mapCallbackQuery, mapPrivateTextUpdate } = require('./telegram-message.mapper');
 
 // TELEGRAM_STATE_FILE lets hosted deploys keep the duplicate guard on a persistent disk.
-const STATE_FILE = process.env.TELEGRAM_STATE_FILE || path.join(process.cwd(), '.tools', 'telegram-state.json');
+// A callback query id is unique for that query and is not a user id, so the
+// persisted dedup key is only `cq:<callbackQueryId>`. Older files may still
+// contain callbackQueryId:channelUserId:callbackData. Those are recognized in
+// memory so a replay is still dropped, and the next save rewrites them to the
+// query id alone. A missing WEB_SESSION_SECRET never causes a raw id to be
+// written. lastProcessedUpdateId and processedUpdateIds are not user
+// identifiers and are never cleared by erasure.
+const CALLBACK_KEY_PREFIX = 'cq:';
+function statePath() {
+  return process.env.TELEGRAM_STATE_FILE || path.join(process.cwd(), '.tools', 'telegram-state.json');
+}
 
 let memoryState = {
   lastProcessedUpdateId: 0,
@@ -20,7 +30,7 @@ let memoryState = {
 
 function readState() {
   try {
-    const raw = fs.readFileSync(STATE_FILE, 'utf8');
+    const raw = fs.readFileSync(statePath(), 'utf8');
     memoryState = { ...memoryState, ...JSON.parse(raw) };
   } catch (error) {
     // Local state is optional. Memory state still prevents duplicates while running.
@@ -28,35 +38,135 @@ function readState() {
   return memoryState;
 }
 
-function writeState(state) {
-  memoryState = {
+function durableCallbackKey(callbackQueryId) {
+  const id = String(callbackQueryId || '').trim();
+  if (!id || id.includes(':')) return '';
+  return `${CALLBACK_KEY_PREFIX}${id}`;
+}
+
+// Historical keys are `queryId:userId:data` or `queryId:hmac:data`. Keep the
+// query id and drop everything after it. Anything else is discarded so a raw
+// user id cannot be written back.
+function migrateCallbackKey(stored) {
+  const key = String(stored || '');
+  if (key.startsWith(CALLBACK_KEY_PREFIX)) {
+    const rest = key.slice(CALLBACK_KEY_PREFIX.length);
+    return rest && !rest.includes(':') ? key : '';
+  }
+  const queryId = key.split(':')[0];
+  if (!queryId || key.split(':').length < 3) return '';
+  return durableCallbackKey(queryId);
+}
+
+function sanitizeCallbackKeys(keys) {
+  const kept = [];
+  for (const key of keys || []) {
+    const next = migrateCallbackKey(key);
+    if (next && !kept.includes(next)) kept.push(next);
+  }
+  return kept;
+}
+
+function normalizeState(state) {
+  return {
     lastProcessedUpdateId: Number(state.lastProcessedUpdateId || 0),
     processedUpdateIds: [...new Set(state.processedUpdateIds || [])].slice(-200),
-    processedCallbackKeys: [...new Set(state.processedCallbackKeys || [])].slice(-200),
+    processedCallbackKeys: sanitizeCallbackKeys(state.processedCallbackKeys).slice(-200),
   };
+}
+
+function writeState(state) {
+  memoryState = normalizeState(state);
+  const file = statePath();
   try {
-    fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
-    fs.writeFileSync(STATE_FILE, JSON.stringify(memoryState, null, 2));
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const tmp = `${file}.${process.pid}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(memoryState, null, 2), { mode: 0o600 });
+    fs.renameSync(tmp, file);
+    return true;
   } catch (error) {
-    // Keep Telegram connector running even if local state cannot be written.
+    // Memory still blocks duplicates in this process. The caller that must
+    // survive a restart treats a false return as a failed erasure.
+    return false;
   }
 }
 
-function callbackKey(callback = {}) {
+function splitCallbackKey(stored) {
+  const parts = String(stored).split(':');
+  if (parts.length < 3 || !parts[0] || !parts[1]) return null;
+  return {
+    callbackQueryId: parts[0],
+    channelUserId: parts[1],
+    callbackData: parts.slice(2).join(':'),
+  };
+}
+
+function legacyCallbackKey(callback = {}) {
   return [callback.callbackQueryId, callback.channelUserId, callback.callbackData].map(String).join(':');
 }
 
 function wasCallbackProcessed(callback = {}) {
   const state = readState();
-  return (state.processedCallbackKeys || []).includes(callbackKey(callback));
+  const keys = state.processedCallbackKeys || [];
+  const durable = durableCallbackKey(callback.callbackQueryId);
+  if (durable && keys.includes(durable)) return true;
+  // Read-only match for a key that has not been migrated yet. This does not
+  // write the raw id back; the next save stores only the query id.
+  const queryId = String(callback.callbackQueryId || '').trim();
+  if (!queryId) return false;
+  return keys.some((key) => {
+    const stored = String(key);
+    return stored === legacyCallbackKey(callback) || stored.startsWith(`${queryId}:`);
+  });
 }
 
 function markCallbackProcessed(callback = {}) {
+  const next = durableCallbackKey(callback.callbackQueryId);
+  if (!next) {
+    console.error('[telegram] REFUSING to record a callback without a callback query id. A raw user id was not stored.');
+    return false;
+  }
   const state = readState();
-  writeState({
-    ...state,
-    processedCallbackKeys: [...(state.processedCallbackKeys || []), callbackKey(callback)],
-  });
+  const keys = sanitizeCallbackKeys(state.processedCallbackKeys);
+  if (!keys.includes(next)) keys.push(next);
+  return writeState({ ...state, processedCallbackKeys: keys });
+}
+
+// Drop raw ids from callback keys. The query id stays, so a replay is still
+// ignored. This does not need WEB_SESSION_SECRET: there is no HMAC fallback
+// that could store the user id instead.
+function anonymizeCallbackKeysForUsers(channelUserIds = []) {
+  const ids = new Set(channelUserIds.map((id) => String(id || '').trim()).filter(Boolean));
+  if (!ids.size) return { ok: true, rekeyed: 0 };
+  const state = readState();
+  const before = state.processedCallbackKeys || [];
+  let rekeyed = 0;
+  for (const key of before) {
+    const parsed = splitCallbackKey(key);
+    const mentionsSubject = parsed && ids.has(parsed.channelUserId);
+    const migrated = migrateCallbackKey(key);
+    if (mentionsSubject && migrated && migrated !== key) rekeyed += 1;
+  }
+  if (!rekeyed) return { ok: true, rekeyed: 0 };
+  const snapshot = {
+    lastProcessedUpdateId: memoryState.lastProcessedUpdateId,
+    processedUpdateIds: [...(memoryState.processedUpdateIds || [])],
+    processedCallbackKeys: [...before],
+  };
+  const saved = writeState(state);
+  if (!saved) {
+    memoryState = snapshot;
+    return { ok: false, rekeyed: 0 };
+  }
+  return { ok: true, rekeyed };
+}
+
+function forgetMemoryForTests() {
+  memoryState = {
+    lastProcessedUpdateId: 0,
+    processedUpdateIds: [],
+    processedCallbackKeys: [],
+  };
 }
 
 function markProcessed(updateId) {
@@ -218,6 +328,8 @@ function getStatus() {
 }
 
 module.exports = {
+  anonymizeCallbackKeysForUsers,
+  forgetMemoryForTests,
   getOffset,
   getStatus,
   markCallbackProcessed,
