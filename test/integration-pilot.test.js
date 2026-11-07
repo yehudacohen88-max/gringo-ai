@@ -221,8 +221,19 @@ describe('integration: AI limits and restart', { concurrency: false }, () => {
 
   test('counters persist across a real process restart; old and corrupt files are ignored', () => {
     const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'aib-int-')), 'state.json');
+    // The per-user key is an HMAC with WEB_SESSION_SECRET. A restart only
+    // keeps the cap when that secret is the same, which production guarantees.
     const run = (code) => spawnSync(process.execPath, ['-e', code], {
-      cwd: ROOT, encoding: 'utf8', env: { ...process.env, NODE_ENV: 'test', AI_BUDGET_STATE_FILE: file, AI_DAILY_USER_LIMIT: '2', AI_DAILY_GLOBAL_LIMIT: '100' },
+      cwd: ROOT,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        WEB_SESSION_SECRET: 'test-only-web-session-secret-0123456789abcdef',
+        AI_BUDGET_STATE_FILE: file,
+        AI_DAILY_USER_LIMIT: '2',
+        AI_DAILY_GLOBAL_LIMIT: '100',
+      },
     });
     const mod = "const b=require('./src/modules/ai-provider/ai-budget.service');";
     let r = run(`${mod} b.reserve('telegram:1'); b.reserve('telegram:1'); b.recordUsage({total_tokens:7}); b.flush();`);
