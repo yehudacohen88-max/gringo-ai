@@ -202,6 +202,8 @@ class AiBudgetError extends Error {
 }
 
 // Reserve one call. Throws AiBudgetError (no network call should follow).
+// A missing WEB_SESSION_SECRET throws before any counter is written. There is
+// no fallback that stores an unsalted hash or the raw user id.
 function reserve(rawUserKey, now = new Date()) {
   roll(now);
   const userKey = rawUserKey ? String(rawUserKey) : '';

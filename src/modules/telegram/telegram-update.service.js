@@ -1,10 +1,8 @@
 const { handleChannelPrivacy } = require('../privacy/privacy-channel');
 const privacyService = require('../privacy/privacy.service');
 const privacyNotice = require('../privacy/privacy-notice');
-const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const { env } = require('../../config/env');
 const telegramClient = require('./telegram-client.service');
 const telegramMessageService = require('./telegram-message.service');
 const { communicationService } = require('../communication');
@@ -12,11 +10,14 @@ const { safeTelegramWarning } = require('./telegram-errors');
 const { getUnsupportedPrivateChat, mapCallbackQuery, mapPrivateTextUpdate } = require('./telegram-message.mapper');
 
 // TELEGRAM_STATE_FILE lets hosted deploys keep the duplicate guard on a persistent disk.
-// Callback keys store an HMAC of the channel user id, not the raw id. Older
-// files may still contain callbackQueryId:channelUserId:callbackData; lookups
-// accept both forms so a replay is still dropped. Erasure rewrites only the
-// subject's keys. lastProcessedUpdateId and processedUpdateIds are not user
+// A callback query id is unique for that query and is not a user id, so the
+// persisted dedup key is only `cq:<callbackQueryId>`. Older files may still
+// contain callbackQueryId:channelUserId:callbackData. Those are recognized in
+// memory so a replay is still dropped, and the next save rewrites them to the
+// query id alone. A missing WEB_SESSION_SECRET never causes a raw id to be
+// written. lastProcessedUpdateId and processedUpdateIds are not user
 // identifiers and are never cleared by erasure.
+const CALLBACK_KEY_PREFIX = 'cq:';
 function statePath() {
   return process.env.TELEGRAM_STATE_FILE || path.join(process.cwd(), '.tools', 'telegram-state.json');
 }
@@ -37,11 +38,40 @@ function readState() {
   return memoryState;
 }
 
+function durableCallbackKey(callbackQueryId) {
+  const id = String(callbackQueryId || '').trim();
+  if (!id || id.includes(':')) return '';
+  return `${CALLBACK_KEY_PREFIX}${id}`;
+}
+
+// Historical keys are `queryId:userId:data` or `queryId:hmac:data`. Keep the
+// query id and drop everything after it. Anything else is discarded so a raw
+// user id cannot be written back.
+function migrateCallbackKey(stored) {
+  const key = String(stored || '');
+  if (key.startsWith(CALLBACK_KEY_PREFIX)) {
+    const rest = key.slice(CALLBACK_KEY_PREFIX.length);
+    return rest && !rest.includes(':') ? key : '';
+  }
+  const queryId = key.split(':')[0];
+  if (!queryId || key.split(':').length < 3) return '';
+  return durableCallbackKey(queryId);
+}
+
+function sanitizeCallbackKeys(keys) {
+  const kept = [];
+  for (const key of keys || []) {
+    const next = migrateCallbackKey(key);
+    if (next && !kept.includes(next)) kept.push(next);
+  }
+  return kept;
+}
+
 function normalizeState(state) {
   return {
     lastProcessedUpdateId: Number(state.lastProcessedUpdateId || 0),
     processedUpdateIds: [...new Set(state.processedUpdateIds || [])].slice(-200),
-    processedCallbackKeys: [...new Set(state.processedCallbackKeys || [])].slice(-200),
+    processedCallbackKeys: sanitizeCallbackKeys(state.processedCallbackKeys).slice(-200),
   };
 }
 
@@ -61,20 +91,6 @@ function writeState(state) {
   }
 }
 
-function callbackUserTokenWith(secret, channelUserId) {
-  return crypto.createHmac('sha256', secret).update(`telegram-callback:${channelUserId}`).digest('hex').slice(0, 24);
-}
-
-function callbackUserToken(channelUserId) {
-  const secret = env.webSessionSecret;
-  if (!secret) {
-    const error = new Error('WEB_SESSION_SECRET is required to key Telegram callback dedup.');
-    error.code = 'PRIVACY_KEY_UNAVAILABLE';
-    throw error;
-  }
-  return callbackUserTokenWith(secret, channelUserId);
-}
-
 function splitCallbackKey(stored) {
   const parts = String(stored).split(':');
   if (parts.length < 3 || !parts[0] || !parts[1]) return null;
@@ -85,24 +101,6 @@ function splitCallbackKey(stored) {
   };
 }
 
-function replaceBounded(text, needle, replacement) {
-  const raw = String(text);
-  const id = String(needle || '');
-  if (id.length < 5 || !raw.includes(id)) return raw;
-  const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return raw.replace(new RegExp(`(^|[^A-Za-z0-9_])${escaped}(?=$|[^A-Za-z0-9_])`, 'g'), `$1${replacement}`);
-}
-
-function callbackDataToken(callbackData, channelUserId, token) {
-  return replaceBounded(callbackData, channelUserId, token);
-}
-
-function callbackKey(callback = {}) {
-  const token = callbackUserToken(callback.channelUserId);
-  const data = callbackDataToken(callback.callbackData, callback.channelUserId, token);
-  return [callback.callbackQueryId, token, data].map(String).join(':');
-}
-
 function legacyCallbackKey(callback = {}) {
   return [callback.callbackQueryId, callback.channelUserId, callback.callbackData].map(String).join(':');
 }
@@ -110,84 +108,52 @@ function legacyCallbackKey(callback = {}) {
 function wasCallbackProcessed(callback = {}) {
   const state = readState();
   const keys = state.processedCallbackKeys || [];
-  let current = '';
-  try {
-    current = callbackKey(callback);
-  } catch (error) {
-    current = '';
-  }
-  if (current && keys.includes(current)) return true;
-  if (keys.includes(legacyCallbackKey(callback))) return true;
-  if (env.webSessionSecretPrevious && callback.channelUserId) {
-    const previous = callbackUserTokenWith(env.webSessionSecretPrevious, callback.channelUserId);
-    const data = callbackDataToken(callback.callbackData, callback.channelUserId, previous);
-    if (keys.includes([callback.callbackQueryId, previous, data].map(String).join(':'))) return true;
-  }
-  return false;
-}
-
-function markCallbackProcessed(callback = {}) {
-  const state = readState();
-  let next = '';
-  try {
-    next = callbackKey(callback);
-  } catch (error) {
-    next = legacyCallbackKey(callback);
-  }
-  const legacy = legacyCallbackKey(callback);
-  const keys = (state.processedCallbackKeys || []).filter((key) => key !== legacy && key !== next);
-  writeState({
-    ...state,
-    processedCallbackKeys: [...keys, next],
+  const durable = durableCallbackKey(callback.callbackQueryId);
+  if (durable && keys.includes(durable)) return true;
+  // Read-only match for a key that has not been migrated yet. This does not
+  // write the raw id back; the next save stores only the query id.
+  const queryId = String(callback.callbackQueryId || '').trim();
+  if (!queryId) return false;
+  return keys.some((key) => {
+    const stored = String(key);
+    return stored === legacyCallbackKey(callback) || stored.startsWith(`${queryId}:`);
   });
 }
 
-// Rewrite this subject's raw callback keys to the HMAC form and keep them,
-// so a replay is still ignored and other users' keys stay as they are.
-function anonymizeCallbackKeysForUsers(channelUserIds = []) {
-  const ids = [...new Set(channelUserIds.map((id) => String(id || '').trim()).filter(Boolean))];
-  if (!ids.length) return { ok: true, rekeyed: 0 };
-  const tokens = new Map();
-  try {
-    for (const id of ids) {
-      const current = callbackUserToken(id);
-      tokens.set(id, current);
-      if (env.webSessionSecretPrevious) tokens.set(callbackUserTokenWith(env.webSessionSecretPrevious, id), current);
-    }
-  } catch (error) {
-    console.error('[telegram] REFUSING to anonymize callback keys without WEB_SESSION_SECRET. A known fallback key is not used.');
-    return { ok: false, rekeyed: 0 };
+function markCallbackProcessed(callback = {}) {
+  const next = durableCallbackKey(callback.callbackQueryId);
+  if (!next) {
+    console.error('[telegram] REFUSING to record a callback without a callback query id. A raw user id was not stored.');
+    return false;
   }
   const state = readState();
-  const next = [];
+  const keys = sanitizeCallbackKeys(state.processedCallbackKeys);
+  if (!keys.includes(next)) keys.push(next);
+  return writeState({ ...state, processedCallbackKeys: keys });
+}
+
+// Drop raw ids from callback keys. The query id stays, so a replay is still
+// ignored. This does not need WEB_SESSION_SECRET: there is no HMAC fallback
+// that could store the user id instead.
+function anonymizeCallbackKeysForUsers(channelUserIds = []) {
+  const ids = new Set(channelUserIds.map((id) => String(id || '').trim()).filter(Boolean));
+  if (!ids.size) return { ok: true, rekeyed: 0 };
+  const state = readState();
+  const before = state.processedCallbackKeys || [];
   let rekeyed = 0;
-  for (const key of state.processedCallbackKeys || []) {
+  for (const key of before) {
     const parsed = splitCallbackKey(key);
-    const token = parsed ? tokens.get(parsed.channelUserId) : '';
-    if (!parsed || !token) {
-      next.push(key);
-      continue;
-    }
-    const rawId = ids.find((id) => id === parsed.channelUserId || tokens.get(id) === token || (env.webSessionSecretPrevious && callbackUserTokenWith(env.webSessionSecretPrevious, id) === parsed.channelUserId));
-    let data = parsed.callbackData;
-    if (rawId) {
-      data = callbackDataToken(data, rawId, token);
-      if (env.webSessionSecretPrevious) {
-        const previous = callbackUserTokenWith(env.webSessionSecretPrevious, rawId);
-        if (previous) data = replaceBounded(data, previous, token);
-      }
-    }
-    const rewritten = [parsed.callbackQueryId, token, data].join(':');
-    if (rewritten !== key) rekeyed += 1;
-    if (!next.includes(rewritten)) next.push(rewritten);
+    const mentionsSubject = parsed && ids.has(parsed.channelUserId);
+    const migrated = migrateCallbackKey(key);
+    if (mentionsSubject && migrated && migrated !== key) rekeyed += 1;
   }
   if (!rekeyed) return { ok: true, rekeyed: 0 };
   const snapshot = {
     lastProcessedUpdateId: memoryState.lastProcessedUpdateId,
     processedUpdateIds: [...(memoryState.processedUpdateIds || [])],
-    processedCallbackKeys: [...(memoryState.processedCallbackKeys || [])],
+    processedCallbackKeys: [...before],
   };
-  const saved = writeState({ ...state, processedCallbackKeys: next });
+  const saved = writeState(state);
   if (!saved) {
     memoryState = snapshot;
     return { ok: false, rekeyed: 0 };

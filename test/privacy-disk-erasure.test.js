@@ -1,7 +1,7 @@
 // Disk files, sheet gaps, and the deletion reply. Consent gate on, no live APIs.
 process.env.GRINGO_PRIVACY_CONSENT_GATE = 'on';
 
-const { describe, test, beforeEach, afterEach } = require('node:test');
+const { describe, test, beforeEach, afterEach, mock } = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -17,6 +17,7 @@ const privacyStore = require('../src/modules/privacy/privacy-store');
 const { handleChannelPrivacy } = require('../src/modules/privacy/privacy-channel');
 const crmAgentRepository = require('../src/modules/crm-agent/crm-agent.repository');
 const telegramUpdate = require('../src/modules/telegram/telegram-update.service');
+const telegramMessageService = require('../src/modules/telegram/telegram-message.service');
 
 const USER_A = '111222333';
 const USER_B = '444555666';
@@ -175,8 +176,9 @@ describe('privacy erasure of disk files and sheet gaps', { concurrency: false },
     const savedTelegram = telegramBody();
     assert.equal(savedTelegram.lastProcessedUpdateId, 50);
     assert.deepEqual(savedTelegram.processedUpdateIds, [49, 50]);
-    assert.equal(savedTelegram.processedCallbackKeys.includes(`9002:${USER_B}:open`), true);
-    assert.equal(JSON.stringify(savedTelegram.processedCallbackKeys).includes(USER_A), false);
+    assert.deepEqual(savedTelegram.processedCallbackKeys, ['cq:9001', 'cq:9002']);
+    assert.equal(JSON.stringify(savedTelegram).includes(USER_A), false);
+    assert.equal(JSON.stringify(savedTelegram).includes(USER_B), false);
     assert.equal(sheets.UserTasks[2][1], 'usr_disk_b');
     assert.equal(sheets.Jobs[1][1], 'Farm work');
     assert.equal(JSON.stringify(sheets.UserProfiles).includes(USER_A), false);
@@ -345,6 +347,113 @@ describe('privacy erasure of disk files and sheet gaps', { concurrency: false },
       assert.match(limits, /7/);
       assert.match(limits, /30/);
       assert.equal(/immediately/i.test(done.reply), false);
+    }
+  });
+
+  test('a missing secret records callback dedup without a raw telegram id', async () => {
+    const previous = env.webSessionSecret;
+    env.webSessionSecret = '';
+    const seen = [];
+    const privacy = mock.method(privacyService, 'allowsPersonalProcessing', async () => true);
+    const handler = mock.method(telegramMessageService, 'processCallback', async (_callback, options) => {
+      seen.push(Boolean(options.duplicate));
+      return { duplicate: Boolean(options.duplicate) };
+    });
+    const userId = '111222333';
+    const chatId = '444555666';
+    const queryId = '7777';
+    const update = (updateId) => ({
+      update_id: updateId,
+      callback_query: {
+        id: queryId,
+        data: `open:${userId}`,
+        from: { id: Number(userId), language_code: 'en' },
+        message: { message_id: 7, chat: { id: Number(chatId), type: 'private' } },
+      },
+    });
+    try {
+      const first = await telegramUpdate.processUpdate(update(80));
+      const second = await telegramUpdate.processUpdate(update(81));
+      assert.equal(first.processed, true);
+      assert.equal(first.duplicate, false);
+      assert.equal(second.duplicate, true);
+      assert.deepEqual(seen, [false, true]);
+      const saved = fs.readFileSync(telegramFile, 'utf8');
+      assert.equal(saved.includes(userId), false);
+      assert.equal(saved.includes(chatId), false);
+      assert.equal(saved.includes(`open:${userId}`), false);
+      assert.equal(saved.includes(`cq:${queryId}`), true);
+      telegramUpdate.forgetMemoryForTests();
+      assert.equal(telegramUpdate.wasCallbackProcessed({
+        callbackQueryId: queryId,
+        channelUserId: userId,
+        callbackData: `open:${userId}`,
+      }), true);
+    } finally {
+      privacy.mock.restore();
+      handler.mock.restore();
+      env.webSessionSecret = previous;
+    }
+  });
+
+  test('free-text redaction does not change another user\'s cells', async () => {
+    const prefix = '111222';
+    const longer = '111222333';
+    const phoneA = '972500000001';
+    const phoneB = '972500000002';
+    sheets.UserProfiles = [
+      ['userId', 'channel', 'channelUserId', 'fullName', 'telegramUserId', 'whatsappPhone'],
+      ['usr_prefix_owner', 'telegram', prefix, 'Prefix Person', prefix, phoneA],
+      [longer, 'telegram', longer, 'Longer Person', longer, phoneB],
+    ];
+    sheets.UserTasks = [
+      ['taskId', 'userId', 'title', 'notes'],
+      ['t-prefix', 'usr_prefix_owner', 'mine', `call ${phoneA}`],
+      ['t-longer', longer, `task ${longer}`, `mentioned ${phoneA} and ${longer}`],
+      ['t-numeric', longer, '1234567', '123456'],
+    ];
+    sheets.DailyReports = [
+      ['reportId', 'mostCommonQuestions', 'other'],
+      ['daily_shared', `see ${prefix}999 and ${longer} and ${phoneA} / ${phoneB}`, 'leave-this'],
+    ];
+    const beforeLongerProfile = sheets.UserProfiles[2].slice();
+    const beforeLongerTask = sheets.UserTasks[2].slice();
+    const beforeNumericTask = sheets.UserTasks[3].slice();
+    const beforeSharedOther = sheets.DailyReports[1][2];
+    useSheets();
+    await erasure.eraseSubject(erasure.buildSubject(
+      {
+        userId: 'usr_prefix_owner',
+        channel: 'telegram',
+        channelUserId: prefix,
+        telegramUserId: prefix,
+        whatsappPhone: phoneA,
+      },
+      { channel: 'telegram', channelUserId: prefix }
+    ));
+    assert.deepEqual(sheets.UserProfiles[2], beforeLongerProfile);
+    assert.deepEqual(sheets.UserTasks[2], beforeLongerTask);
+    assert.deepEqual(sheets.UserTasks[3], beforeNumericTask);
+    assert.equal(sheets.DailyReports[1][2], beforeSharedOther);
+    const shared = sheets.DailyReports[1][1];
+    assert.equal(shared.includes(longer), true);
+    assert.equal(shared.includes(`${prefix}999`), true);
+    assert.equal(shared.includes(phoneB), true);
+    assert.equal(shared.includes(phoneA), false);
+    assert.equal(shared.includes('[erased]'), true);
+    assert.equal(JSON.stringify(sheets.UserProfiles).includes('Prefix Person'), false);
+  });
+
+  test('a missing budget secret does not write a raw user id or an unsalted key', () => {
+    const previous = env.webSessionSecret;
+    env.webSessionSecret = '';
+    const before = fs.readFileSync(budgetFile, 'utf8');
+    try {
+      assert.throws(() => aiBudget.reserve(`telegram:${USER_A}`), (error) => error.code === 'PRIVACY_KEY_UNAVAILABLE');
+      assert.equal(fs.readFileSync(budgetFile, 'utf8'), before);
+      assert.equal(before.includes(USER_A), false);
+    } finally {
+      env.webSessionSecret = previous;
     }
   });
 

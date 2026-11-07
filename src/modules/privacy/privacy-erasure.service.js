@@ -133,9 +133,26 @@ function freeTextTokens(subject) {
   return [...new Set(tokens)].sort((left, right) => right.length - left.length);
 }
 
+// Digits, letters, and the characters that show up inside ids (underscore,
+// plus, at, dot, hyphen). A shorter id must not match inside a longer one.
+const ID_CHAR = 'A-Za-z0-9_+@.-';
+
 function replaceToken(text, token) {
+  const value = String(text);
+  if (!token || token.length < 6 || !value.includes(token)) return value;
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return text.replace(new RegExp(`(^|[^A-Za-z0-9_])${escaped}(?=$|[^A-Za-z0-9_])`, 'g'), '$1[erased]');
+  return value.replace(new RegExp(`(^|[^${ID_CHAR}])${escaped}(?=$|[^${ID_CHAR}])`, 'g'), '$1[erased]');
+}
+
+const FOREIGN_OWNER_COLUMNS = [...USER_ID_COLUMNS, ...Object.keys(CHANNEL_COLUMNS), 'channelUserId', 'telegramUsername'];
+
+function rowHasForeignOwner(header, row) {
+  const value = (column) => {
+    const index = header.indexOf(column);
+    const cell = index >= 0 ? cleanText(row[index]) : '';
+    return column === 'telegramUsername' ? cell.replace(/^@/, '') : cell;
+  };
+  return FOREIGN_OWNER_COLUMNS.some((column) => value(column));
 }
 
 function redactCells(row, tokens) {
@@ -224,8 +241,11 @@ async function scanSheets(subject, { erase, skipProfile = false, onlySheet = '' 
         matched.push(erase ? index + 1 : rowToObject(header, rows[index]));
         continue;
       }
-      // Owned rows are blanked above. A shared row (a report, a note, a
-      // draft) stays, but this person's identifier is removed from its text.
+      // A row owned by someone else is left byte-for-byte, even when its
+      // text contains this person's id as a prefix or a mention.
+      if (rowHasForeignOwner(header, rows[index])) continue;
+      // A shared row (no owner column) stays, but this person's whole
+      // identifier token is removed from its text.
       if (erase) {
         const redacted = redactCells(rows[index], tokens);
         if (redacted) redactions.push({ rowNumber: index + 1, row: redacted });
