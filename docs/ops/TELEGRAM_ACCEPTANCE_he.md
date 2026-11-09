@@ -27,7 +27,7 @@ npm run acceptance:telegram -- --url https://<service>.onrender.com   # שרת �
 | 12 | `מחק את המידע שלי <הקוד>` | אישור מחיקה; בגיליון — שורות המשתמש נמחקו/אנונימיות, רשומת audit נשארה |
 | 13 | לחזור על 3–12 באנגלית: `privacy`, `decline`, `accept`, `my data`, `withdraw consent`, `delete my data` | אותן תוצאות באנגלית |
 | 14 | לחזור בתאית: `ความเป็นส่วนตัว`, `ไม่ยอมรับ`, `ยอมรับ`, `ข้อมูลของฉัน`, `ถอนความยินยอม`, `ลบข้อมูล` | אותן תוצאות בתאית (לבקש מדובר תאית לבדוק ניסוח לפני פנייה לעובדים — PRV-02) |
-| 15 | תפריט `/` בבוט | 6 הפקודות מ-BotFather מופיעות; `/privacy` `/accept` `/mydata` `/withdraw` `/delete` עובדים |
+| 15 | תפריט `/` בבוט | 7 הפקודות מ-BotFather מופיעות; `/privacy` `/language` `/accept` `/mydata` `/withdraw` `/delete` עובדים. `/language he`, `/language th`, `/language en` (או עברית / ไทย / English) שומרים בחירה מפורשת אחרי הסכמה |
 | 16 | להוסיף את הבוט לקבוצה | נחסם (setjoingroups Disable) |
 | 17 | מתג חירום: Render → `AI_ENABLED=false` → Save, לחכות ל-Live, לשלוח שאלה | תשובת fallback בלי AI; פקודות פרטיות עובדות. להחזיר ל-`true` |
 | 18 | Manual Deploy נוסף ואז הודעה | עובד אחרי כמה שניות השבתה; אין תשובה כפולה להודעות ישנות (state על הדיסק: `TELEGRAM_STATE_FILE`) |

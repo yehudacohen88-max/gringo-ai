@@ -235,9 +235,10 @@ describe('P0-2 review fixes', { concurrency: false }, () => {
         await crmAgentRepository.createUserProfile(profile);
         const { failing } = fakeSheets({ UserTasks: [['taskId', 'userId'], ['t1', userId]], UserProfiles: [['userId', 'channel', 'channelUserId'], [userId, channel, id]] });
         failing.add('UserTasks');
-        const asked = await handleChannelPrivacy(channel, { channelUserId: id, messageText: 'delete my data', languageCode: language });
+        const deletePhrase = language === 'he' ? 'מחק את המידע שלי' : language === 'th' ? 'ลบข้อมูล' : 'delete my data';
+        const asked = await handleChannelPrivacy(channel, { channelUserId: id, messageText: deletePhrase, languageCode: language });
         const code = asked.reply.match(/(\d{6})/)[1];
-        const partial = await handleChannelPrivacy(channel, { channelUserId: id, messageText: `delete my data ${code}`, languageCode: language });
+        const partial = await handleChannelPrivacy(channel, { channelUserId: id, messageText: `${deletePhrase} ${code}`, languageCode: language });
         assert.equal(partial.status, 'PRIVACY_DELETE_PARTIAL');
         assert.ok(partial.reply.startsWith(privacyNotice.REPLIES[language].deletePartial), `${channel}/${language}`);
         assert.equal(partial.reply.includes(privacyNotice.REPLIES[language].deleteDone), false);
@@ -283,7 +284,8 @@ describe('P0-2 review fixes', { concurrency: false }, () => {
         const id = `U${crypto.randomBytes(8).toString('hex')}`;
         await handleChannelPrivacy('line', { channelUserId: id, messageText: 'accept', languageCode: language });
         await crmAgentRepository.createUserProfile({ userId: `usr_${id}`, channel: 'line', channelUserId: id, lineUserId: id, fullName: 'Summary Person' });
-        const summary = await handleChannelPrivacy('line', { channelUserId: id, messageText: 'my data', languageCode: language });
+        const myData = language === 'he' ? 'המידע שלי' : language === 'th' ? 'ข้อมูลของฉัน' : 'my data';
+        const summary = await handleChannelPrivacy('line', { channelUserId: id, messageText: myData, languageCode: language });
         assert.equal(summary.status, 'PRIVACY_DATA_SUMMARY');
         assert.ok(summary.reply.startsWith(privacyNotice.REPLIES[language].exportTitle));
         assert.ok(summary.reply.includes(privacyNotice.REPLIES[language].exportFullHint));

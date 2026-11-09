@@ -92,6 +92,7 @@ openssl rand -base64 48     # פעם שנייה → WEB_SESSION_SECRET
 6. `/setcommands` → לבחור את הבוט → להדביק:
    ```
    privacy - הודעת פרטיות / Privacy notice / ความเป็นส่วนตัว
+   language - שפה / Language / ภาษา (/language he, /language th, /language en)
    accept - אישור הסכמה / Accept / ยอมรับ
    decline - סירוב / Decline / ไม่ยอมรับ
    mydata - סיכום המידע שלי / My data / ข้อมูลของฉัน

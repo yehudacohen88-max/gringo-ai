@@ -35,7 +35,7 @@ const ENGLISH_FINAL_REPLY = [
 ].join('\n\n');
 
 function completeProfile(overrides = {}) {
-  return {
+  const profile = {
     userId: 'usr_transfer_chat',
     fullName: 'Somchai',
     country: 'Thailand',
@@ -51,6 +51,14 @@ function completeProfile(overrides = {}) {
     wantsExchangeRateAlerts: 'Yes',
     ...overrides,
   };
+  if (
+    Object.prototype.hasOwnProperty.call(overrides, 'preferredLanguage')
+    && overrides.preferredLanguage
+    && !Object.prototype.hasOwnProperty.call(overrides, 'languageSource')
+  ) {
+    profile.languageSource = 'explicit';
+  }
+  return profile;
 }
 
 function enableActiveSupervisor() {
@@ -214,7 +222,10 @@ test('English money-transfer reply for a Hebrew user is translated once and omit
     assert.equal(calls[0].sourceLanguage, 'en');
     assert.equal(calls[0].targetLanguage, 'he');
     assert.equal(calls[0].text.includes('reported_quote_unverified'), false);
-    assert.equal(response.reply, `translated:${ENGLISH_FINAL_REPLY}`);
+    assert.equal(
+      response.reply,
+      `translated:${ENGLISH_FINAL_REPLY}\n\nThe answer is in Hebrew because that is the language saved in your profile. To get answers in English, send: English`
+    );
     assert.equal(response.replyLanguage, undefined);
   });
 });

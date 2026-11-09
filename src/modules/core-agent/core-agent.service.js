@@ -18,6 +18,11 @@ const serviceService = require('../services/service.service');
 const taskService = require('../tasks/task.service');
 const { knowledgeAgentService } = require('../knowledge-agent');
 const { languageDetectionService } = require('../language');
+const {
+  appendLanguageConflictNotice,
+  languageSwitchReply,
+  parseLanguageSwitch,
+} = require('../language/language-preference');
 const { translationService } = require('../translation');
 const {
   contextManagerService,
@@ -60,6 +65,25 @@ const OUTGOING_TRANSLATION_NOTICES = Object.freeze({
   he: 'לא הצלחתי לתרגם כרגע את התשובה לעברית, אז היא מוצגת באנגלית.',
 });
 const OUTGOING_HEBREW_TRANSLATION_NOTICE = OUTGOING_TRANSLATION_NOTICES.he;
+
+function withLanguageConflictNotice(response = {}, resolution = {}) {
+  if (response.skipLanguageConflict) {
+    const cleaned = { ...response };
+    delete cleaned.skipLanguageConflict;
+    return cleaned;
+  }
+  const reply = appendLanguageConflictNotice(response.reply, resolution);
+  if (reply === response.reply) return response;
+  const updated = { ...response, reply };
+  const meta = response[OUTGOING_TRANSLATION_METADATA];
+  if (meta) {
+    Object.defineProperty(updated, OUTGOING_TRANSLATION_METADATA, {
+      value: { ...meta, deliveryResponse: reply },
+      enumerable: false,
+    });
+  }
+  return updated;
+}
 
 function noticeLanguageKey(userLanguage = '') {
   const primary = languagePrimary(userLanguage);
@@ -1472,11 +1496,13 @@ async function processWebMessage(messageContext = {}) {
   let question = originalQuestion;
   const channel = messageContext.channel || 'web';
   const channelUserId = requireChannelUserId(messageContext);
-  const incomingLanguageResolution = languageDetectionService.resolveLanguage({
+  const languageInput = {
     explicitLanguage: messageContext.explicitLanguage,
     channelLanguage: messageContext.language || messageContext.languageCode || messageContext.channelLanguage,
     text: originalQuestion,
-  });
+  };
+  // Translation follows the message script, not the phone UI language.
+  const incomingLanguageResolution = languageDetectionService.resolveIncomingLanguage(languageInput);
   let userLanguage = incomingLanguageResolution.language;
   const userContext = {
     channel,
@@ -1486,16 +1512,15 @@ async function processWebMessage(messageContext = {}) {
   };
   const onboardingStatus = await onboardingService.getStatus(userContext);
   const savedLanguage = await crmAgentService.getUserLanguage(onboardingStatus.profile || {});
-  const languageResolution = languageDetectionService.resolveLanguage({
-    explicitLanguage: messageContext.explicitLanguage,
+  // Reply language: preferredLanguage only when languageSource is explicit.
+  // detectedLanguage, the legacy language column, and a preferredLanguage
+  // with any other source must not outrank a clearly written message.
+  const languageResolution = languageDetectionService.resolveReplyLanguage({
+    ...languageInput,
     profile: {
-      ...onboardingStatus.profile,
       preferredLanguage: savedLanguage.preferredLanguage,
-      detectedLanguage: savedLanguage.detectedLanguage,
-      language: savedLanguage.language,
+      languageSource: savedLanguage.languageSource,
     },
-    channelLanguage: messageContext.language || messageContext.languageCode || messageContext.channelLanguage,
-    text: originalQuestion,
   });
   userLanguage = languageResolution.language;
   userContext.language = userLanguage;
@@ -1566,7 +1591,7 @@ async function processWebMessage(messageContext = {}) {
           enumerable: false,
         });
       }
-      return finalized;
+      return withLanguageConflictNotice(finalized, languageResolution);
     }
     const delivered = await applyOutgoingTranslation(finalized, userLanguage);
     if (delivered.responseTranslation?.fallbackUsed && messageContext.requestId) {
@@ -1577,11 +1602,42 @@ async function processWebMessage(messageContext = {}) {
         storeSupervisorPlan(plan, 'storeResponseTranslationFailure');
       }
     }
-    return delivered;
+    return withLanguageConflictNotice(delivered, languageResolution);
   };
 
+  // עברית / ไทย / English / "/language he" saves a new explicit choice.
+  // The language onboarding question still owns that answer so setup advances.
+  // Privacy consent runs before this function on messaging channels, so a
+  // switch cannot be saved until the user has consented.
+  // Bare words such as "ไทย" are also valid onboarding answers (for example the
+  // country), so they switch language only after setup is finished. /language
+  // is unambiguous and works as soon as this function runs.
+  const languageCommand = /^\/language(?:@\w+)?\b/i.test(originalQuestion);
+  const languageSwitch = (onboardingStatus.complete || languageCommand)
+    ? parseLanguageSwitch(originalQuestion)
+    : '';
+  const languageQuestionPending = !onboardingStatus.complete
+    && !languageDetectionService.normalizeLanguageCode(onboardingStatus.profile?.preferredLanguage);
+  if (languageSwitch && !languageQuestionPending && onboardingStatus.profile?.userId) {
+    let saved = true;
+    try {
+      await crmAgentService.setPreferredLanguage(onboardingStatus.profile.userId, languageSwitch);
+    } catch (error) {
+      saved = false;
+    }
+    return deliverResponse({
+      reply: languageSwitchReply(languageSwitch, saved),
+      skipOutgoingTranslation: true,
+      skipLanguageConflict: true,
+      category: 'Profile',
+      status: saved ? 'LANGUAGE_UPDATED' : 'LANGUAGE_UPDATE_FAILED',
+      crm: { attempted: true, saved, memoryUpdated: false, error: '' },
+    });
+  }
+
+  const onboardingMessage = languageSwitch && languageQuestionPending ? languageSwitch : originalQuestion;
   if (!onboardingStatus.complete || /^(restart onboarding|restart profile|start over|reset profile|correct|correct previous|change previous|fix previous)$/i.test(originalQuestion)) {
-    const onboardingResult = await onboardingService.handleMessage(originalQuestion, userContext);
+    const onboardingResult = await onboardingService.handleMessage(onboardingMessage, userContext);
 
     if (onboardingResult.handled) {
       // Onboarding copy is static and already in the user's language, so it

@@ -79,10 +79,11 @@ function bannedTexts(language) {
 }
 
 async function channelConfirm(id, language) {
-  const asked = await handleChannelPrivacy('line', { channelUserId: id, messageText: 'delete my data', languageCode: language });
+  const phrase = language === 'he' ? 'מחק את המידע שלי' : language === 'th' ? 'ลบข้อมูล' : 'delete my data';
+  const asked = await handleChannelPrivacy('line', { channelUserId: id, messageText: phrase, languageCode: language });
   const code = (asked.reply.match(/\b\d{6}\b/) || [])[0];
   assert.ok(code, 'confirmation code issued');
-  return handleChannelPrivacy('line', { channelUserId: id, messageText: `delete my data ${code}`, languageCode: language });
+  return handleChannelPrivacy('line', { channelUserId: id, messageText: `${phrase} ${code}`, languageCode: language });
 }
 
 describe('P0-2 review round 3', { concurrency: false }, () => {
@@ -223,7 +224,8 @@ describe('P0-2 review round 3', { concurrency: false }, () => {
       await assert.rejects(() => privacyService.allowsPersonalProcessing({ channel: 'line', channelUserId: id }));
       assert.equal(await privacyGuard.identityAllowed('line', id), false);
       for (const language of LANGS) {
-        const reply = await handleChannelPrivacy('line', { channelUserId: id, messageText: 'hello', languageCode: language });
+        const sample = language === 'he' ? 'שלום' : language === 'th' ? 'สวัสดี' : 'hello';
+        const reply = await handleChannelPrivacy('line', { channelUserId: id, messageText: sample, languageCode: language });
         assert.ok(reply, 'message is not passed on to normal processing');
         assert.equal(reply.status, 'PRIVACY_UNAVAILABLE');
         assert.equal(reply.reply, privacyNotice.reply(language, 'privacyUnavailable'));

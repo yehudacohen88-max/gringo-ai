@@ -1,6 +1,9 @@
 const privacyService = require('./privacy.service');
 const notice = require('./privacy-notice');
 const { env } = require('../../config/env');
+const { crmAgentService } = require('../crm-agent');
+const { languageDetectionService } = require('../language');
+const { appendLanguageConflictNotice } = require('../language/language-preference');
 
 const COMMANDS = {
   privacy: ['privacy', '/privacy', 'פרטיות', 'ความเป็นส่วนตัว'],
@@ -66,24 +69,59 @@ function result(reply, status) {
   return { reply, status, privacy: true, user: null };
 }
 
+// Same order as chat replies: explicit saved choice, else a clear message
+// script, else the channel app language, else English. Profile lookup failure
+// must not change the privacy decision, so it falls through to the message.
+async function resolvePrivacyLanguage(channel, message = {}) {
+  const channelLanguage = message.languageCode || message.language || '';
+  const text = message.messageText || '';
+  let profile = {};
+  try {
+    const found = await crmAgentService.findUserByChannel(channel, message.channelUserId);
+    if (found) {
+      const saved = await crmAgentService.getUserLanguage(found);
+      profile = {
+        preferredLanguage: saved.preferredLanguage || '',
+        languageSource: saved.languageSource || '',
+      };
+    }
+  } catch (error) {
+    profile = {};
+  }
+  return languageDetectionService.resolveReplyLanguage({ profile, channelLanguage, text });
+}
+
+function present(text, resolution) {
+  return appendLanguageConflictNotice(text, resolution);
+}
+
 // Runs before any channel handler. Returns null when the message may go on to
 // normal processing. The identity comes from a signature-verified webhook or
 // the Telegram bot API, never from message text.
 // Fails closed: if consent or pending-deletion state cannot be read (for
 // example a Sheets outage), the message is not processed.
 async function handleChannelPrivacy(channel, message = {}) {
+  let resolution;
   try {
-    return await handleChannelPrivacyUnsafe(channel, message);
+    resolution = await resolvePrivacyLanguage(channel, message);
+    return await handleChannelPrivacyUnsafe(channel, message, resolution);
   } catch (error) {
-    const language = notice.noticeLanguage(message.languageCode || message.language) || notice.guessLanguageFromText(message.messageText);
-    return result(notice.reply(language, 'privacyUnavailable'), 'PRIVACY_UNAVAILABLE');
+    if (!resolution) {
+      resolution = languageDetectionService.resolveReplyLanguage({
+        channelLanguage: message.languageCode || message.language,
+        text: message.messageText,
+      });
+    }
+    return result(present(notice.reply(resolution.language, 'privacyUnavailable'), resolution), 'PRIVACY_UNAVAILABLE');
   }
 }
 
-async function handleChannelPrivacyUnsafe(channel, message = {}) {
+async function handleChannelPrivacyUnsafe(channel, message = {}, resolution) {
   const identity = { channel, channelUserId: String(message.channelUserId || '').trim() };
   if (!identity.channelUserId) return null;
-  const language = notice.noticeLanguage(message.languageCode || message.language) || notice.guessLanguageFromText(message.messageText);
+  const language = resolution.language;
+  const say = (text) => present(text, resolution);
+  const noticed = (privacyResult) => ({ ...privacyResult, reply: say(privacyResult.reply) });
   const parsed = parsePrivacyCommand(message.messageText);
 
   // An unfinished deletion blocks everything else. Any message, including
@@ -92,33 +130,33 @@ async function handleChannelPrivacyUnsafe(channel, message = {}) {
   const current = await privacyService.getStatus(identity);
   if (current.deletionPending && !(parsed && parsed.command === 'privacy')) {
     const outcome = await privacyService.retryDeletion(identity);
-    return deletionReply(language, outcome);
+    return noticed(deletionReply(language, outcome));
   }
 
   if (parsed) {
     switch (parsed.command) {
       case 'privacy':
-        return result(notice.channelNoticeText(language), 'PRIVACY_NOTICE');
+        return result(say(notice.channelNoticeText(language)), 'PRIVACY_NOTICE');
       case 'accept':
         await privacyService.acceptConsent(identity, language);
-        return result(notice.reply(language, 'accepted'), 'PRIVACY_CONSENT_ACCEPTED');
+        return result(say(notice.reply(language, 'accepted')), 'PRIVACY_CONSENT_ACCEPTED');
       case 'decline':
         await privacyService.declineConsent(identity, language);
-        return result(notice.reply(language, 'declined'), 'PRIVACY_CONSENT_DECLINED');
+        return result(say(notice.reply(language, 'declined')), 'PRIVACY_CONSENT_DECLINED');
       case 'withdraw':
         await privacyService.withdrawConsent(identity, language);
-        return result(notice.reply(language, 'withdrawn'), 'PRIVACY_CONSENT_WITHDRAWN');
+        return result(say(notice.reply(language, 'withdrawn')), 'PRIVACY_CONSENT_WITHDRAWN');
       case 'export':
-        return result(dataSummary(language, await privacyService.exportData(identity)), 'PRIVACY_DATA_SUMMARY');
+        return result(say(dataSummary(language, await privacyService.exportData(identity))), 'PRIVACY_DATA_SUMMARY');
       case 'delete': {
         const { confirmationCode } = privacyService.requestDeletion(identity);
-        return result(`${notice.getNotice(language).limits}\n\n${notice.reply(language, 'deleteConfirm', confirmationCode)}`, 'PRIVACY_DELETE_CONFIRMATION_REQUIRED');
+        return result(say(`${notice.getNotice(language).limits}\n\n${notice.reply(language, 'deleteConfirm', confirmationCode)}`), 'PRIVACY_DELETE_CONFIRMATION_REQUIRED');
       }
       case 'deleteConfirm': {
         const outcome = await privacyService.confirmDeletion(identity, parsed.code);
-        if (outcome.code === 'DELETION_NOT_STARTED') return deletionReply(language, outcome);
-        if (!outcome.ok) return result(notice.reply(language, 'deleteBadCode'), 'PRIVACY_DELETE_REJECTED');
-        return deletionReply(language, outcome);
+        if (outcome.code === 'DELETION_NOT_STARTED') return noticed(deletionReply(language, outcome));
+        if (!outcome.ok) return result(say(notice.reply(language, 'deleteBadCode')), 'PRIVACY_DELETE_REJECTED');
+        return noticed(deletionReply(language, outcome));
       }
       default:
         break;
@@ -126,10 +164,11 @@ async function handleChannelPrivacyUnsafe(channel, message = {}) {
   }
 
   if (await privacyService.allowsPersonalProcessing(identity)) return null;
-  return result(`${notice.reply(language, 'consentRequired')}\n\n${notice.channelNoticeText(language)}`, 'PRIVACY_CONSENT_REQUIRED');
+  return result(say(`${notice.reply(language, 'consentRequired')}\n\n${notice.channelNoticeText(language)}`), 'PRIVACY_CONSENT_REQUIRED');
 }
 
 module.exports = {
   handleChannelPrivacy,
   parsePrivacyCommand,
+  resolvePrivacyLanguage,
 };

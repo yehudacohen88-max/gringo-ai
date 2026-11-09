@@ -148,6 +148,7 @@ function createHelpReply() {
     '- documents',
     '- notifications',
     '- tasks',
+    'Change language: /language he, /language th, /language en, or send עברית, ไทย, or English.',
   ].join('\n');
 }
 

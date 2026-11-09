@@ -319,11 +319,14 @@ async function updateDetectedLanguage(userId, resolution = {}) {
   if (!detectedLanguage) throw unsupportedLanguageError(resolution.language);
 
   const languageSource = normalizeLanguageSource(resolution.source);
+  const record = await requireUserProfileRecord(userId);
+  // A saved explicit choice stays explicit. Detection may refresh
+  // detectedLanguage, and it never writes preferredLanguage.
+  const keepExplicit = normalizeLanguageSource(record.profile.languageSource) === 'explicit';
   const updates = {
     detectedLanguage,
-    languageSource: languageSource || 'default',
+    ...(keepExplicit ? {} : { languageSource: languageSource || 'default' }),
   };
-  const record = await requireUserProfileRecord(userId);
 
   if (!hasChanged(record.profile, updates)) {
     return record.profile;
