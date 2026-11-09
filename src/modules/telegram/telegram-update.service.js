@@ -1,4 +1,4 @@
-const { handleChannelPrivacy } = require('../privacy/privacy-channel');
+const { handleChannelPrivacy, resolvePrivacyLanguage } = require('../privacy/privacy-channel');
 const privacyService = require('../privacy/privacy.service');
 const privacyNotice = require('../privacy/privacy-notice');
 const fs = require('fs');
@@ -194,10 +194,16 @@ function getOffset() {
 async function sendConsentNotice(callback = {}) {
   if (!callback.channelChatId) return;
   try {
+    const resolution = await resolvePrivacyLanguage('telegram', {
+      channelUserId: callback.channelUserId,
+      languageCode: callback.languageCode,
+      messageText: '',
+    });
+    const language = resolution.language;
     await communicationService.sendMessage({
       channel: 'telegram',
       to: callback.channelChatId,
-      text: `${privacyNotice.reply(callback.languageCode, 'consentRequired')}\n\n${privacyNotice.channelNoticeText(callback.languageCode)}`,
+      text: `${privacyNotice.reply(language, 'consentRequired')}\n\n${privacyNotice.channelNoticeText(language)}`,
     });
   } catch (error) {
     safeTelegramWarning('Telegram delivery failed for the consent notice.');

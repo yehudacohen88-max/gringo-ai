@@ -118,6 +118,27 @@ test('does not write when preferred language values are unchanged', async () => 
   assert.equal(writes.length, 0);
 });
 
+test('automatic detection does not clear an explicit language choice', async () => {
+  const writes = mockRepository(
+    baseProfile({
+      preferredLanguage: 'th',
+      detectedLanguage: 'th',
+      languageSource: 'explicit',
+    })
+  );
+
+  const updated = await crmAgentService.updateDetectedLanguage('usr_language_preference', {
+    language: 'Hebrew',
+    source: 'text',
+  });
+
+  assert.equal(updated.preferredLanguage, 'th');
+  assert.equal(updated.detectedLanguage, 'he');
+  assert.equal(updated.languageSource, 'explicit');
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].profile.languageSource, 'explicit');
+});
+
 test('does not write when detected language values are unchanged', async () => {
   const writes = mockRepository(
     baseProfile({

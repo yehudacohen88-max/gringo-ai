@@ -129,10 +129,10 @@ function noticeLanguage(language) {
 }
 
 function guessLanguageFromText(text = '') {
-  const value = String(text || '');
-  if (/[\u0e00-\u0e7f]/.test(value)) return 'th';
-  if (/[\u0590-\u05ff]/.test(value)) return 'he';
-  return '';
+  const { detectMessageLanguage } = require('../language/language-detection.service');
+  const detected = detectMessageLanguage(text);
+  if (!detected.clear || (detected.language !== 'he' && detected.language !== 'th')) return '';
+  return detected.language;
 }
 
 function getNotice(language) {

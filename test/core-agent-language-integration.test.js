@@ -97,11 +97,27 @@ test('Core Agent preferredLanguage overrides channel language', async () => {
   assert.equal(state.detectedUpdates.length, 0);
 });
 
-test('Core Agent uses channel language when no preference exists', async () => {
+test('Core Agent uses a clear message script before the channel language', async () => {
   const state = mockCoreLanguage(completeProfile());
 
   const result = await coreAgentService.processWebMessage({
     message: 'Hello Gringo',
+    channel: 'telegram',
+    channelUserId: 'channel-language-text',
+    languageCode: 'ar',
+  });
+
+  assert.equal(result.category, 'Onboarding');
+  assert.equal(state.detectedUpdates.length, 1);
+  assert.equal(state.detectedUpdates[0].resolution.language, 'en');
+  assert.equal(state.detectedUpdates[0].resolution.source, 'text');
+});
+
+test('Core Agent uses channel language when the message has no clear script', async () => {
+  const state = mockCoreLanguage(completeProfile());
+
+  const result = await coreAgentService.processWebMessage({
+    message: '12345',
     channel: 'telegram',
     channelUserId: 'channel-language',
     languageCode: 'ar',
@@ -141,11 +157,8 @@ test('Core Agent uses default language when no signal exists', async () => {
   assert.equal(state.detectedUpdates.length, 0);
 });
 
-test('Core Agent relies on CRM method to avoid unchanged detectedLanguage writes', async () => {
+test('Core Agent does not let auto-detected language override a clear message', async () => {
   const state = mockCoreLanguage(completeProfile({ detectedLanguage: 'he', languageSource: 'text' }));
-  crmAgentService.updateDetectedLanguage = async () => {
-    throw new Error('Should not be called for saved profile language.');
-  };
 
   await coreAgentService.processWebMessage({
     message: 'Hello Gringo',
@@ -153,7 +166,9 @@ test('Core Agent relies on CRM method to avoid unchanged detectedLanguage writes
     channelUserId: 'saved-detected-language',
   });
 
-  assert.equal(state.detectedUpdates.length, 0);
+  assert.equal(state.detectedUpdates.length, 1);
+  assert.equal(state.detectedUpdates[0].resolution.language, 'en');
+  assert.equal(state.detectedUpdates[0].resolution.source, 'text');
 });
 
 test('Core Agent never overwrites preferredLanguage with automatic detection', async () => {

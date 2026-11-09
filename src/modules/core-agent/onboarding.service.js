@@ -114,6 +114,9 @@ function buildFieldUpdate(field, value) {
     return {
       preferredLanguage: value,
       language: value,
+      // The language question is an explicit choice. Later detection must not
+      // replace it; only a language-switch command or the profile setting can.
+      languageSource: value ? 'explicit' : '',
     };
   }
 
@@ -167,6 +170,7 @@ async function restartOnboarding(userContext = {}) {
     return record;
   }, {});
   updates.language = '';
+  updates.languageSource = '';
   const profile = await updateUserProfile(userContext, updates);
   onboardingStateByUser.set(getStateKey(userContext), {});
   return profile;

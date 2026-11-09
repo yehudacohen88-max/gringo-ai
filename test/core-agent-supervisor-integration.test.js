@@ -388,7 +388,10 @@ test('profile recall is handled before active Supervisor routing', async () => {
     assert.equal(state.savedConversations.length, 1);
     assert.equal(state.savedConversations[0].category, 'Profile');
     assert.equal(state.savedConversations[0].status, 'PROFILE_RECALL');
-    assert.equal(state.savedConversations[0].answer, response.reply);
+    assert.equal(
+      response.reply,
+      `${state.savedConversations[0].answer}\n\nThe answer is in Thai because that is the language saved in your profile. To get answers in English, send: English`
+    );
   }));
 });
 

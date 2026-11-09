@@ -66,10 +66,20 @@ test('saved profile language overrides text', () => {
   assert.equal(result.source, 'profile');
 });
 
-test('channel language is used as fallback before text', () => {
+test('a clear message script outranks the channel language', () => {
   const result = languageDetectionService.resolveLanguage({
     channelLanguage: 'ar',
     text: 'Hello',
+  });
+
+  assert.equal(result.language, 'en');
+  assert.equal(result.source, 'text');
+});
+
+test('channel language is the fallback when the message has no letters', () => {
+  const result = languageDetectionService.resolveLanguage({
+    channelLanguage: 'ar',
+    text: '12345',
   });
 
   assert.equal(result.language, 'ar');

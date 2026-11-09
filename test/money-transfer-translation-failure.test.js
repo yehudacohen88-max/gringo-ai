@@ -371,7 +371,10 @@ test('Hebrew-preferred English transfer keeps the English answer when outgoing t
     assert.equal(response.status, 'SUPERVISOR_COMPLETED');
     assert.equal(plan.status, 'completed');
     assert.equal(plan.tasks[0].result.status, 'success');
-    assert.equal(response.reply, `${OUTGOING_HEBREW_TRANSLATION_NOTICE}\n\n${ENGLISH_TRANSFER_REPLY}`);
+    assert.equal(
+      response.reply,
+      `${OUTGOING_HEBREW_TRANSLATION_NOTICE}\n\n${ENGLISH_TRANSFER_REPLY}\n\nThe answer is in Hebrew because that is the language saved in your profile. To get answers in English, send: English`
+    );
     assert.equal(response.reply.includes(HEBREW_NOTICE), false);
     assert.equal(response.reply.includes(INCOMING_LANGUAGE_FAILURE_REPLY), false);
     assert.equal(response.reply.includes('insufficient_quota'), false);

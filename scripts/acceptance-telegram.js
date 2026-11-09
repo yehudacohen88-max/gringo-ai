@@ -64,7 +64,8 @@ async function telegramChecks() {
       return sent.slice(before).filter((m) => String(m.chat_id) === String(chatId)).map((m) => m.text).join('\n');
     };
     const t = (k) => String(R[c.lang][k]);
-    check(`[${c.lang}] first message → consent notice`, (await say('hello')).includes(t('consentRequired')));
+    const greet = c.lang === 'he' ? 'שלום' : c.lang === 'th' ? 'สวัสดี' : 'hello';
+    check(`[${c.lang}] first message → consent notice`, (await say(greet)).includes(t('consentRequired')));
     check(`[${c.lang}] privacy command → notice`, (await say(c.privacy)).includes(privacyNotice.getNotice(c.lang).title));
     check(`[${c.lang}] accept → consent saved`, (await say(c.accept)).includes(t('accepted')));
     const summary = await say(c.mydata);
@@ -73,11 +74,11 @@ async function telegramChecks() {
     const code = (delReply.match(/(\d{6})/) || [])[1];
     check(`[${c.lang}] delete → 6-digit confirmation code`, Boolean(code));
     check(`[${c.lang}] withdraw → consent withdrawn`, (await say(c.withdraw)).includes(t('withdrawn')));
-    check(`[${c.lang}] after withdraw → consent notice again`, (await say('hello again')).includes(t('consentRequired')));
+    check(`[${c.lang}] after withdraw → consent notice again`, (await say(greet)).includes(t('consentRequired')));
     if (code) {
       await say(c.accept);
       const done = await say(`${c.del} ${code}`);
-      check(`[${c.lang}] delete + code → deletion reply, then notice again`, done.length > 0 && (await say('hi')).includes(t('consentRequired')));
+      check(`[${c.lang}] delete + code → deletion reply, then notice again`, done.length > 0 && (await say(greet)).includes(t('consentRequired')));
     }
   }
 }

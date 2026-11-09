@@ -214,7 +214,10 @@ test('English money-transfer reply for a Hebrew user is translated once and omit
     assert.equal(calls[0].sourceLanguage, 'en');
     assert.equal(calls[0].targetLanguage, 'he');
     assert.equal(calls[0].text.includes('reported_quote_unverified'), false);
-    assert.equal(response.reply, `translated:${ENGLISH_FINAL_REPLY}`);
+    assert.equal(
+      response.reply,
+      `translated:${ENGLISH_FINAL_REPLY}\n\nThe answer is in Hebrew because that is the language saved in your profile. To get answers in English, send: English`
+    );
     assert.equal(response.replyLanguage, undefined);
   });
 });
