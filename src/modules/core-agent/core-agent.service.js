@@ -1512,8 +1512,9 @@ async function processWebMessage(messageContext = {}) {
   };
   const onboardingStatus = await onboardingService.getStatus(userContext);
   const savedLanguage = await crmAgentService.getUserLanguage(onboardingStatus.profile || {});
-  // Reply language: explicit preferredLanguage only. detectedLanguage and the
-  // legacy language column must not outrank a clearly written message.
+  // Reply language: preferredLanguage only when languageSource is explicit.
+  // detectedLanguage, the legacy language column, and a preferredLanguage
+  // with any other source must not outrank a clearly written message.
   const languageResolution = languageDetectionService.resolveReplyLanguage({
     ...languageInput,
     profile: {

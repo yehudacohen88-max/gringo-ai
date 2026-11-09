@@ -51,6 +51,59 @@ test('privacy consent follows the message script before the Telegram app languag
   assert.ok(emojiOnThaiPhone.reply.includes(privacyNotice.reply('th', 'consentRequired')));
 });
 
+async function saveLanguage(channelUserId, preferredLanguage, languageSource) {
+  const accepted = await handleChannelPrivacy('telegram', {
+    channelUserId,
+    messageText: 'accept',
+    languageCode: 'en',
+  });
+  assert.equal(accepted.status, 'PRIVACY_CONSENT_ACCEPTED');
+  const user = await crmAgentService.findOrCreateUser({ channel: 'telegram', channelUserId });
+  if (languageSource === 'explicit') {
+    await crmAgentService.setPreferredLanguage(user.userId, preferredLanguage);
+    return;
+  }
+  await crmAgentService.updateUserProfile(user.userId, {
+    preferredLanguage,
+    ...(languageSource ? { languageSource } : {}),
+  });
+}
+
+test('privacy screens ignore preferredLanguage unless languageSource is explicit', async () => {
+  const textSource = id();
+  await saveLanguage(textSource, 'th', 'text');
+  const fromText = await handleChannelPrivacy('telegram', {
+    channelUserId: textSource,
+    messageText: 'פרטיות',
+    languageCode: 'en',
+  });
+  assert.equal(fromText.status, 'PRIVACY_NOTICE');
+  assert.ok(fromText.reply.includes(privacyNotice.getNotice('he').title));
+  assert.equal(fromText.reply.includes(privacyNotice.getNotice('th').title), false);
+  assert.equal(fromText.reply.includes('התשובה בתאית'), false);
+
+  const missingSource = id();
+  await saveLanguage(missingSource, 'th');
+  const fromMissing = await handleChannelPrivacy('telegram', {
+    channelUserId: missingSource,
+    messageText: 'פרטיות',
+    languageCode: 'th',
+  });
+  assert.ok(fromMissing.reply.includes(privacyNotice.getNotice('he').title));
+  assert.equal(fromMissing.reply.includes('התשובה בתאית'), false);
+
+  const explicit = id();
+  await saveLanguage(explicit, 'th', 'explicit');
+  const fromExplicit = await handleChannelPrivacy('telegram', {
+    channelUserId: explicit,
+    messageText: 'פרטיות',
+    languageCode: 'en',
+  });
+  assert.ok(fromExplicit.reply.includes(privacyNotice.getNotice('th').title));
+  assert.match(fromExplicit.reply, /התשובה בתאית/);
+  assert.match(fromExplicit.reply, /שלח: עברית/);
+});
+
 test('an explicit saved language wins on privacy screens and adds the switch notice', async () => {
   const channelUserId = id();
   const accepted = await handleChannelPrivacy('telegram', {

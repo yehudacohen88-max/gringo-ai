@@ -117,23 +117,31 @@ function resolveIncomingLanguage(input = {}) {
   return withMessage(detectTextLanguage(input.text || input.message), '');
 }
 
-// Reply language. An explicit saved choice (preferredLanguage) outranks a
-// clear message. Auto-detected language and the legacy language column do not.
-// With no explicit choice, a clear message script wins, then the channel
-// language, then English. Emoji and digits do not invent a preference.
-// conflict is true when the saved choice and a clear message language differ,
-// so the caller can answer in the saved language and say how to switch.
+// Only languageSource "explicit" is a saved user choice. A preferredLanguage
+// left by detection, the legacy language column, or a missing source is not.
+function explicitSavedLanguage(input = {}) {
+  const profile = input.profile || {};
+  const source = cleanText(input.languageSource || profile.languageSource).toLowerCase();
+  if (source !== 'explicit') return null;
+  return resolveCandidate(
+    input.preferredLanguage || profile.preferredLanguage || input.profileLanguage,
+    'profile'
+  );
+}
+
+// Reply language. A verified explicit choice outranks a clear message.
+// Anything else stored as preferredLanguage does not. With no explicit
+// choice, a clear message script wins, then the channel language, then
+// English. Emoji and digits do not invent a preference. conflict is true
+// when the explicit choice and a clear message language differ, so the
+// caller can answer in the saved language and say how to switch.
 function resolveReplyLanguage(input = {}) {
   const message = detectMessageLanguage(input.text || input.message);
   const messageLanguage = message.clear ? normalizeLanguageCode(message.language) : '';
   const explicitTurn = resolveCandidate(input.explicitLanguage || input.requestedLanguage, 'explicit');
   if (explicitTurn) return withMessage(explicitTurn, messageLanguage);
 
-  const profile = input.profile || {};
-  const preferred = resolveCandidate(
-    input.preferredLanguage || profile.preferredLanguage || input.profileLanguage,
-    'profile'
-  );
+  const preferred = explicitSavedLanguage(input);
   if (preferred) {
     return {
       ...preferred,

@@ -64,10 +64,13 @@ function isComplete(profile = {}) {
   return !getNextField(profile);
 }
 
-// The language used for onboarding copy: the saved choice first, otherwise
-// the language resolved for this message (Telegram language_code or text).
+// Onboarding copy uses a verified explicit choice first. A preferredLanguage
+// with any other languageSource does not override the language of this message.
 function displayLanguage(profile = {}, userContext = {}) {
-  return normalizeOnboardingLanguage(profile.preferredLanguage)
+  const explicit = String(profile.languageSource || '').trim().toLowerCase() === 'explicit'
+    ? normalizeOnboardingLanguage(profile.preferredLanguage)
+    : '';
+  return explicit
     || normalizeOnboardingLanguage(userContext.language)
     || 'en';
 }

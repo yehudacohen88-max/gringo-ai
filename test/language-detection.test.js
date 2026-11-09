@@ -56,14 +56,24 @@ test('explicit language overrides detected text', () => {
   assert.equal(result.source, 'explicit');
 });
 
-test('saved profile language overrides text', () => {
+test('explicit saved profile language overrides text', () => {
   const result = languageDetectionService.resolveLanguage({
-    profile: { preferredLanguage: 'Russian' },
+    profile: { preferredLanguage: 'Russian', languageSource: 'explicit' },
     text: 'Hello',
   });
 
   assert.equal(result.language, 'ru');
   assert.equal(result.source, 'profile');
+});
+
+test('preferredLanguage without an explicit source does not override text', () => {
+  const result = languageDetectionService.resolveLanguage({
+    profile: { preferredLanguage: 'Russian' },
+    text: 'Hello',
+  });
+
+  assert.equal(result.language, 'en');
+  assert.equal(result.source, 'text');
 });
 
 test('a clear message script outranks the channel language', () => {

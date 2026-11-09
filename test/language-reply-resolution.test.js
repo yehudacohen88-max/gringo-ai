@@ -108,25 +108,44 @@ test('resolver: historical, auto-detected and legacy values do not beat a clear 
   assert.equal(lang.resolveIncomingLanguage({ text: HE_Q, channelLanguage: 'th' }).language, 'he');
 });
 
-test('resolver: an explicit preferred language wins and reports a real conflict', () => {
-  const resolution = lang.resolveReplyLanguage({ text: HE_Q, profile: { preferredLanguage: 'th' } });
-  assert.equal(resolution.language, 'th');
-  assert.equal(resolution.conflict, true);
-  assert.equal(resolution.messageLanguage, 'he');
-  assert.equal(lang.resolveReplyLanguage({ text: 'What are my rights at work?', profile: { preferredLanguage: 'th' } }).conflict, true);
-  assert.equal(lang.resolveReplyLanguage({ text: 'สิทธิของฉันในฐานะคนงาน', profile: { preferredLanguage: 'th' } }).conflict, false);
+test('resolver: only languageSource explicit outranks a clear Hebrew message', () => {
+  const explicit = lang.resolveReplyLanguage({
+    text: HE_Q,
+    profile: { preferredLanguage: 'th', languageSource: 'explicit' },
+  });
+  assert.equal(explicit.language, 'th');
+  assert.equal(explicit.conflict, true);
+  assert.equal(explicit.messageLanguage, 'he');
+
+  for (const languageSource of ['text', 'detected', 'telegram', 'app', 'profile', 'channel', 'default', '']) {
+    const profile = { preferredLanguage: 'th', ...(languageSource ? { languageSource } : {}) };
+    assert.equal(lang.resolveReplyLanguage({ text: HE_Q, profile }).language, 'he', languageSource || 'missing');
+    assert.equal(lang.resolveReplyLanguage({ text: HE_Q, profile }).conflict, false, languageSource || 'missing');
+  }
+  assert.equal(lang.resolveReplyLanguage({ text: HE_Q, profile: { preferredLanguage: 'th' } }).language, 'he');
+
+  assert.equal(lang.resolveReplyLanguage({
+    text: 'What are my rights at work?',
+    profile: { preferredLanguage: 'th', languageSource: 'explicit' },
+  }).conflict, true);
+  assert.equal(lang.resolveReplyLanguage({
+    text: 'สิทธิของฉันในฐานะคนงาน',
+    profile: { preferredLanguage: 'th', languageSource: 'explicit' },
+  }).conflict, false);
 });
 
 test('resolver: emoji or digits fall back to the channel language, then English', () => {
   assert.equal(lang.resolveReplyLanguage({ text: '👍', channelLanguage: 'he' }).language, 'he');
   assert.equal(lang.resolveReplyLanguage({ text: '123', profile: { detectedLanguage: 'th' } }).language, 'en');
   assert.equal(lang.resolveReplyLanguage({ text: '👍' }).language, 'en');
-  assert.equal(lang.resolveReplyLanguage({ text: '👍', profile: { preferredLanguage: 'th' } }).language, 'th');
-  assert.equal(lang.resolveReplyLanguage({ text: '👍', profile: { preferredLanguage: 'th' } }).conflict, false);
+  assert.equal(lang.resolveReplyLanguage({ text: '👍', profile: { preferredLanguage: 'th', languageSource: 'explicit' } }).language, 'th');
+  assert.equal(lang.resolveReplyLanguage({ text: '👍', profile: { preferredLanguage: 'th', languageSource: 'explicit' } }).conflict, false);
+  assert.equal(lang.resolveReplyLanguage({ text: '👍', profile: { preferredLanguage: 'th', languageSource: 'text' } }).language, 'en');
+  assert.equal(lang.resolveReplyLanguage({ text: '👍', profile: { preferredLanguage: 'th' } }).language, 'en');
 });
 
 test('saved Thai plus a Hebrew question: Thai reply, Hebrew switch notice, Hebrew is still the source text', async () => {
-  const state = mock(profileWith({ preferredLanguage: 'th', language: 'th' }));
+  const state = mock(profileWith({ preferredLanguage: 'th', language: 'th', languageSource: 'explicit' }));
   const result = await send(HE_Q, 'en');
   assert.deepEqual(state.translate, ['he->en', 'en->th']);
   assert.match(result.reply, /^\[th\]/);
@@ -135,14 +154,14 @@ test('saved Thai plus a Hebrew question: Thai reply, Hebrew switch notice, Hebre
 });
 
 test('saved Thai plus a Thai question: no conflict notice', async () => {
-  mock(profileWith({ preferredLanguage: 'th', language: 'th' }));
+  mock(profileWith({ preferredLanguage: 'th', language: 'th', languageSource: 'explicit' }));
   const result = await send('สิทธิของฉันในฐานะคนงานก่อสร้าง', 'th', 'tg-thai-match');
   assert.doesNotMatch(result.reply, /התשובה/);
   assert.doesNotMatch(result.reply, /The answer is in/);
 });
 
 test('saved Hebrew plus a Hebrew question on an English phone: Hebrew reply, no notice', async () => {
-  const state = mock(profileWith({ preferredLanguage: 'he', language: 'he' }));
+  const state = mock(profileWith({ preferredLanguage: 'he', language: 'he', languageSource: 'explicit' }));
   const result = await send(HE_Q, 'en', 'tg-he-match');
   assert.deepEqual(state.translate, ['he->en', 'en->he']);
   assert.match(result.reply, /^\[he\]/);
@@ -150,26 +169,40 @@ test('saved Hebrew plus a Hebrew question on an English phone: Hebrew reply, no 
 });
 
 test('language switches via עברית, ไทย, English and /language he|th|en', async () => {
-  const hebrew = mock(profileWith({ preferredLanguage: 'th', language: 'th' }));
+  const hebrew = mock(profileWith({ preferredLanguage: 'th', language: 'th', languageSource: 'explicit' }));
   const toHebrew = await send('עברית', 'th', 'tg-switch-he');
   assert.deepEqual(hebrew.setPreferred, ['he']);
   assert.equal(toHebrew.status, 'LANGUAGE_UPDATED');
   assert.equal(toHebrew.reply, 'מעכשיו אענה לך בעברית.');
 
-  const thai = mock(profileWith({ preferredLanguage: 'he' }));
+  const thai = mock(profileWith({ preferredLanguage: 'he', languageSource: 'explicit' }));
   const toThai = await send('/language th', 'en', 'tg-switch-th');
   assert.deepEqual(thai.setPreferred, ['th']);
   assert.equal(toThai.reply, 'ต่อจากนี้ฉันจะตอบเป็นภาษาไทย');
 
-  const english = mock(profileWith({ preferredLanguage: 'th' }));
+  const english = mock(profileWith({ preferredLanguage: 'th', languageSource: 'explicit' }));
   const toEnglish = await send('English', 'th', 'tg-switch-en');
   assert.deepEqual(english.setPreferred, ['en']);
   assert.equal(toEnglish.reply, 'From now on I will reply in English.');
 
-  const command = mock(profileWith({ preferredLanguage: 'en' }));
+  const command = mock(profileWith({ preferredLanguage: 'en', languageSource: 'explicit' }));
   assert.equal((await send('/language@GringoPilotBot he', 'en', 'tg-switch-cmd')).status, 'LANGUAGE_UPDATED');
   assert.deepEqual(command.setPreferred, ['he']);
   assert.equal((await send('ไทย', 'en', 'tg-switch-word')).status, 'LANGUAGE_UPDATED');
+});
+
+test('preferredLanguage th with languageSource text or missing stays with the Hebrew message', async () => {
+  for (const extra of [
+    { preferredLanguage: 'th', languageSource: 'text' },
+    { preferredLanguage: 'th' },
+  ]) {
+    const state = mock(profileWith(extra));
+    const result = await send(HE_Q, 'en', `tg-not-explicit-${extra.languageSource || 'missing'}`);
+    assert.deepEqual(state.translate, ['he->en', 'en->he']);
+    assert.match(result.reply, /^\[he\]/);
+    assert.doesNotMatch(result.reply, /^\[th\]/);
+    assert.doesNotMatch(result.reply, /התשובה בתאית/);
+  }
 });
 
 test('a clear Hebrew question with no explicit preference follows the message, not a Thai hint or an English phone', async () => {
@@ -190,7 +223,7 @@ test('onboarding stores the language answer as an explicit user choice', async (
 });
 
 test('fallback and daily-limit replies use the saved language and carry the conflict notice', async () => {
-  const fallback = mock(profileWith({ preferredLanguage: 'th', language: 'th' }));
+  const fallback = mock(profileWith({ preferredLanguage: 'th', language: 'th', languageSource: 'explicit' }));
   knowledgeAgentService.answerQuestion = async () => ({ answer: '', category: 'Other', status: 'NOT_FOUND', relevantKnowledge: [] });
   aiProviderService.generateReply = async () => {
     throw new Error('provider down');
@@ -200,7 +233,7 @@ test('fallback and daily-limit replies use the saved language and carry the conf
   assert.match(fallbackResult.reply, /התשובה בתאית/);
   assert.equal(fallback.translate.includes('he->en'), true);
 
-  mock(profileWith({ preferredLanguage: 'he', language: 'he' }));
+  mock(profileWith({ preferredLanguage: 'he', language: 'he', languageSource: 'explicit' }));
   knowledgeAgentService.answerQuestion = async () => ({ answer: '', category: 'Other', status: 'NOT_FOUND', relevantKnowledge: [] });
   aiProviderService.generateReply = async () => {
     throw new AiBudgetError('user_daily_limit');

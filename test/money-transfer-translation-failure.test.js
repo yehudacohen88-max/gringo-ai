@@ -41,7 +41,7 @@ const ENGLISH_TRANSFER_REPLY = [
 ].join('\n\n');
 
 function completeProfile(overrides = {}) {
-  return {
+  const profile = {
     userId: 'usr_transfer_chat',
     fullName: 'Somchai',
     country: 'Thailand',
@@ -57,6 +57,14 @@ function completeProfile(overrides = {}) {
     wantsExchangeRateAlerts: 'Yes',
     ...overrides,
   };
+  if (
+    Object.prototype.hasOwnProperty.call(overrides, 'preferredLanguage')
+    && overrides.preferredLanguage
+    && !Object.prototype.hasOwnProperty.call(overrides, 'languageSource')
+  ) {
+    profile.languageSource = 'explicit';
+  }
+  return profile;
 }
 
 function enableActiveSupervisor() {

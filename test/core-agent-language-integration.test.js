@@ -71,7 +71,7 @@ function mockCoreLanguage(profile, options = {}) {
 }
 
 test('Core Agent preferredLanguage overrides text language', async () => {
-  const state = mockCoreLanguage(completeProfile({ preferredLanguage: 'th' }));
+  const state = mockCoreLanguage(completeProfile({ preferredLanguage: 'th', languageSource: 'explicit' }));
 
   await coreAgentService.processWebMessage({
     message: 'שלום',
@@ -84,7 +84,7 @@ test('Core Agent preferredLanguage overrides text language', async () => {
 });
 
 test('Core Agent preferredLanguage overrides channel language', async () => {
-  const state = mockCoreLanguage(completeProfile({ preferredLanguage: 'he' }));
+  const state = mockCoreLanguage(completeProfile({ preferredLanguage: 'he', languageSource: 'explicit' }));
 
   await coreAgentService.processWebMessage({
     message: 'Hello Gringo',
@@ -145,7 +145,7 @@ test('Core Agent uses text detection when profile and channel are empty', async 
 });
 
 test('Core Agent uses default language when no signal exists', async () => {
-  const state = mockCoreLanguage(completeProfile({ preferredLanguage: 'en' }));
+  const state = mockCoreLanguage(completeProfile({ preferredLanguage: 'en', languageSource: 'explicit' }));
 
   await coreAgentService.processWebMessage({
     message: '?!',
@@ -172,7 +172,7 @@ test('Core Agent does not let auto-detected language override a clear message', 
 });
 
 test('Core Agent never overwrites preferredLanguage with automatic detection', async () => {
-  const state = mockCoreLanguage(completeProfile({ preferredLanguage: 'th', detectedLanguage: 'he' }));
+  const state = mockCoreLanguage(completeProfile({ preferredLanguage: 'th', detectedLanguage: 'he', languageSource: 'explicit' }));
 
   await coreAgentService.processWebMessage({
     message: 'Привет',
@@ -185,7 +185,7 @@ test('Core Agent never overwrites preferredLanguage with automatic detection', a
 });
 
 test('Core Agent keeps existing intent routing unchanged for job search', async () => {
-  const state = mockCoreLanguage(completeProfile({ preferredLanguage: 'th' }));
+  const state = mockCoreLanguage(completeProfile({ preferredLanguage: 'th', languageSource: 'explicit' }));
 
   const result = await coreAgentService.processWebMessage({
     message: 'I am looking for construction work in Tel Aviv',

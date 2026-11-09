@@ -19,7 +19,7 @@ const { coreAgentService } = require('../src/modules/core-agent');
 Module._load = originalLoad;
 
 function completeProfile(overrides = {}) {
-  return {
+  const profile = {
     userId: 'usr_outgoing_translation',
     fullName: 'Somchai',
     country: 'Thailand',
@@ -35,6 +35,14 @@ function completeProfile(overrides = {}) {
     wantsExchangeRateAlerts: 'Yes',
     ...overrides,
   };
+  if (
+    Object.prototype.hasOwnProperty.call(overrides, 'preferredLanguage')
+    && overrides.preferredLanguage
+    && !Object.prototype.hasOwnProperty.call(overrides, 'languageSource')
+  ) {
+    profile.languageSource = 'explicit';
+  }
+  return profile;
 }
 
 function mockCore(profile, options = {}) {

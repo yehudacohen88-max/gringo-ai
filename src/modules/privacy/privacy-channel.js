@@ -80,7 +80,10 @@ async function resolvePrivacyLanguage(channel, message = {}) {
     const found = await crmAgentService.findUserByChannel(channel, message.channelUserId);
     if (found) {
       const saved = await crmAgentService.getUserLanguage(found);
-      profile = { preferredLanguage: saved.preferredLanguage || '' };
+      profile = {
+        preferredLanguage: saved.preferredLanguage || '',
+        languageSource: saved.languageSource || '',
+      };
     }
   } catch (error) {
     profile = {};
