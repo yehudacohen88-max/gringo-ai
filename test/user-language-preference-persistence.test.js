@@ -107,6 +107,7 @@ test('does not write when preferred language values are unchanged', async () => 
   const writes = mockRepository(
     baseProfile({
       preferredLanguage: 'he',
+      language: 'he',
       languageSource: 'explicit',
       languageUpdatedAt: '2026-07-27T10:00:00.000Z',
     })
@@ -178,6 +179,22 @@ test('old profiles with empty language fields still return a safe user language 
     languageUpdatedAt: '',
     language: '',
   });
+});
+
+test('explicit switch updates the legacy language column and a later read keeps it', async () => {
+  const writes = mockRepository(baseProfile({
+    language: 'th',
+    preferredLanguage: 'th',
+    languageSource: 'text',
+  }));
+
+  const updated = await crmAgentService.setPreferredLanguage('usr_language_preference', 'he');
+
+  assert.equal(updated.preferredLanguage, 'he');
+  assert.equal(updated.language, 'he');
+  assert.equal(updated.languageSource, 'explicit');
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].profile.language, 'he');
 });
 
 test('language updates preserve unrelated profile data', async () => {

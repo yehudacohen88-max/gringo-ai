@@ -22,6 +22,17 @@ const knowledgeBaseService = require('../src/modules/knowledge-agent/knowledge-b
 const documentService = require('../src/modules/documents/document.service');
 const crmAgentService = require('../src/modules/crm-agent/crm-agent.service');
 
+function approvedLegalSource(source = {}) {
+  return {
+    ...source,
+    verified: true,
+    url: source.url || 'https://example.test/wage-protection-law',
+    verifiedAt: source.verifiedAt || '2026-09-01',
+    contentStatus: 'approved',
+    reviewedBy: source.reviewedBy || 'test-legal-review',
+  };
+}
+
 function createTask(overrides = {}) {
   return {
     taskId: 'task_employment_1',
@@ -198,11 +209,10 @@ test('salary payment timing with monthly scope reads verified rule and avoids ge
             salaryDue: 'Salary for a month is due at the end of that month for a monthly-paid employee.',
             delayedAfter: 'Unpaid monthly salary becomes delayed salary if it has not been paid by the ninth day after the payment date.',
           },
-          source: {
+          source: approvedLegalSource({
             title: 'Wage Protection Law, 5718-1958',
             authority: 'State of Israel',
-            verified: true,
-          },
+          }),
         };
       },
     }],
@@ -245,7 +255,9 @@ test('salary payment timing variants use focused handler with monthly scope', as
 
     assert.equal(result.status, 'success');
     assert.equal(result.output.employmentIntent, 'salary_payment_timing');
-    assert.match(result.output.message, /Wage Protection Law, 5718-1958/i);
+    assert.match(result.output.message, /should not guess/i);
+    assert.equal(result.output.needsVerifiedRule, true);
+    assert.doesNotMatch(result.output.message, /ninth day/i);
     assertSupportedResultContract(result);
   }
 });
@@ -351,11 +363,10 @@ test('missing salary with complete monthly facts retrieves verified knowledge an
             salaryDueReference: 'israel_salary_payment_timing_monthly',
             delayedSalaryStatusReference: 'israel_salary_payment_timing_monthly',
           },
-          source: {
+          source: approvedLegalSource({
             title: 'Wage Protection Law, 5718-1958',
             authority: 'State of Israel',
-            verified: true,
-          },
+          }),
         };
       },
       findVerifiedSalaryPaymentTimingRule: () => ({
@@ -364,11 +375,10 @@ test('missing salary with complete monthly facts retrieves verified knowledge an
           salaryDue: 'Salary for a month is due at the end of that month for a monthly-paid employee.',
           delayedAfter: 'Unpaid monthly salary becomes delayed salary if it has not been paid by the ninth day after the payment date.',
         },
-        source: {
+        source: approvedLegalSource({
           title: 'Wage Protection Law, 5718-1958',
           authority: 'State of Israel',
-          verified: true,
-        },
+        }),
       }),
     }],
   ], async () => {

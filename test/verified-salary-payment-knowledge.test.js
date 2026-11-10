@@ -86,10 +86,9 @@ test('salary payment timing handler uses verified monthly knowledge record', asy
   const result = await employmentSalaryAgent.execute(createSalaryTask('When should I receive my salary?'));
 
   assert.equal(result.status, 'success');
-  assert.match(result.output.message, /due at the end of that month/i);
-  assert.match(result.output.message, /ninth day after the payment date/i);
-  assert.match(result.output.message, /Wage Protection Law, 5718-1958/i);
-  assert.equal(result.output.needsVerifiedRule, false);
+  assert.match(result.output.message, /should not guess/i);
+  assert.equal(result.output.needsVerifiedRule, true);
+  assert.doesNotMatch(result.output.message, /ninth day after the payment date/i);
 });
 
 test('salary payment timing handler protects unknown payment frequency', async () => {

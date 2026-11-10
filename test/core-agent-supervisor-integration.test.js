@@ -1089,9 +1089,9 @@ test('active Supervisor blocked salary-payment follow-up resumes original task w
   });
 
   assert.equal(second.status, 'SUPERVISOR_COMPLETED');
-  assert.match(second.reply, /Salary for a month is due at the end of that month/i);
-  assert.match(second.reply, /ninth day after the payment date/i);
-  assert.match(second.reply, /Wage Protection Law, 5718-1958/i);
+  assert.match(second.reply, /should not guess/i);
+  assert.doesNotMatch(second.reply, /ninth day after the payment date/i);
+  assert.doesNotMatch(second.reply, /Wage Protection Law/i);
   assert.doesNotMatch(second.reply, /employer has until the 9th to pay/i);
 
   const completedPlan = supervisorService.getPlan('req_active_salary_frequency_start');

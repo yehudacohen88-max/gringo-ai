@@ -123,7 +123,7 @@ test('repeated same-day pattern extracts daily hours and repeated day facts', as
   assert.equal(facts(result).workweekDays, null);
 });
 
-test('combined common message reaches safe calculation and returns 410 ILS', async () => {
+test('combined common message extracts facts and does not state statutory overtime pay', async () => {
   const result = await executeSalary('I earn 40 ILS per hour, work 5 days a week, and worked 10 hours today.');
 
   assert.equal(result.status, 'success');
@@ -131,27 +131,30 @@ test('combined common message reaches safe calculation and returns 410 ILS', asy
   assert.equal(facts(result).currency, 'ILS');
   assert.equal(facts(result).workweekDays, 5);
   assert.equal(facts(result).dailyHoursWorked, 10);
-  assert.equal(result.output.calculation.grossPay, 410);
+  assert.equal(result.output.calculation, undefined);
+  assert.match(result.output.message, /does not yet have verified salary-calculation rules/i);
+  assert.doesNotMatch(result.output.message, /410 ILS|125%/i);
 });
 
-test('6-day common message reaches safe 370 ILS calculation', async () => {
+test('6-day common message does not state statutory overtime pay', async () => {
   const result = await executeSalary('I earn 40 ILS per hour. I work 6 days a week. I worked 9 hours today.');
 
   assert.equal(result.status, 'success');
-  assert.equal(result.output.calculation.grossPay, 370);
+  assert.equal(result.output.calculation, undefined);
+  assert.doesNotMatch(result.output.message, /370 ILS|125%/i);
 });
 
-test('weekly-only message stays safe and partial', async () => {
+test('weekly-only message does not state the 42-hour statutory threshold', async () => {
   const result = await executeSalary('I earn 40 ILS/hour and worked 45 hours this week.');
 
-  assert.equal(result.status, 'partial');
+  assert.equal(result.status, 'success');
   assert.equal(facts(result).salaryRate, 40);
   assert.equal(facts(result).salaryRateType, 'hourly');
   assert.equal(facts(result).weeklyHoursWorked, 45);
   assert.equal(facts(result).dailyHoursWorked, null);
-  assert.equal(result.output.overtimeClassification.weeklyClassification.weeklyOvertimeCandidateHours, 3);
   assert.equal(result.output.calculation, undefined);
-  assert.match(result.output.message, /weekly total alone/i);
+  assert.match(result.output.message, /does not yet have verified salary-calculation rules/i);
+  assert.doesNotMatch(result.output.message, /42 hours/i);
 });
 
 test('transfer amount in multi-intent source message is not mistaken for salary or hours', async () => {
@@ -231,10 +234,11 @@ test('existing overtime calculations remain unchanged', async () => {
     shortenedWorkdayRuleApplicable: true,
   });
 
-  assert.equal(five.output.calculation.grossPay, 410);
-  assert.equal(six.output.calculation.grossPay, 370);
-  assert.equal(night.output.calculation.grossPay, 330);
-  assert.equal(shortened.output.calculation.grossPay, 330);
+  for (const result of [five, six, night, shortened]) {
+    assert.equal(result.output.needsVerifiedRule, true);
+    assert.equal(result.output.calculation, undefined);
+    assert.doesNotMatch(result.output.message, /125%|150%|410 ILS|370 ILS|330 ILS/i);
+  }
 });
 
 test('salary payment timing remains unchanged', async () => {
@@ -244,7 +248,8 @@ test('salary payment timing remains unchanged', async () => {
   });
 
   assert.equal(result.output.employmentIntent, 'salary_payment_timing');
-  assert.match(result.output.message, /Salary for a month is due at the end of that month/i);
+  assert.match(result.output.message, /should not guess/i);
+  assert.doesNotMatch(result.output.message, /ninth day/i);
 });
 
 test('missing salary remains unchanged', async () => {
@@ -256,7 +261,8 @@ test('missing salary remains unchanged', async () => {
   });
 
   assert.equal(result.output.employmentIntent, 'missing_salary');
-  assert.match(result.output.message, /August/i);
+  assert.match(result.output.message, /should not guess/i);
+  assert.doesNotMatch(result.output.message, /ninth day/i);
 });
 
 test('Supervisor, Finance, Health, and profile-memory detection remain available', async () => {
@@ -301,6 +307,6 @@ test('Supervisor, Finance, Health, and profile-memory detection remain available
 test('no new legal rules or payroll engine behavior appears in salary extraction responses', async () => {
   const result = await executeSalary('I earn 40 ILS per hour. I work 5 days a week. I worked 10 hours today.');
 
-  assert.doesNotMatch(result.output.message, /net salary is|tax is|pension is|holiday pay is|accommodation deduction is/i);
-  assert.match(result.output.message, /not a full payslip calculation/i);
+  assert.doesNotMatch(result.output.message, /net salary is|tax is|pension is|holiday pay is|accommodation deduction is|125%/i);
+  assert.match(result.output.message, /does not yet have verified salary-calculation rules/i);
 });

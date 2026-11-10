@@ -1,14 +1,28 @@
 const { KNOWLEDGE_CATEGORIES } = require('./knowledge-agent.constants');
 
+// Clear rights questions are checked before jobs: "rights as a construction
+// worker" mentions a worker but asks about rights. Only unambiguous rights
+// terms are here; salary/pay/employer keep their original, later position so
+// money-transfer questions that mention paying are not re-routed.
+// Thai, Sinhala and Hindi terms need native-speaker review.
+const STRONG_RIGHTS_PATTERN = new RegExp([
+  '\\b(rights|overtime|payslips?|pension|dismissal|dismissed|fired|minimum wage)\\b',
+  'זכויות|שעות נוספות|תלוש|פיטורי|פנסיה|שכר מינימום',
+  'สิทธิ|ค่าล่วงเวลา|ค่าจ้าง',
+  'අයිතිවාසිකම්|අතිකාල',
+  'अधिकार|ओवरटाइम',
+].join('|'), 'u');
+
 async function classifyQuestion(questionContext) {
   const question = String(questionContext?.question || '').toLowerCase();
   let category = 'Other';
 
-  if (/\b(job|jobs|work|worker|working)\b|\u05e2\u05d1\u05d5\u05d3|\u05de\u05e9\u05e8\u05d4|\u05ea\u05e2\u05e1\u05d5\u05e7\u05d4/.test(question)) category = 'Jobs FAQ';
+  if (STRONG_RIGHTS_PATTERN.test(question)) category = 'Workers Rights';
+  else if (/\b(job|jobs|work|worker|working)\b|\u05e2\u05d1\u05d5\u05d3|\u05de\u05e9\u05e8\u05d4|\u05ea\u05e2\u05e1\u05d5\u05e7\u05d4|מחפש עבודה/.test(question)) category = 'Jobs FAQ';
   else if (/\b(house|housing|rent|apartment|room)\b|\u05d3\u05d9\u05e8\u05d4|\u05d7\u05d3\u05e8|\u05e9\u05db\u05d9\u05e8\u05d5\u05ea|\u05d1\u05d9\u05ea|\u05de\u05d2\u05d5\u05e8\u05d9\u05dd/.test(question)) category = 'Housing';
   else if (/\b(money|transfer)\b|\u05db\u05e1\u05e3|\u05d4\u05e2\u05d1\u05e8\u05d4|\u05dc\u05d4\u05e2\u05d1\u05d9\u05e8/.test(question)) category = 'Money Transfer Companies';
   else if (/\b(exchange|rate|rates)\b|\u05e9\u05e2\u05e8|\u05de\u05d8\u05d1\u05e2|\u05d7\u05dc\u05d9\u05e4\u05d9\u05df/.test(question)) category = 'Exchange Rates';
-  else if (/\b(rights|salary|law|legal|pay|paid|employer)\b|\u05d6\u05db\u05d5\u05d9\u05d5\u05ea|\u05e9\u05db\u05e8|\u05d7\u05d5\u05e7|\u05de\u05e9\u05e4\u05d8/.test(question)) category = 'Workers Rights';
+  else if (/\b(rights|salary|law|legal|pay|paid|employer)\b|\u05d6\u05db\u05d5\u05d9\u05d5\u05ea|\u05e9\u05db\u05e8|\u05d7\u05d5\u05e7|\u05de\u05e9\u05e4\u05d8|משכורת|לא שילמו/.test(question)) category = 'Workers Rights';
   else if (/\b(document|documents|visa|passport)\b|\u05de\u05e1\u05de\u05da|\u05de\u05e1\u05de\u05db\u05d9\u05dd|\u05d5\u05d9\u05d6\u05d4|\u05d3\u05e8\u05db\u05d5\u05df/.test(question)) category = 'Documents';
   else if (/\b(doctor|health|healthcare|clinic|hospital)\b|\u05e8\u05d5\u05e4\u05d0|\u05d1\u05e8\u05d9\u05d0\u05d5\u05ea|\u05de\u05e8\u05e4\u05d0\u05d4|\u05d1\u05d9\u05ea \u05d7\u05d5\u05dc\u05d9\u05dd/.test(question)) category = 'Healthcare';
   else if (/\b(emergency|police|ambulance|fire)\b|\u05d7\u05d9\u05e8\u05d5\u05dd|\u05de\u05e9\u05d8\u05e8\u05d4|\u05d0\u05de\u05d1\u05d5\u05dc\u05e0\u05e1|\u05db\u05d9\u05d1\u05d5\u05d9/.test(question)) category = 'Emergency Numbers';

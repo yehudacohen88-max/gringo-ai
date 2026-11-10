@@ -3,6 +3,7 @@ const jobService = require('../../jobs/job.service');
 const { assistantCatalogReply, catalogMeta } = require('../../../shared/pilotCatalog');
 const knowledgeAgentService = require('../../knowledge-agent/knowledge-agent.service');
 const knowledgeBaseService = require('../../knowledge-agent/knowledge-base.service');
+const { passesLegalVerification } = require('../../knowledge-agent/legal-verification');
 const documentService = require('../../documents/document.service');
 const crmAgentService = require('../../crm-agent/crm-agent.service');
 const {
@@ -36,6 +37,29 @@ const SALARY_CALCULATION_UNVERIFIED_RULE_RESPONSE = 'I have the basic salary fac
 
 function cleanText(value) {
   return value === undefined || value === null ? '' : String(value).trim();
+}
+
+function presentableLegalRecord(record) {
+  return passesLegalVerification(record) ? record : null;
+}
+
+function statutoryOvertimeRecordsPresentable() {
+  return [
+    knowledgeBaseService.findVerifiedOvertimePayMultiplierRule(),
+    knowledgeBaseService.findWeeklyOvertimeClassificationRule(),
+    knowledgeBaseService.findFiveDayDailyOvertimeClassificationRule(),
+    knowledgeBaseService.findSixDayDailyOvertimeClassificationRule(),
+  ].every((record) => passesLegalVerification(record));
+}
+
+function unverifiedOvertimeCalculation(task, facts) {
+  return createResult(task, 'success', {
+    capability: 'jobs.salary',
+    employmentIntent: 'salary_amount_or_calculation',
+    message: SALARY_CALCULATION_UNVERIFIED_RULE_RESPONSE,
+    needsVerifiedRule: true,
+    ...(facts ? { knownFacts: facts } : {}),
+  });
 }
 
 function normalizeEmploymentMessage(value) {
@@ -774,6 +798,9 @@ function handleSalaryCalculation(task, input = {}) {
 
     if (facts.dailyHoursWorked === null && facts.weeklyHoursWorked !== null) {
       const hasWeeklyOvertimeCandidate = weeklyCandidateHours > 0;
+      if (hasWeeklyOvertimeCandidate && !statutoryOvertimeRecordsPresentable()) {
+        return unverifiedOvertimeCalculation(task, facts);
+      }
       const message = hasWeeklyOvertimeCandidate
         ? `I can identify possible weekly overtime above 42 hours: ${formatAmount(weeklyCandidateHours)} candidate hour(s), but I should not calculate final overtime pay from a weekly total alone because I do not know the daily sequence or whether any daily overtime overlaps with the weekly candidate hours.`
         : 'I can see the weekly total hours, but I do not have enough daily information to calculate daily overtime pay safely.';
@@ -804,6 +831,7 @@ function handleSalaryCalculation(task, input = {}) {
 
     if (needsWorkweekDays) {
       if (weeklyCandidateHours > 0) {
+        if (!statutoryOvertimeRecordsPresentable()) return unverifiedOvertimeCalculation(task, facts);
         const message = [
           `I can identify possible weekly overtime above 42 hours: ${formatAmount(weeklyCandidateHours)} candidate hour(s).`,
           SALARY_CALCULATION_WORKWEEK_DAYS_QUESTION,
@@ -839,6 +867,7 @@ function handleSalaryCalculation(task, input = {}) {
     const hasUnresolvedSpecialContext = dailyClassification.status === PATH_STATUS.SPECIAL_CONTEXT_REQUIRES_SEPARATE_RULE;
 
     if (dailyClassification.status === PATH_STATUS.CLASSIFIED) {
+      if (!statutoryOvertimeRecordsPresentable()) return unverifiedOvertimeCalculation(task, facts);
       const multiplierRule = knowledgeBaseService.findVerifiedOvertimePayMultiplierRule();
       const regularHours = Math.min(facts.dailyHoursWorked, dailyClassification.regularDailyHoursBoundary);
       const regularPay = regularHours * facts.salaryRate;
@@ -1072,8 +1101,8 @@ function handleMissingSalary(task, input = {}) {
     }, ['unsupported_payment_frequency'], [MISSING_SALARY_UNSUPPORTED_FREQUENCY_RESPONSE]);
   }
 
-  const missingSalaryKnowledge = knowledgeBaseService.findVerifiedMissingSalaryRule();
-  const salaryTimingKnowledge = knowledgeBaseService.findVerifiedSalaryPaymentTimingRule();
+  const missingSalaryKnowledge = presentableLegalRecord(knowledgeBaseService.findVerifiedMissingSalaryRule());
+  const salaryTimingKnowledge = presentableLegalRecord(knowledgeBaseService.findVerifiedSalaryPaymentTimingRule());
 
   if (!missingSalaryKnowledge || !salaryTimingKnowledge) {
     return createResult(task, 'success', {
@@ -1135,7 +1164,7 @@ function handleSalaryPaymentTiming(task, input = {}, employmentIntent = {}) {
     return blocked(task, 'missing_required_input', SALARY_PAYMENT_FREQUENCY_QUESTION);
   }
 
-  const knowledge = knowledgeBaseService.findVerifiedSalaryPaymentTimingRule();
+  const knowledge = presentableLegalRecord(knowledgeBaseService.findVerifiedSalaryPaymentTimingRule());
   if (!knowledge) {
     return createResult(task, 'success', {
       capability: 'jobs.salary',

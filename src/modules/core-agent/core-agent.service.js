@@ -17,6 +17,8 @@ const moneyService = require('../money/money.service');
 const serviceService = require('../services/service.service');
 const taskService = require('../tasks/task.service');
 const { knowledgeAgentService } = require('../knowledge-agent');
+const { knowledgeSafeForAi } = require('../knowledge-agent/legal-verification');
+const { createRightsUnverifiedFallback } = require('../knowledge-agent/rights-unverified-fallback');
 const { languageDetectionService } = require('../language');
 const {
   appendLanguageConflictNotice,
@@ -664,6 +666,7 @@ async function buildLiveMultiIntentSupervisorResponse({
 function shouldUseAiProvider(question, knowledgeResult) {
   const normalized = String(question || '').trim().toLowerCase();
 
+  if (knowledgeResult && knowledgeResult.legalFallback) return false;
   if (knowledgeResult.status === 'NOT_FOUND') return true;
   if (knowledgeResult.category === 'Other') return true;
   if (/^(hi|hello|hey|shalom|good morning|good evening|good afternoon|\u05e9\u05dc\u05d5\u05dd|\u05d4\u05d9\u05d9|\u05d0\u05d4\u05dc\u05df)\b/.test(normalized)) {
@@ -679,6 +682,10 @@ const FRIENDLY_FALLBACK = {
   he: 'אין לי כרגע תשובה מאומתת לשאלה הזו, ואני לא רוצה לנחש. למידע רשמי אפשר לפנות לקו לעובד (kavlaoved.org.il), לרשות האוכלוסין וההגירה (gov.il) או למשרד העבודה.',
   th: 'ตอนนี้ฉันยังไม่มีคำตอบที่ยืนยันได้สำหรับคำถามนี้ และไม่อยากเดา สำหรับข้อมูลทางการ ติดต่อ Kav LaOved (kavlaoved.org.il), สำนักงานประชากรและการเข้าเมืองของอิสราเอล (gov.il) หรือกระทรวงแรงงานอิสราเอล',
   en: "I don't have a verified answer to this right now, and I don't want to guess. For official information, contact Kav LaOved (kavlaoved.org.il), the Population and Immigration Authority (gov.il) or the Ministry of Labor.",
+  // Sinhala and Hindi below are pending native-speaker review. They do not
+  // repeat the domains above, because those pages could not be confirmed.
+  si: 'මේ ප්‍රශ්නයට තහවුරු කළ පිළිතුරක් මට දැනට නැත, එබැවින් මම අනුමාන නොකරමි. නිල තොරතුරු සඳහා රජයේ නිල වෙබ් අඩවි බලන්න.',
+  hi: 'इस प्रश्न का सत्यापित उत्तर अभी मेरे पास नहीं है, और मैं अनुमान नहीं लगाना चाहता। आधिकारिक जानकारी के लिए सरकारी निकायों की आधिकारिक वेबसाइट देखें।',
 };
 
 // Shown when the daily AI limit is reached or AI is switched off. It does not
@@ -687,12 +694,17 @@ const AI_PAUSED_REPLY = {
   he: 'הגעת למגבלת השאלות היומית לתשובות חכמות. אפשר להמשיך לשאול על עבודה, דיור, מסמכים וכסף, ומחר המגבלה מתאפסת.',
   th: 'วันนี้คุณใช้คำตอบอัจฉริยะครบตามจำนวนแล้ว คุณยังถามเรื่องงาน ที่พัก เอกสาร และการเงินได้ และจะรีเซ็ตใหม่พรุ่งนี้',
   en: "You've reached today's limit for smart answers. You can still ask about jobs, housing, documents and money, and the limit resets tomorrow.",
+  // Pending native-speaker review.
+  si: 'අද ස්මාර්ට් පිළිතුරු සීමාව ඉක්මවා ඇත. රැකියා, නිවාස, ලේඛන සහ මුදල් ගැන තවම අසන්න පුළුවන්. සීමාව හෙට යළි සකසයි.',
+  hi: 'आज के स्मार्ट उत्तरों की सीमा पूरी हो गई है। आप नौकरी, आवास, दस्तावेज़ और पैसे के बारे में अभी भी पूछ सकते हैं। सीमा कल रीसेट होगी।',
 };
 
 function replyLanguageKey(language) {
   const code = String(language || '').toLowerCase();
-  if (code.startsWith('he')) return 'he';
+  if (code.startsWith('he') || code.startsWith('iw')) return 'he';
   if (code.startsWith('th')) return 'th';
+  if (code.startsWith('si')) return 'si';
+  if (code.startsWith('hi')) return 'hi';
   return 'en';
 }
 
@@ -2386,7 +2398,10 @@ async function processWebMessage(messageContext = {}) {
     error: '',
   };
 
-  if (shouldUseAiProvider(question, knowledgeResult)) {
+  if (knowledgeResult.legalFallback) {
+    reply = createRightsUnverifiedFallback(userLanguage);
+    finalStatus = 'LEGAL_UNVERIFIED';
+  } else if (shouldUseAiProvider(question, knowledgeResult)) {
     ai.attempted = true;
 
     try {
@@ -2395,7 +2410,7 @@ async function processWebMessage(messageContext = {}) {
         budgetKey: getConversationKey(userContext),
         userLanguage,
         userProfile,
-        relevantKnowledge: knowledgeResult.relevantKnowledge || [],
+        relevantKnowledge: knowledgeSafeForAi(knowledgeResult.relevantKnowledge || []),
         recentConversation: getRecentConversation(userContext),
         conversationContext,
         memorySnapshot,
@@ -2444,6 +2459,7 @@ async function processWebMessage(messageContext = {}) {
 
   return deliverResponse({
     reply,
+    ...(knowledgeResult.legalFallback ? { skipOutgoingTranslation: true, replyLanguage: userLanguage } : {}),
     category: knowledgeResult.category,
     status: finalStatus,
     ai,
@@ -2474,6 +2490,8 @@ module.exports = {
   FRIENDLY_FALLBACK,
   createAiPausedReply,
   createFriendlyFallback,
+  createRightsUnverifiedFallback,
+  shouldUseAiProvider,
   forgetConversation,
   coordinateAgents,
   getOnboardingStatus: onboardingService.getStatus,

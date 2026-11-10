@@ -92,17 +92,32 @@ function messageFor(language, key) {
   return table[code] || table.en;
 }
 
-function languageFromProfile(profile) {
-  return languageDetectionService.normalizeLanguageCode(
-    profile && (profile.preferredLanguage || profile.language || profile.detectedLanguage)
-  ) || 'en';
+// preferredLanguage is a saved choice only when languageSource is explicit.
+// Otherwise use detectedLanguage, then the channel language (Telegram
+// language_code, passed in or copied onto the profile for this call).
+// The legacy language column is not a choice: it is updated on an explicit
+// switch so the sheet stays consistent, and it must not pick command copy.
+function explicitOrDetectedLanguage(profile) {
+  if (!profile || typeof profile !== 'object') return '';
+  const normalize = languageDetectionService.normalizeLanguageCode;
+  const source = String(profile.languageSource || '').trim().toLowerCase();
+  if (source === 'explicit') {
+    const preferred = normalize(profile.preferredLanguage);
+    if (preferred) return preferred;
+  }
+  return normalize(profile.detectedLanguage) || '';
+}
+
+function languageFromProfile(profile, channelLanguage) {
+  return explicitOrDetectedLanguage(profile)
+    || languageDetectionService.normalizeLanguageCode(
+      channelLanguage || (profile && profile.channelLanguage)
+    )
+    || 'en';
 }
 
 function responseLanguage(req, profile) {
-  const fromProfile = profile
-    ? languageDetectionService.normalizeLanguageCode(profile.preferredLanguage || profile.language)
-    : '';
-  return fromProfile || languageFromRequest(req);
+  return explicitOrDetectedLanguage(profile) || languageFromRequest(req);
 }
 
 module.exports = {

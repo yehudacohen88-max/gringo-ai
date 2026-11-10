@@ -215,12 +215,10 @@ test('daily overtime message connects safely to salary calculation handler', asy
   ));
 
   assert.equal(result.status, 'success');
-  assert.equal(result.output.knowledgeId, DAILY_OVERTIME_RECORD_ID);
-  assert.equal(result.output.calculation.regularHours, 9);
-  assert.equal(result.output.calculation.dailyOvertimeCandidateHours, 1);
-  assert.equal(result.output.calculation.grossPay, 410);
-  assert.match(result.output.message || '', /Gross pay for these supplied hours: 410 ILS/i);
-  assert.doesNotMatch(result.output.message || '', /net salary is|complete payslip amount is/i);
+  assert.equal(result.output.needsVerifiedRule, true);
+  assert.equal(result.output.calculation, undefined);
+  assert.match(result.output.message || '', /does not yet have verified salary-calculation rules/i);
+  assert.doesNotMatch(result.output.message || '', /410 ILS|125%|net salary is|complete payslip amount is/i);
 });
 
 test('salary payment timing knowledge remains unchanged', () => {

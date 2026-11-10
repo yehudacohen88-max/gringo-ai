@@ -1,5 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+const { isLegalCategory, isLegalKnowledgeItem, passesLegalVerification } = require('./legal-verification');
+const { topicKeysForQuestion } = require('./topic-mappings');
 
 const KNOWLEDGE_BASE_DIR = path.join(__dirname, 'knowledge-base');
 
@@ -7,9 +9,12 @@ function normalize(value) {
   return String(value || '').toLowerCase();
 }
 
+// Keeps letters and combining marks of every script (Hebrew, Thai, Sinhala,
+// Devanagari, and the rest), so non-Latin keywords can match at all.
 function normalizeText(value) {
   return normalize(value)
-    .replace(/[^a-z0-9\u0590-\u05ff%:\s-]/gi, ' ')
+    .normalize('NFC')
+    .replace(/[^\p{L}\p{M}\p{N}%:\s-]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -42,7 +47,25 @@ function knowledgeTermMatches(question, term) {
   const normalizedTerm = normalizeText(term);
   if (!normalizedQuestion || !normalizedTerm) return false;
   const escapedTerm = normalizedTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
-  return new RegExp(`(^|\\b)${escapedTerm}(\\b|$)`, 'i').test(normalizedQuestion);
+  // \b is ASCII-only in JavaScript, so a Hebrew keyword in mid-sentence never
+  // matched. Unicode letter/number lookarounds give whole-word matching for
+  // every script. Thai is written without spaces between words, so a Thai
+  // keyword matches as a substring.
+  if (/[\u0e00-\u0e7f]/.test(normalizedTerm)) return normalizedQuestion.includes(normalizedTerm);
+  // Hebrew attaches one or two prefix letters (ו ה ב כ ל מ ש) to a word:
+  // "כעובד" is "עובד" with a prefix.
+  const hebrewPrefix = /^[\u0590-\u05ff]/.test(normalizedTerm) ? '(?:[והבכלמש]{1,2})?' : '';
+  return new RegExp(`(?<![\\p{L}\\p{M}\\p{N}])${hebrewPrefix}${escapedTerm}(?![\\p{L}\\p{M}\\p{N}])`, 'iu').test(normalizedQuestion);
+}
+
+function itemTopicMatchesKeys(item, keys) {
+  const topic = normalizeText(String(item && item.topic || '').replace(/[_-]+/g, ' '));
+  return keys.some((key) => {
+    const label = normalizeText(String(key || '').replace(/[_-]+/g, ' '));
+    if (!topic || !label) return false;
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+    return new RegExp(`(?<![\\p{L}\\p{M}\\p{N}])${escaped}(?![\\p{L}\\p{M}\\p{N}])`, 'iu').test(topic);
+  });
 }
 
 function isStrongRelevanceTerm(term) {
@@ -70,12 +93,14 @@ function hasPositiveRelevanceEvidence(item = {}, question = '', category = '') {
   });
   const titleMatches = isStrongRelevanceTerm(item.title) && knowledgeTermMatches(normalizedQuestion, item.title);
   const topicMatches = isStrongRelevanceTerm(item.topic) && knowledgeTermMatches(normalizedQuestion, item.topic);
+  const mappedTopicMatches = itemTopicMatchesKeys(item, topicKeysForQuestion(question, knowledgeTermMatches));
 
   return Boolean(
-    (categoryMatches && (matchedStrongKeyword || titleMatches || topicMatches))
+    (categoryMatches && (matchedStrongKeyword || titleMatches || topicMatches || mappedTopicMatches))
     || matchedExplicitKeyword
     || titleMatches
     || topicMatches
+    || mappedTopicMatches
   );
 }
 
@@ -112,6 +137,10 @@ function scoreKnowledgeItem(item, question, category) {
     score += 1;
   }
 
+  if (itemTopicMatchesKeys(item, topicKeysForQuestion(question, knowledgeTermMatches))) {
+    score += 5;
+  }
+
   return score;
 }
 
@@ -133,6 +162,11 @@ function findRelevantKnowledge(question, category, limit = 5) {
       keywords: Array.isArray(match.item.keywords) ? [...match.item.keywords] : [],
       question: match.item.question,
       answer: match.item.answer,
+      source: match.item.source && typeof match.item.source === 'object' ? { ...match.item.source } : null,
+      verifiedAt: match.item.verifiedAt || '',
+      contentStatus: match.item.contentStatus || '',
+      reviewedBy: match.item.reviewedBy || '',
+      legalReviewBy: match.item.legalReviewBy || '',
       score: match.score,
       relevanceEvidence: {
         categoryMatched: normalizeText(match.item.category) === normalizeText(category),
@@ -717,6 +751,15 @@ function findWeeklyRestOvertimeInteractionRule(items = loadKnowledgeItems()) {
   return items.find(matchesWeeklyRestOvertimeInteractionScope) || null;
 }
 
+function formatVerifiedLegalAnswer(item) {
+  const answer = String(item.answer || '').trim();
+  const title = String(item.source && item.source.title || '').trim();
+  const url = String(item.source && item.source.url || '').trim();
+  const citation = [title, url].filter(Boolean).join(' ');
+  if (!citation) return answer;
+  return `${answer}\n\nSource: ${citation}`;
+}
+
 async function searchKnowledgeBase(classifiedQuestion) {
   const question = String(classifiedQuestion?.questionContext?.question || '');
   const category = classifiedQuestion?.category || 'Other';
@@ -724,18 +767,43 @@ async function searchKnowledgeBase(classifiedQuestion) {
     if (match.score <= 0) return false;
     return hasPositiveRelevanceEvidence(match, question, category);
   });
-  const matches = relevantKnowledge;
+  const withheldUnverifiedIds = [];
+  const presentable = [];
+  for (const match of relevantKnowledge) {
+    if (isLegalKnowledgeItem(match) && !passesLegalVerification(match)) {
+      withheldUnverifiedIds.push(match.id);
+    } else {
+      presentable.push(match);
+    }
+  }
 
-  if (matches.length > 0) {
-    const bestMatch = matches[0];
+  // Rights questions with nothing that passed the gate never become a free
+  // answer. Unverified legal records are not returned as context.
+  if (isLegalCategory(category) && presentable.length === 0) {
+    return {
+      status: 'NOT_FOUND',
+      legalFallback: true,
+      matches: [],
+      answer: '',
+      category,
+      relevantKnowledge: [],
+      withheldUnverifiedIds,
+      classifiedQuestion,
+    };
+  }
+
+  if (presentable.length > 0) {
+    const bestMatch = presentable[0];
 
     return {
       status: 'FOUND',
-      matches: matches.map((match) => match.id),
-      answer: bestMatch.answer,
+      legalFallback: false,
+      matches: presentable.map((match) => match.id),
+      answer: isLegalKnowledgeItem(bestMatch) ? formatVerifiedLegalAnswer(bestMatch) : bestMatch.answer,
       category: bestMatch.category,
       item: bestMatch,
-      relevantKnowledge: matches,
+      relevantKnowledge: presentable,
+      withheldUnverifiedIds,
       classifiedQuestion,
     };
   }
@@ -743,20 +811,24 @@ async function searchKnowledgeBase(classifiedQuestion) {
   if (/\b(human|person|team)\b/.test(normalize(question))) {
     return {
       status: 'NEEDS_HUMAN',
+      legalFallback: false,
       matches: [],
       answer: '',
       category,
-      relevantKnowledge,
+      relevantKnowledge: [],
+      withheldUnverifiedIds,
       classifiedQuestion,
     };
   }
 
   return {
     status: 'NOT_FOUND',
+    legalFallback: false,
     matches: [],
     answer: '',
     category,
-    relevantKnowledge,
+    relevantKnowledge: [],
+    withheldUnverifiedIds,
     classifiedQuestion,
   };
 }
@@ -791,4 +863,5 @@ module.exports = {
   scoreKnowledgeItem,
   searchKnowledgeBase,
   hasPositiveRelevanceEvidence,
+  normalizeText,
 };

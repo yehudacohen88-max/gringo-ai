@@ -24,66 +24,25 @@ async function executeSalary(question, input = {}) {
   return employmentSalaryAgent.execute(createTask({ question, ...input }));
 }
 
-test('salary handler uses overtime classification for a safe 5-day daily calculation', async () => {
-  const result = await executeSalary('I earn 40 ILS per hour. I work 5 days a week. I worked 10 hours today.');
-
+function assertStatutoryPayWithheld(result) {
   assert.equal(result.status, 'success');
-  assert.equal(result.output.calculation.regularHours, 9);
-  assert.equal(result.output.calculation.dailyOvertimeCandidateHours, 1);
-  assert.equal(result.output.calculation.overtimeAt125Hours, 1);
-  assert.equal(result.output.calculation.overtimeAt125Pay, 50);
-  assert.equal(result.output.calculation.grossPay, 410);
-  assert.match(result.output.message, /Gross pay for these supplied hours: 410 ILS/i);
-});
+  assert.equal(result.output.needsVerifiedRule, true);
+  assert.equal(result.output.calculation, undefined);
+  assert.match(result.output.message, /does not yet have verified salary-calculation rules/i);
+  assert.doesNotMatch(result.output.message, /125%|150%|42 hours|410 ILS|370 ILS|330 ILS|460 ILS|520 ILS/i);
+}
 
-test('5-day 11 hours uses first two overtime hours at 125 percent', async () => {
-  const result = await executeSalary('I earn 40 ILS per hour. I work 5 days a week. I worked 11 hours today.');
-
-  assert.equal(result.output.calculation.regularHours, 9);
-  assert.equal(result.output.calculation.overtimeAt125Hours, 2);
-  assert.equal(result.output.calculation.overtimeAt125Pay, 100);
-  assert.equal(result.output.calculation.overtimeAt150Hours, 0);
-  assert.equal(result.output.calculation.grossPay, 460);
-});
-
-test('5-day 12 hours uses third and later overtime hours at 150 percent', async () => {
-  const result = await executeSalary('I earn 40 ILS per hour. I work 5 days a week. I worked 12 hours today.');
-
-  assert.equal(result.output.calculation.regularHours, 9);
-  assert.equal(result.output.calculation.overtimeAt125Hours, 2);
-  assert.equal(result.output.calculation.overtimeAt150Hours, 1);
-  assert.equal(result.output.calculation.overtimeAt150Pay, 60);
-  assert.equal(result.output.calculation.grossPay, 520);
-});
-
-test('6-day workweek uses 8 regular hours and does not apply 5-day boundary', async () => {
-  const result = await executeSalary('I earn 40 ILS per hour. I work 6 days a week. I worked 9 hours today.');
-
-  assert.equal(result.status, 'success');
-  assert.equal(result.output.calculation.regularHours, 8);
-  assert.equal(result.output.calculation.overtimeAt125Hours, 1);
-  assert.equal(result.output.calculation.grossPay, 370);
-});
-
-test('verified night work uses 7-hour boundary and invents no night premium', async () => {
-  const result = await executeSalary('I earn 40 ILS per hour. I worked 8 hours today.', {
-    isNightWork: true,
-  });
-
-  assert.equal(result.output.calculation.regularHours, 7);
-  assert.equal(result.output.calculation.dailyOvertimeCandidateHours, 1);
-  assert.equal(result.output.calculation.grossPay, 330);
-  assert.doesNotMatch(result.output.message, /night premium|night bonus|differential/i);
-});
-
-test('verified shortened day uses 7-hour boundary and does not apply 6-day boundary', async () => {
-  const result = await executeSalary('I earn 40 ILS per hour. I work 6 days a week. I worked 8 hours today.', {
-    shortenedWorkdayRuleApplicable: true,
-  });
-
-  assert.equal(result.output.calculation.regularHours, 7);
-  assert.equal(result.output.calculation.overtimeAt125Hours, 1);
-  assert.equal(result.output.calculation.grossPay, 330);
+test('statutory overtime pay is withheld until the multiplier records pass review', async () => {
+  for (const [question, input] of [
+    ['I earn 40 ILS per hour. I work 5 days a week. I worked 10 hours today.', {}],
+    ['I earn 40 ILS per hour. I work 5 days a week. I worked 11 hours today.', {}],
+    ['I earn 40 ILS per hour. I work 5 days a week. I worked 12 hours today.', {}],
+    ['I earn 40 ILS per hour. I work 6 days a week. I worked 9 hours today.', {}],
+    ['I earn 40 ILS per hour. I worked 8 hours today.', { isNightWork: true }],
+    ['I earn 40 ILS per hour. I work 6 days a week. I worked 8 hours today.', { shortenedWorkdayRuleApplicable: true }],
+  ]) {
+    assertStatutoryPayWithheld(await executeSalary(question, input));
+  }
 });
 
 test('missing hourly rate asks only for hourly rate', async () => {
@@ -119,26 +78,18 @@ test('workweekDays is not inferred from time-entry count', async () => {
   assert.deepEqual(result.output.missingFacts, ['workweek_days']);
 });
 
-test('daily and weekly overlap returns safe partial answer without double counting', async () => {
+test('daily and weekly overlap does not state a combined statutory amount', async () => {
   const result = await executeSalary('I earn 40 ILS per hour. I work 5 days a week. I worked 10 hours today and 45 hours this week.');
 
-  assert.equal(result.status, 'partial');
-  assert.equal(result.output.calculation.grossPay, 410);
-  assert.equal(result.output.overtimeClassification.aggregationRequired, true);
-  assert.equal(result.output.overtimeClassification.candidateHoursAggregated, false);
-  assert.match(result.output.message, /cannot safely add daily and weekly overtime together/i);
+  assertStatutoryPayWithheld(result);
+  assert.doesNotMatch(result.output.message, /cannot safely add daily and weekly overtime together/i);
 });
 
-test('weekly overtime signal is preserved when workweek structure is still missing', async () => {
+test('weekly overtime above 42 hours is not stated while the classification record is unreviewed', async () => {
   const result = await executeSalary('I earn 40 ILS per hour. I worked 10 hours today and 45 hours this week.');
 
-  assert.equal(result.status, 'partial');
-  assert.deepEqual(result.output.missingFacts, ['workweek_days']);
-  assert.equal(result.output.overtimeClassification.weeklyClassification.weeklyOvertimeCandidateHours, 3);
-  assert.match(result.output.message, /weekly overtime above 42 hours/i);
-  assert.match(result.output.message, /5 days or 6 days/i);
-  assert.match(result.output.message, /should not calculate or add daily and weekly overtime together/i);
-  assert.equal(result.output.calculation, undefined);
+  assertStatutoryPayWithheld(result);
+  assert.doesNotMatch(result.output.message, /42 hours/i);
 });
 
 test('weekly-rest and overtime unsafe arithmetic avoids universal 175 or 200 percent', async () => {
@@ -161,12 +112,10 @@ test('holiday work remains safely unresolved and unknown special context blocks 
   assert.match(unknown.output.message, /special workday context/i);
 });
 
-test('result is gross only and avoids full payroll calculations', async () => {
+test('withheld overtime pay does not become a payslip', async () => {
   const result = await executeSalary('I earn 40 ILS per hour. I work 5 days a week. I worked 10 hours today.');
 
-  assert.equal(result.output.calculation.isGrossOnly, true);
-  assert.equal(result.output.calculation.isCompletePayslip, false);
-  assert.match(result.output.message, /not a full payslip calculation/i);
+  assertStatutoryPayWithheld(result);
   assert.doesNotMatch(result.output.message, /net salary is|tax is|pension is|accommodation deduction is/i);
 });
 
@@ -231,5 +180,5 @@ test('Supervisor multi-intent Finance Health profile and sourceMessage behavior 
   assert.equal(finance.status, 'partial');
   assert.match(finance.output.message, /not currently have enough real reported observations/i);
   assert.equal(health.status, 'success');
-  assert.equal(sourceMessage.output.calculation.grossPay, 410);
+  assertStatutoryPayWithheld(sourceMessage);
 });
