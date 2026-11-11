@@ -17,13 +17,15 @@ const moneyService = require('../money/money.service');
 const serviceService = require('../services/service.service');
 const taskService = require('../tasks/task.service');
 const { knowledgeAgentService } = require('../knowledge-agent');
-const { knowledgeSafeForAi, passesLegalVerification } = require('../knowledge-agent/legal-verification');
+const { isLegalCategory, knowledgeSafeForAi } = require('../knowledge-agent/legal-verification');
 const { createRightsUnverifiedFallback } = require('../knowledge-agent/rights-unverified-fallback');
 const {
   containsUnsupportedStatutoryClaim,
+  claimTopics,
   guardGeneratedLegalOutput,
   guardLegalReply,
   looksLikeLegalOrRightsQuestion,
+  recordsCoverClaim,
   replyContainsRightsFallback,
   swapRightsFallbackToLanguage,
 } = require('../knowledge-agent/legal-question-guard');
@@ -2433,14 +2435,13 @@ async function processWebMessage(messageContext = {}) {
     error: '',
   };
 
-  const verifiedLegalContext = (knowledgeResult.relevantKnowledge || []).some((item) => passesLegalVerification(item));
-  const legalQuestion = looksLikeLegalOrRightsQuestion(originalQuestion) || looksLikeLegalOrRightsQuestion(question);
-  // Block free generation. A non-statutory answer already retrieved stays;
-  // statutory wording in it is removed by the output guard below.
-  const blockFreeLegalAnswer = Boolean(
-    knowledgeResult.legalFallback
-    || (legalQuestion && !verifiedLegalContext && shouldUseAiProvider(question, knowledgeResult))
-  );
+  const asked = `${originalQuestion}\n${question}`;
+  const verifiedRecords = knowledgeResult.relevantKnowledge || [];
+  const legalSegment = looksLikeLegalOrRightsQuestion(asked) || isLegalCategory(knowledgeResult.category);
+  const claimCovered = legalSegment && recordsCoverClaim(verifiedRecords, claimTopics(asked));
+  // A legal segment with no topic-matched verified record is not sent to the
+  // model and is not shown as a retrieved answer.
+  const blockFreeLegalAnswer = Boolean(legalSegment && !claimCovered);
   let withholdLegalTranslation = blockFreeLegalAnswer;
   if (blockFreeLegalAnswer) {
     reply = createRightsUnverifiedFallback(userLanguage);
@@ -2462,8 +2463,10 @@ async function processWebMessage(messageContext = {}) {
       });
 
       const guardedReply = guardGeneratedLegalOutput(aiResult.text, {
+        question: asked,
         language: userLanguage,
-        verifiedLegalContext,
+        legalSegment,
+        verifiedRecords,
       });
       if (guardedReply !== aiResult.text) withholdLegalTranslation = true;
       reply = guardedReply;

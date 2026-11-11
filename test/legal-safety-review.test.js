@@ -239,11 +239,126 @@ test('ordinary job and money questions are not replaced by the legal fallback', 
 });
 
 test('generated text with a statutory percentage is replaced when nothing was verified', () => {
-  const guarded = guardGeneratedLegalOutput('You should get 150% on Saturday.', { language: 'en', verifiedLegalContext: false });
+  const guarded = guardGeneratedLegalOutput('You should get 150% on Saturday.', {
+    question: 'how much should I get paid for Saturday?',
+    language: 'en',
+    legalSegment: true,
+  });
   assert.equal(guarded, RIGHTS_UNVERIFIED_FALLBACK.en);
-  const kept = guardGeneratedLegalOutput('You should get 150% on Saturday.', { language: 'en', verifiedLegalContext: true });
-  assert.match(kept, /150%/);
   assert.match(buildDeveloperInstructions(), /do not state a statutory percentage/i);
+});
+
+test('a pattern-free legal claim never reaches the user without a matching verified record', () => {
+  const claim = 'Your employer can keep your passport if you agree.';
+  const guarded = guardGeneratedLegalOutput(claim, {
+    question: 'can my boss keep my passport?',
+    language: 'en',
+    legalSegment: true,
+    verifiedLegalContext: true,
+  });
+  assert.equal(guarded, RIGHTS_UNVERIFIED_FALLBACK.en);
+  assert.equal(guarded.includes(claim), false);
+
+  const flagged = guardLegalReply(claim, {
+    question: 'can my boss keep my passport?',
+    legalSegment: true,
+    legalClaimsVerified: true,
+    verifiedLegalContext: true,
+  });
+  assert.equal(flagged, RIGHTS_UNVERIFIED_FALLBACK.en);
+  assert.equal(flagged.includes('if you agree'), false);
+});
+
+test('a verified overtime record does not authorize a passport claim', () => {
+  const overtime = {
+    id: 'israel_overtime_pay_multipliers_section_16a',
+    topic: 'overtime_pay_multipliers',
+    title: 'Overtime pay multipliers',
+    category: 'Workers Rights',
+    keywords: ['overtime pay', '125%'],
+    source: {
+      verified: true,
+      url: 'https://example.test/overtime',
+      verifiedAt: '2026-11-01',
+      contentStatus: 'approved',
+      reviewedBy: 'legal-review',
+    },
+  };
+  const claim = 'Your employer can keep your passport if you agree.';
+  const reply = guardLegalReply(claim, {
+    question: 'can my boss keep my passport?',
+    legalSegment: true,
+    verifiedRecords: [overtime],
+  });
+  assert.equal(reply, RIGHTS_UNVERIFIED_FALLBACK.en);
+  assert.equal(reply.includes(claim), false);
+});
+
+test('unsupported passport, dismissal, deduction and leave claims fall closed in he, en and th', () => {
+  const cases = [
+    ['can my boss keep my passport?', 'en'],
+    ['can they fire me if I am sick?', 'en'],
+    ['can they deduct for housing?', 'en'],
+    ['am I entitled to sick leave?', 'en'],
+    ['מותר למעסיק לקחת לי את הדרכון?', 'he'],
+    ['אפשר לפטר אותי אם אני חולה?', 'he'],
+    ['אפשר לנכות לי על דיור?', 'he'],
+    ['מגיעים לי ימי מחלה?', 'he'],
+    ['นายจ้างยึดหนังสือเดินทางของฉันได้ไหม', 'th'],
+    ['นายจ้างไล่ฉันออกได้ไหม', 'th'],
+    ['นายจ้างหักค่าที่พักได้ไหม', 'th'],
+    ['ฉันได้ลาป่วยไหม', 'th'],
+  ];
+  for (const [question, language] of cases) {
+    const reply = guardLegalReply('Your employer can keep your passport if you agree.', {
+      question,
+      language,
+      legalSegment: true,
+      verifiedRecords: [],
+    });
+    assert.equal(reply, RIGHTS_UNVERIFIED_FALLBACK[language], question);
+    assert.equal(reply.includes('if you agree'), false, question);
+  }
+});
+
+test('mixed intent keeps job listings and user-supplied arithmetic, and still falls closed on the legal part', () => {
+  const job = supervisorService.composeResponse({
+    status: 'success',
+    items: [
+      {
+        status: 'success',
+        sourceQuestion: 'find me a job',
+        output: { message: 'Relevant jobs:\n1. Helper - Tel Aviv' },
+      },
+      {
+        status: 'success',
+        sourceQuestion: 'can my boss keep my passport?',
+        output: { message: 'Your employer can keep your passport if you agree.', legalClaimsVerified: true },
+      },
+    ],
+  }, { language: 'en' });
+  assert.match(job, /Relevant jobs/);
+  assert.match(job, /I do not have verified information on this yet/);
+  assert.doesNotMatch(job, /if you agree/);
+
+  const arithmetic = supervisorService.composeResponse({
+    status: 'success',
+    items: [
+      {
+        status: 'success',
+        sourceQuestion: 'calculate 10 hours at 40 shekels',
+        output: { message: 'For 10 regular hours at 40 ILS per hour, your basic gross pay for those regular hours is 400 ILS.' },
+      },
+      {
+        status: 'success',
+        sourceQuestion: 'can they deduct for housing?',
+        output: { message: 'Yes, housing can be deducted from your wage.' },
+      },
+    ],
+  }, { language: 'he' });
+  assert.match(arithmetic, /basic gross pay for those regular hours/);
+  assert.match(arithmetic, /אין לי מידע מאומת/);
+  assert.doesNotMatch(arithmetic, /deducted from your wage/);
 });
 
 test('privacy consent and onboarding language set stay as they were', () => {

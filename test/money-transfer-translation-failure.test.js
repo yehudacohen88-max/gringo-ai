@@ -264,7 +264,9 @@ test('Hebrew salary plus transfer stays partial when incoming translation fails'
     assert.equal(plan.incomingTranslation.fallbackUsed, true);
     assert.equal(plan.incomingTranslation.errorCode, 'PROVIDER_RATE_LIMIT');
     assert.equal(plan.incomingTranslation.failureType, 'rate_limit');
-    assert.equal(response.reply, `${HEBREW_TRANSFER_REPLY}\n\n${HEBREW_NOTICE}`);
+    assert.match(response.reply, /לפי דיווחים שנשמרו ב-Gringo/);
+    assert.match(response.reply, /I do not have verified information on this yet/);
+    assert.match(response.reply, new RegExp(HEBREW_NOTICE));
     assert.equal(response.reply.includes('PROVIDER_RATE_LIMIT'), false);
     assert.equal(response.reply.includes('insufficient_quota'), false);
     assert.equal(response.reply.includes('429'), false);

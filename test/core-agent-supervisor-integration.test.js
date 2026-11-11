@@ -183,7 +183,7 @@ test('integration is disabled by default', async () => {
     };
     const response = await coreAgentService.processWebMessage(messageContext);
 
-    assert.equal(response.reply.includes('Workers should keep written records and ask for help if wages are unpaid.'), true);
+    assert.equal(response.reply.includes('I do not have verified information on this yet') && !response.reply.includes('Workers should keep written records'), true);
     assert.equal(createRequestContextCalls, 0);
     assert.equal(messageContext.supervisorPlan, undefined);
   });
@@ -200,7 +200,8 @@ test('existing behavior is unchanged when disabled', async () => {
     channelUserId: 'supervisor-disabled-behavior',
   });
 
-  assert.equal(response.reply, 'Workers should keep written records and ask for help if wages are unpaid.');
+  assert.match(response.reply, /I do not have verified information on this yet/);
+  assert.doesNotMatch(response.reply, /Workers should keep written records/);
   assert.equal(response.category, 'Rights');
   assert.equal(response.supervisorPlan, undefined);
   assert.equal(state.getAiCalls(), 0);
@@ -246,7 +247,7 @@ test('Supervisor runs when both flags are enabled and stores an internal plan', 
     assert.equal(storedPlan.requestId, 'req_enabled');
     assert.equal(messageContext.supervisorPlan.requestId, 'req_enabled');
     assert.equal(response.supervisorPlan, undefined);
-    assert.equal(response.reply.includes('Workers should keep written records and ask for help if wages are unpaid.'), true);
+    assert.equal(response.reply.includes('I do not have verified information on this yet') && !response.reply.includes('Workers should keep written records'), true);
   }))));
 });
 
@@ -283,7 +284,8 @@ test('Supervisor failure does not interrupt the request', async () => {
         channelUserId: 'supervisor-failure',
       });
 
-      assert.equal(response.reply, 'Workers should keep written records and ask for help if wages are unpaid.');
+      assert.match(response.reply, /I do not have verified information on this yet/);
+  assert.doesNotMatch(response.reply, /Workers should keep written records/);
       assert.match(warnings[0], /Supervisor integration warning/);
     });
   } finally {
@@ -308,7 +310,8 @@ test('no Domain Agent is executed and no additional LLM call occurs', async () =
       channelUserId: 'supervisor-no-execution',
     });
 
-    assert.equal(response.reply, 'Workers should keep written records and ask for help if wages are unpaid.');
+    assert.match(response.reply, /I do not have verified information on this yet/);
+  assert.doesNotMatch(response.reply, /Workers should keep written records/);
     assert.equal(executed, false);
     assert.equal(state.getAiCalls(), 0);
   } finally {
@@ -342,7 +345,7 @@ test('active delivery follows the execution flag by default', async () => {
       channelUserId: 'active-disabled-default',
     });
 
-    assert.equal(response.reply.includes('Workers should keep written records and ask for help if wages are unpaid.'), true);
+    assert.equal(response.reply.includes('I do not have verified information on this yet') && !response.reply.includes('Workers should keep written records'), true);
     assert.equal(response.status, 'SUPERVISOR_COMPLETED');
     assert.equal(executed, true);
   } finally {
@@ -723,7 +726,7 @@ test('enabled active Supervisor flow runs end to end for a single-domain request
   try {
     const response = await coreAgentService.processWebMessage({
       requestId: 'req_active_single',
-      message: 'salary employer rights',
+      message: 'what is new in the community today',
       channel: 'web',
       channelUserId: 'active-single',
     });
@@ -1133,7 +1136,7 @@ test('active Supervisor response uses normal delivery path and translates at mos
   try {
     const response = await coreAgentService.processWebMessage({
       requestId: 'req_active_translate',
-      message: 'salary employer rights',
+      message: 'what is new in the community today',
       channel: 'line',
       channelUserId: 'active-translate',
     });
@@ -1167,7 +1170,8 @@ test('active Supervisor failure falls back to existing Core Agent behavior witho
       channelUserId: 'active-failure',
     });
 
-    assert.equal(response.reply, 'Workers should keep written records and ask for help if wages are unpaid.');
+    assert.match(response.reply, /I do not have verified information on this yet/);
+  assert.doesNotMatch(response.reply, /Workers should keep written records/);
     assert.equal(JSON.stringify(response).includes('internal supervisor failure'), false);
     assert.match(warnings[0], /Supervisor integration warning/);
   } finally {

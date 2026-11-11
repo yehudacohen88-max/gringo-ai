@@ -211,10 +211,10 @@ test('missing salary hourly multi-intent does not apply monthly rule and preserv
   });
 
   assert.equal(response.status, 'SUPERVISOR_MULTI_INTENT_PARTIAL');
-  assert.match(response.reply, /I only have verified missing-salary knowledge for monthly-paid workers right now/i);
+  assert.match(response.reply, /I do not have verified information on this yet/i);
   assert.doesNotMatch(response.reply, /Salary for a month is due at the end of that month/i);
+  assert.doesNotMatch(response.reply, /ninth day/i);
   assert.match(response.reply, /not currently have enough real reported observations for ILS → THB/i);
-  assert.equal(response.reply.indexOf('monthly-paid workers') < response.reply.indexOf('not currently have enough real reported observations'), true);
 });
 
 test('salary calculation and money transfer multi-intent preserves salary facts and Finance result', async () => {

@@ -1,8 +1,7 @@
 const { randomUUID } = require('node:crypto');
 const { employmentSalaryAgent } = require('../domains/employment-salary.agent');
-const { guardLegalReply, joinGuardedParts, swapRightsFallbackToLanguage } = require('../../knowledge-agent/legal-question-guard');
+const { guardLegalReply, joinGuardedParts, looksLikeLegalOrRightsQuestion, swapRightsFallbackToLanguage } = require('../../knowledge-agent/legal-question-guard');
 const { createRightsUnverifiedFallback } = require('../../knowledge-agent/rights-unverified-fallback');
-const { passesLegalVerification } = require('../../knowledge-agent/legal-verification');
 const { financeConsumerAgent } = require('../domains/finance-consumer.agent');
 const { healthLifeCommunityAgent } = require('../domains/health-life-community.agent');
 const { translationService } = require('../../translation');
@@ -367,16 +366,29 @@ function transferResponseAlreadyComplete(domainResults = []) {
     && spoken.every((result) => cleanText(result?.output?.capability) === 'finance.transfer');
 }
 
-function outputHasVerifiedLegalContext(output) {
-  if (!output || typeof output !== 'object') return false;
-  if (output.legalClaimsVerified === true) return true;
+const LEGAL_EMPLOYMENT_INTENTS = new Set([
+  'missing_salary',
+  'salary_payment_timing',
+  'overtime',
+  'payslip',
+  'rest_days',
+  'employer_issue',
+]);
+
+function collectVerifiedRecords(output) {
+  if (!output || typeof output !== 'object') return [];
+  const records = [];
+  if (Array.isArray(output.verifiedRecords)) records.push(...output.verifiedRecords);
+  if (Array.isArray(output.relevantKnowledge)) records.push(...output.relevantKnowledge);
   const knowledge = output.knowledge;
-  if (knowledge && knowledge.legalFallback) return false;
-  const candidates = [];
-  if (knowledge && typeof knowledge === 'object') candidates.push(knowledge);
-  if (Array.isArray(knowledge && knowledge.relevantKnowledge)) candidates.push(...knowledge.relevantKnowledge);
-  if (Array.isArray(output.relevantKnowledge)) candidates.push(...output.relevantKnowledge);
-  return candidates.some((item) => passesLegalVerification(item));
+  if (knowledge && Array.isArray(knowledge.relevantKnowledge)) records.push(...knowledge.relevantKnowledge);
+  return records;
+}
+
+function segmentLooksLegal(question, output) {
+  if (looksLikeLegalOrRightsQuestion(question)) return true;
+  if (output && LEGAL_EMPLOYMENT_INTENTS.has(cleanText(output.employmentIntent))) return true;
+  return false;
 }
 
 function outputText(output = {}) {
@@ -1929,7 +1941,9 @@ class SupervisorService {
         return guardLegalReply(raw, {
           question: cleanText(result.sourceQuestion),
           language,
-          verifiedLegalContext: outputHasVerifiedLegalContext(result.output),
+          legalSegment: segmentLooksLegal(result.sourceQuestion, result.output),
+          verifiedRecords: collectVerifiedRecords(result.output),
+          output: result.output,
         });
       })
       .filter(Boolean);
@@ -2177,7 +2191,9 @@ class SupervisorService {
       .map((result) => guardLegalReply(outputText(result.output), {
         question: cleanText(result.sourceQuestion),
         language,
-        verifiedLegalContext: outputHasVerifiedLegalContext(result.output),
+        legalSegment: segmentLooksLegal(result.sourceQuestion, result.output),
+        verifiedRecords: collectVerifiedRecords(result.output),
+        output: result.output,
       }))
       .filter(Boolean);
     const suppressGenericFollowUp = domainResults.some((result) => result.output?.suppressGenericFollowUp === true);
