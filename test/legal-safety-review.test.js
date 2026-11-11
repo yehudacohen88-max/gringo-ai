@@ -248,7 +248,8 @@ test('generated text with a statutory percentage is replaced when nothing was ve
     language: 'en',
     legalSegment: true,
   });
-  assert.equal(guarded, RIGHTS_UNVERIFIED_FALLBACK.en);
+  assert.ok(guarded.includes(RIGHTS_UNVERIFIED_FALLBACK.en));
+  assert.equal(guarded.includes('150%'), false);
   assert.match(buildDeveloperInstructions(), /do not state a statutory percentage/i);
 });
 
@@ -260,7 +261,7 @@ test('a pattern-free legal claim never reaches the user without a matching verif
     legalSegment: true,
     verifiedLegalContext: true,
   });
-  assert.equal(guarded, RIGHTS_UNVERIFIED_FALLBACK.en);
+  assert.ok(guarded.includes(RIGHTS_UNVERIFIED_FALLBACK.en));
   assert.equal(guarded.includes(claim), false);
 
   const flagged = guardLegalReply(claim, {
@@ -269,7 +270,7 @@ test('a pattern-free legal claim never reaches the user without a matching verif
     legalClaimsVerified: true,
     verifiedLegalContext: true,
   });
-  assert.equal(flagged, RIGHTS_UNVERIFIED_FALLBACK.en);
+  assert.ok(flagged.includes(RIGHTS_UNVERIFIED_FALLBACK.en));
   assert.equal(flagged.includes('if you agree'), false);
 });
 
@@ -294,7 +295,7 @@ test('a verified overtime record does not authorize a passport claim', () => {
     legalSegment: true,
     verifiedRecords: [overtime],
   });
-  assert.equal(reply, RIGHTS_UNVERIFIED_FALLBACK.en);
+  assert.ok(reply.includes(RIGHTS_UNVERIFIED_FALLBACK.en));
   assert.equal(reply.includes(claim), false);
 });
 
@@ -320,7 +321,7 @@ test('unsupported passport, dismissal, deduction and leave claims fall closed in
       legalSegment: true,
       verifiedRecords: [],
     });
-    assert.equal(reply, RIGHTS_UNVERIFIED_FALLBACK[language], question);
+    assert.ok(reply.includes(RIGHTS_UNVERIFIED_FALLBACK[language]), question);
     assert.equal(reply.includes('if you agree'), false, question);
   }
 });
@@ -373,7 +374,7 @@ test('mixed free text is not kept just because it also mentions a job or asks a 
       language,
       legalSegment: true,
     });
-    assert.equal(reply, RIGHTS_UNVERIFIED_FALLBACK[language], language);
+    assert.ok(reply.includes(RIGHTS_UNVERIFIED_FALLBACK[language]), language);
     assert.equal(reply.includes('keep your passport'), false, language);
     assert.equal(reply.includes('Relevant jobs'), false, language);
   }
@@ -383,7 +384,7 @@ test('mixed free text is not kept just because it also mentions a job or asks a 
       language,
       legalSegment: true,
     });
-    assert.equal(embedded, RIGHTS_UNVERIFIED_FALLBACK[language], language);
+    assert.ok(embedded.includes(RIGHTS_UNVERIFIED_FALLBACK[language]), language);
     assert.equal(embedded.includes('deduct housing'), false, language);
   }
 });

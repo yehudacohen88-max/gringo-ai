@@ -1,0 +1,26 @@
+{
+  "schema": "source-grounded",
+  "id": "draft-piba2026-hours_rest-en",
+  "language": "en",
+  "topic": "hours_rest",
+  "section": "11",
+  "authorityId": "piba",
+  "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+  "sourceRetrievedAt": "2026-11-11",
+  "handbookEdition": "2026",
+  "nativeReviewRequired": false,
+  "status": "draft",
+  "extraction": "ok",
+  "answer": "The handbook states that workers are entitled to a weekly rest period of at least 36 hours, including Friday, Saturday, or Sunday.",
+  "informationLabel": "This summary is provided for general informational purposes only, and is not a substitute for the wording of the relevant laws, regulations, procedures and extension orders, which are binding.",
+  "claims": [
+    {
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "section": "11",
+      "quote": "workers are entitled to a weekly rest period of at least 36 hours, which must include Friday or Saturday or Sunday.",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    }
+  ]
+}

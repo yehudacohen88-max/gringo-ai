@@ -31,7 +31,7 @@ const CONSTRUCTION = [
   'इज़राइल में निर्माण मज़दूर के रूप में मेरे क्या अधिकार हैं?',
 ];
 
-const LEGAL_CLAIM = /\d|%|@|https?:|125|150|ninth day|שעות עבודה ומנוחה/;
+const LEGAL_CLAIM = /%|@|125|150|ninth day|שעות עבודה ומנוחה|\b\d{2,4}-\d{3,}\b/;
 
 async function category(question) {
   return (await classifyQuestion({ question })).category;

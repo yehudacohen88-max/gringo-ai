@@ -7,6 +7,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "node --require ./scripts/configure-test-env.cjs --test",
+    "verify:quotes": "node scripts/verify-knowledge-quotes.js",
     "test:sheets": "node scripts/testGoogleSheetsConnection.js",
     "setup:workers": "node scripts/setupWorkerSheets.js",
     "setup:crm-agent": "node scripts/setupCrmAgentSheets.js",

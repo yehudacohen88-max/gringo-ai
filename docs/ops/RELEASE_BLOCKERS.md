@@ -1,5 +1,13 @@
 # Release blockers
 
+## Source-grounded handbook drafts are not approved
+
+The PIBA Foreign Workers' Rights Handbook 2026 PDFs and text extracts are in `knowledge/sources/piba_handbook_2026/`. Draft paraphrases for ten topics, in English and Hebrew only, are in `knowledge/drafts/`. Thai, Hindi, and Sinhala extracts are garbled, so those drafts are `extraction_unreliable` and have no quote and no answer. Nothing in `knowledge/approvals/` approves a record. The bot still does not state a legal figure. See `docs/KNOWLEDGE_APPROVAL.md`.
+
+A rights reply links the official handbook PDF for the user's language, gives the retrieval date 2026-11-11, and appends the disclaimer in `src/modules/knowledge-agent/legal-disclaimer.js`. Phone numbers and emails from the handbook are listed only in `docs/CONTACTS_PENDING_VERIFICATION.md`.
+
+Thai, Sinhala, and Hindi disclaimer sentences are `pending_native_review`. They are not reviewed translations.
+
 ## Construction-worker rights knowledge is not verified
 
 This blocks treating construction-worker rights as answered by the knowledge base. Do not invent legal text and do not add unverified entries to fill the gap.
@@ -33,7 +41,7 @@ A source URL, or `source.verified: true` by itself, is not enough. Before a lega
 
 No current entry in `workers-rights.json` has that set. This change does not invent those fields. Until a record passes, a rights-domain question gets the fixed fallback in `src/modules/knowledge-agent/rights-unverified-fallback.js` and the AI is not called. The supervisor employment agent also refuses to quote statutory salary-timing text, missing-salary deadlines, or overtime percentages from records that fail this gate. Basic arithmetic on hours and a rate the user already supplied is unchanged.
 
-The fallback tells the user that no verified information is available, points them at official government websites without naming a page, suggests keeping the contract, payslips and a record of hours, and says it is not legal advice. It states no amount, percentage, or deadline.
+The fallback tells the user that no verified information is available, links the official PIBA 2026 handbook PDF for the user's language, states the retrieval date, suggests keeping the contract, payslips and a record of hours, and appends the disclaimer. It states no wage, percentage, or deadline of its own, and it does not show a phone number or email address.
 
 ## Official pages that were not confirmed
 

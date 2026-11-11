@@ -1,6 +1,12 @@
 // A legal or worker-rights record is presentable only when every one of these
 // is present. A source URL, or source.verified by itself, is not enough.
 // Existing knowledge entries are not given this metadata here.
+//
+// Source-grounded records (schema "source-grounded", or any record with a
+// claims array) ignore status and legalClaimsVerified. They pass only when
+// knowledge/approvals has a matching content hash, reviewer, and date.
+
+const { isSourceGroundedRecord, passesSourceGroundedApproval } = require('./source-grounded-record');
 
 function clean(value) {
   return value === undefined || value === null ? '' : String(value).trim();
@@ -52,8 +58,9 @@ function reviewMetadata(item = {}) {
   return reviewer;
 }
 
-function passesLegalVerification(item = {}) {
+function passesLegalVerification(item = {}, options = {}) {
   if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
+  if (isSourceGroundedRecord(item)) return passesSourceGroundedApproval(item, options);
   const source = item.source;
   if (!source || typeof source !== 'object' || Array.isArray(source)) return false;
   if (source.verified !== true) return false;
@@ -74,6 +81,7 @@ function knowledgeSafeForAi(items) {
 module.exports = {
   isLegalCategory,
   isLegalKnowledgeItem,
+  isSourceGroundedRecord,
   knowledgeSafeForAi,
   passesLegalVerification,
 };

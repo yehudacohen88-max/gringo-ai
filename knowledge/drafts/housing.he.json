@@ -1,0 +1,26 @@
+{
+  "schema": "source-grounded",
+  "id": "draft-piba2026-housing-he",
+  "language": "he",
+  "topic": "housing",
+  "section": "7",
+  "authorityId": "piba",
+  "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+  "sourceRetrievedAt": "2026-11-11",
+  "handbookEdition": "2026",
+  "nativeReviewRequired": false,
+  "status": "draft",
+  "extraction": "ok",
+  "answer": "בזכותון נכתב שמעסיק חייב לספק לעובד הזר מגורים הולמים העומדים בתנאים שנקבעו בתקנות הרלוונטיות.",
+  "informationLabel": "תקציר זה נועד לידיעה כללית בלבד ואינו מהווה תחליף לנוסח החוק‪ ,‬התקנות‪ ,‬הנהלים וצווי‬ ‫ההרחבה הרלוונטיים המחייבים",
+  "claims": [
+    {
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+      "section": "7",
+      "quote": "מעסיק חייב לספק לעובד הזר מגורים הולמים העומדים בתנאים שנקבעו בתקנות הרלוונטיות",
+      "language": "he",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "023c4d36d17262c2b3c66c95afe06faeed03688e9720d52ef29e78d8f9cdc9bc"
+    }
+  ]
+}
