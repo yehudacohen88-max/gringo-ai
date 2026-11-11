@@ -24,10 +24,12 @@ function displayName(message = {}) {
 }
 
 function languageHint(languageCode = '') {
-  const code = cleanText(languageCode).toLowerCase();
-  if (code === 'he') return 'Hebrew';
+  const code = cleanText(languageCode).toLowerCase().split('-')[0];
+  if (code === 'he' || code === 'iw') return 'Hebrew';
   if (code === 'th') return 'Thai';
   if (code === 'en') return 'English';
+  if (code === 'si') return 'Sinhala';
+  if (code === 'hi') return 'Hindi';
   return '';
 }
 
@@ -132,13 +134,17 @@ async function findOrCreateTelegramUser(message = {}) {
   });
 }
 
-function createStartIntro(firstName = '') {
-  const name = firstName ? ` ${firstName}` : '';
-  return `Hi${name}. I am Gringo. I can help with jobs, housing, money transfer, community, services, documents, notifications and tasks.`;
-}
+// Thai, Sinhala and Hindi strings are pending native-speaker review.
+const START_INTRO = Object.freeze({
+  en: (name) => `Hi${name}. I am Gringo. I can help with jobs, housing, money transfer, community, services, documents, notifications and tasks.`,
+  he: (name) => `שלום${name}. אני גרינגו. אני יכול לעזור עם עבודה, דיור, העברת כסף, קהילה, שירותים, מסמכים, התראות ומשימות.`,
+  th: (name) => `สวัสดี${name} ฉันคือ Gringo ฉันช่วยเรื่องงาน ที่พัก การโอนเงิน ชุมชน บริการ เอกสาร การแจ้งเตือน และงานที่ต้องทำได้`,
+  si: (name) => `ආයුබෝවන්${name}. මම Gringo. රැකියා, නිවාස, මුදල් යැවීම, ප්‍රජාව, සේවා, ලේඛන, දැනුම්දීම් සහ කාර්ය ගැන මට උදව් කළ හැක.`,
+  hi: (name) => `नमस्ते${name}. मैं Gringo हूँ। मैं नौकरी, आवास, पैसे भेजने, समुदाय, सेवाओं, दस्तावेज़, सूचनाओं और कार्यों में मदद कर सकता हूँ।`,
+});
 
-function createHelpReply() {
-  return [
+const HELP_REPLY = Object.freeze({
+  en: [
     'Gringo can help with:',
     '- jobs',
     '- housing',
@@ -148,8 +154,71 @@ function createHelpReply() {
     '- documents',
     '- notifications',
     '- tasks',
-    'Change language: /language he, /language th, /language en, or send עברית, ไทย, or English.',
-  ].join('\n');
+    'Change language: /language he, /language th, /language en, /language si, /language hi, or send עברית, ไทย, English, සිංහල, or हिंदी.',
+  ].join('\n'),
+  he: [
+    'גרינגו יכול לעזור עם:',
+    '- עבודה',
+    '- דיור',
+    '- העברת כסף',
+    '- קהילה',
+    '- שירותים',
+    '- מסמכים',
+    '- התראות',
+    '- משימות',
+    'החלפת שפה: /language he, /language th, /language en, /language si, /language hi, או שליחה של עברית, ไทย, English, සිංහල, או हिंदी.',
+  ].join('\n'),
+  th: [
+    'Gringo ช่วยได้เรื่อง:',
+    '- งาน',
+    '- ที่พัก',
+    '- การโอนเงิน',
+    '- ชุมชน',
+    '- บริการ',
+    '- เอกสาร',
+    '- การแจ้งเตือน',
+    '- งานที่ต้องทำ',
+    'เปลี่ยนภาษา: /language he, /language th, /language en, /language si, /language hi หรือส่ง עברית, ไทย, English, සිංහල, หรือ हिंदी',
+  ].join('\n'),
+  si: [
+    'Gringo ට උදව් කළ හැක්කේ:',
+    '- රැකියා',
+    '- නිවාස',
+    '- මුදල් යැවීම',
+    '- ප්‍රජාව',
+    '- සේවා',
+    '- ලේඛන',
+    '- දැනුම්දීම්',
+    '- කාර්ය',
+    'භාෂාව වෙනස් කිරීම: /language he, /language th, /language en, /language si, /language hi, හෝ යවන්න עברית, ไทย, English, සිංහල, හෝ हिंदी.',
+  ].join('\n'),
+  hi: [
+    'Gringo इनमें मदद कर सकता है:',
+    '- नौकरी',
+    '- आवास',
+    '- पैसे भेजना',
+    '- समुदाय',
+    '- सेवाएँ',
+    '- दस्तावेज़',
+    '- सूचनाएँ',
+    '- कार्य',
+    'भाषा बदलें: /language he, /language th, /language en, /language si, /language hi, या भेजें עברית, ไทย, English, සිංහල, या हिंदी।',
+  ].join('\n'),
+});
+
+function copyLanguage(language) {
+  const code = cleanText(language).toLowerCase().split('-')[0];
+  return HELP_REPLY[code] ? code : 'en';
+}
+
+function createStartIntro(firstName = '', language = 'en') {
+  const name = firstName ? ` ${firstName}` : '';
+  const builder = START_INTRO[copyLanguage(language)] || START_INTRO.en;
+  return builder(name);
+}
+
+function createHelpReply(language = 'en') {
+  return HELP_REPLY[copyLanguage(language)] || HELP_REPLY.en;
 }
 
 function incompleteProfileFields(profile = {}) {
@@ -413,21 +482,25 @@ async function processStart(message = {}) {
     channel: 'telegram',
     channelUserId: message.channelUserId,
   });
-  const intro = createStartIntro(message.firstName);
+  const intro = createStartIntro(message.firstName, languageFromProfile(user, message.languageCode));
   const reply = onboarding.complete || !onboarding.prompt ? intro : `${intro}\n\n${onboarding.prompt}`;
   return { reply, user, status: 'TELEGRAM_START' };
 }
 
 async function processHelp(message = {}) {
   const user = await findOrCreateTelegramUser(message);
-  const reply = createHelpReply();
+  const reply = createHelpReply(languageFromProfile(user, message.languageCode));
   return { reply, user, status: 'TELEGRAM_HELP' };
 }
 
 async function processTextMessage(message = {}) {
   const user = await findOrCreateTelegramUser(message);
   const profile = await currentProfile(user.userId);
-  const commandResult = await runCommand(message.messageText, { ...profile, userId: user.userId });
+  const commandResult = await runCommand(message.messageText, {
+    ...profile,
+    userId: user.userId,
+    channelLanguage: message.languageCode,
+  });
   if (commandResult) {
     return {
       ...commandResult,
@@ -683,7 +756,11 @@ async function processCallback(callback = {}, options = {}) {
 
   try {
     const user = await findOrCreateTelegramUser(callback);
-    const profile = { ...(await currentProfile(user.userId)), userId: user.userId };
+    const profile = {
+      ...(await currentProfile(user.userId)),
+      userId: user.userId,
+      channelLanguage: callback.languageCode,
+    };
     const reply = await processCallbackAction(callback, user, profile, parsed);
     await answerCallback(callback, 'Done.');
     await editCallbackMessage(callback, reply, undefined);

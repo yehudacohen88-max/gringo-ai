@@ -268,7 +268,7 @@ test('unrelated English Supervisor answers are still translated for a Hebrew use
     await withTranslationSpy(async (calls) => {
       const response = await coreAgentService.processWebMessage({
         requestId: 'req_unrelated_translate',
-        message: 'salary employer rights',
+        message: 'what is new in the community today',
         channel: 'web',
         channelUserId: 'unrelated-translate',
       });

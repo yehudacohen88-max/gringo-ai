@@ -42,25 +42,35 @@ function createContext(message) {
   };
 }
 
-test('salary payment timing knowledge remains available when the question has direct relevance evidence', async () => {
+test('salary payment timing knowledge is withheld until review metadata exists', async () => {
   const result = await answer('What is the salary payment date for monthly salary in Israel?');
 
-  assert.equal(result.status, 'FOUND');
-  assert.equal(result.relevantKnowledge.some((item) => item.id === 'israel_salary_payment_timing_monthly'), true);
+  assert.equal(result.legalFallback, true);
+  assert.equal(result.status, 'NOT_FOUND');
+  assert.equal(result.answer, '');
+  assert.equal(result.relevantKnowledge.some((item) => item.id === 'israel_salary_payment_timing_monthly'), false);
+  assert.equal(result.withheldUnverifiedIds.includes('israel_salary_payment_timing_monthly'), true);
 });
 
-test('missing salary knowledge remains available when the question has direct relevance evidence', async () => {
+test('missing salary knowledge is withheld until review metadata exists', async () => {
   const result = await answer('I have missing salary and unpaid salary for monthly salary.');
 
-  assert.equal(result.status, 'FOUND');
-  assert.equal(result.relevantKnowledge.some((item) => item.id === 'israel_missing_salary_monthly_foundation'), true);
+  assert.equal(result.legalFallback, true);
+  assert.equal(result.status, 'NOT_FOUND');
+  assert.equal(result.answer, '');
+  assert.equal(result.relevantKnowledge.some((item) => item.id === 'israel_missing_salary_monthly_foundation'), false);
+  assert.equal(result.withheldUnverifiedIds.includes('israel_missing_salary_monthly_foundation'), true);
 });
 
-test('overtime knowledge remains available when the question has direct relevance evidence', async () => {
+test('overtime knowledge is withheld until review metadata exists', async () => {
   const result = await answer('How do overtime pay and overtime multiplier rules work?');
 
-  assert.equal(result.status, 'FOUND');
-  assert.equal(result.relevantKnowledge.some((item) => item.id === 'israel_overtime_pay_multipliers_section_16a'), true);
+  assert.equal(result.legalFallback, true);
+  assert.equal(result.status, 'NOT_FOUND');
+  assert.equal(result.answer, '');
+  assert.equal(result.relevantKnowledge.some((item) => item.id === 'israel_overtime_pay_multipliers_section_16a'), false);
+  assert.equal((result.withheldUnverifiedIds || []).includes('israel_overtime_pay_multipliers_section_16a'), true);
+  assert.doesNotMatch(result.answer, /125%|150%/);
 });
 
 test('bank account question rejects unrelated Employment knowledge', async () => {
@@ -179,7 +189,8 @@ test('focused task question controls knowledge relevance instead of sourceMessag
 
   assert.equal(focusedResult.status, 'NOT_FOUND');
   assert.equal(focusedResult.relevantKnowledge.some((item) => item.category === 'Workers Rights'), false);
-  assert.equal(contaminatedResult.status, 'FOUND');
+  assert.equal(contaminatedResult.legalFallback, true);
+  assert.equal(contaminatedResult.relevantKnowledge.some((item) => item.category === 'Workers Rights'), false);
 });
 
 test('single-word weak relevance terms are insufficient evidence', () => {

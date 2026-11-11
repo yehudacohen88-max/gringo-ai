@@ -206,7 +206,8 @@ test('salary plus bank card multi-intent preserves Employment and Finance fallba
   assert.equal(result.tasks.find((task) => task.domain === 'finance_consumer').input.question, 'my bank card is not working');
   assert.equal(result.results[0].domain, 'employment_salary');
   assert.equal(result.results[1].output.genericFinanceRequestType, 'bank_card_problem');
-  assert.match(result.response, /Which month's salary or payment period/i);
+  assert.match(result.response, /I do not have verified information on this yet/i);
+  assert.doesNotMatch(result.response, /Which month's salary or payment period/i);
   assert.match(result.response, /declined, blocked, lost or stolen/i);
 });
 

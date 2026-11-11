@@ -17,6 +17,15 @@ const moneyService = require('../money/money.service');
 const serviceService = require('../services/service.service');
 const taskService = require('../tasks/task.service');
 const { knowledgeAgentService } = require('../knowledge-agent');
+const { isLegalCategory, knowledgeSafeForAi } = require('../knowledge-agent/legal-verification');
+const { createRightsUnverifiedFallback } = require('../knowledge-agent/rights-unverified-fallback');
+const {
+  containsUnsupportedStatutoryClaim,
+  guardGeneratedLegalOutput,
+  guardLegalReply,
+  looksLikeLegalOrRightsQuestion,
+  swapRightsFallbackToLanguage,
+} = require('../knowledge-agent/legal-question-guard');
 const { languageDetectionService } = require('../language');
 const {
   appendLanguageConflictNotice,
@@ -631,7 +640,7 @@ async function buildLiveMultiIntentSupervisorResponse({
       },
     });
     const synthesis = supervisorService.synthesizeResults(results);
-    let reply = supervisorService.composeResponse(synthesis);
+    let reply = supervisorService.composeResponse(synthesis, { language: userLanguage });
     let status = `SUPERVISOR_MULTI_INTENT_${String(synthesis.status || 'partial').toUpperCase()}`;
 
     if (incomingTranslationUncertain) {
@@ -664,6 +673,7 @@ async function buildLiveMultiIntentSupervisorResponse({
 function shouldUseAiProvider(question, knowledgeResult) {
   const normalized = String(question || '').trim().toLowerCase();
 
+  if (knowledgeResult && knowledgeResult.legalFallback) return false;
   if (knowledgeResult.status === 'NOT_FOUND') return true;
   if (knowledgeResult.category === 'Other') return true;
   if (/^(hi|hello|hey|shalom|good morning|good evening|good afternoon|\u05e9\u05dc\u05d5\u05dd|\u05d4\u05d9\u05d9|\u05d0\u05d4\u05dc\u05df)\b/.test(normalized)) {
@@ -679,6 +689,10 @@ const FRIENDLY_FALLBACK = {
   he: 'אין לי כרגע תשובה מאומתת לשאלה הזו, ואני לא רוצה לנחש. למידע רשמי אפשר לפנות לקו לעובד (kavlaoved.org.il), לרשות האוכלוסין וההגירה (gov.il) או למשרד העבודה.',
   th: 'ตอนนี้ฉันยังไม่มีคำตอบที่ยืนยันได้สำหรับคำถามนี้ และไม่อยากเดา สำหรับข้อมูลทางการ ติดต่อ Kav LaOved (kavlaoved.org.il), สำนักงานประชากรและการเข้าเมืองของอิสราเอล (gov.il) หรือกระทรวงแรงงานอิสราเอล',
   en: "I don't have a verified answer to this right now, and I don't want to guess. For official information, contact Kav LaOved (kavlaoved.org.il), the Population and Immigration Authority (gov.il) or the Ministry of Labor.",
+  // Sinhala and Hindi below are pending native-speaker review. They do not
+  // repeat the domains above, because those pages could not be confirmed.
+  si: 'මේ ප්‍රශ්නයට තහවුරු කළ පිළිතුරක් මට දැනට නැත, එබැවින් මම අනුමාන නොකරමි. නිල තොරතුරු සඳහා රජයේ නිල වෙබ් අඩවි බලන්න.',
+  hi: 'इस प्रश्न का सत्यापित उत्तर अभी मेरे पास नहीं है, और मैं अनुमान नहीं लगाना चाहता। आधिकारिक जानकारी के लिए सरकारी निकायों की आधिकारिक वेबसाइट देखें।',
 };
 
 // Shown when the daily AI limit is reached or AI is switched off. It does not
@@ -687,12 +701,17 @@ const AI_PAUSED_REPLY = {
   he: 'הגעת למגבלת השאלות היומית לתשובות חכמות. אפשר להמשיך לשאול על עבודה, דיור, מסמכים וכסף, ומחר המגבלה מתאפסת.',
   th: 'วันนี้คุณใช้คำตอบอัจฉริยะครบตามจำนวนแล้ว คุณยังถามเรื่องงาน ที่พัก เอกสาร และการเงินได้ และจะรีเซ็ตใหม่พรุ่งนี้',
   en: "You've reached today's limit for smart answers. You can still ask about jobs, housing, documents and money, and the limit resets tomorrow.",
+  // Pending native-speaker review.
+  si: 'අද ස්මාර්ට් පිළිතුරු සීමාව ඉක්මවා ඇත. රැකියා, නිවාස, ලේඛන සහ මුදල් ගැන තවම අසන්න පුළුවන්. සීමාව හෙට යළි සකසයි.',
+  hi: 'आज के स्मार्ट उत्तरों की सीमा पूरी हो गई है। आप नौकरी, आवास, दस्तावेज़ और पैसे के बारे में अभी भी पूछ सकते हैं। सीमा कल रीसेट होगी।',
 };
 
 function replyLanguageKey(language) {
   const code = String(language || '').toLowerCase();
-  if (code.startsWith('he')) return 'he';
+  if (code.startsWith('he') || code.startsWith('iw')) return 'he';
   if (code.startsWith('th')) return 'th';
+  if (code.startsWith('si')) return 'si';
+  if (code.startsWith('hi')) return 'hi';
   return 'en';
 }
 
@@ -1215,7 +1234,7 @@ async function resolveIncomingProcessingText(originalText, languageResolution) {
 function protectOutgoingText(text = '') {
   const protectedValues = [];
   const pattern =
-    /(`[^`]+`|https?:\/\/[^\s)]+|\b[A-Z]{2,}[-_][A-Z0-9_-]+\b|\b[A-Z0-9]{6,}\b|\b\d{4}-\d{2}-\d{2}\b|\b\d+(?:[,.]\d+)?\s?(?:NIS|ILS|THB|USD|EUR|LKR|INR|PHP)\b|\+?\d[\d\s().-]{6,}\d)/g;
+    /(`[^`]+`|__GRINGO_LEGAL_FALLBACK__|https?:\/\/[^\s)]+|\b[A-Z]{2,}[-_][A-Z0-9_-]+\b|\b[A-Z0-9]{6,}\b|\b\d{4}-\d{2}-\d{2}\b|\b\d+(?:[,.]\d+)?\s?(?:NIS|ILS|THB|USD|EUR|LKR|INR|PHP)\b|\+?\d[\d\s().-]{6,}\d)/g;
   const protectedText = String(text || '').replace(pattern, (value) => {
     const token = `__GRINGO_KEEP_${protectedValues.length}__`;
     protectedValues.push({ token, value });
@@ -1231,7 +1250,13 @@ function protectOutgoingText(text = '') {
 }
 
 async function applyOutgoingTranslation(response = {}, targetLanguage = CORE_AGENT_RESPONSE_LANGUAGE) {
-  const originalResponse = String(response.reply || '');
+  const swapped = swapRightsFallbackToLanguage(response.reply, targetLanguage || CORE_AGENT_RESPONSE_LANGUAGE);
+  const rightsFallback = createRightsUnverifiedFallback(targetLanguage || CORE_AGENT_RESPONSE_LANGUAGE);
+  const rightsToken = '__GRINGO_LEGAL_FALLBACK__';
+  const originalResponse = swapped.text.includes(rightsFallback)
+    ? swapped.text.split(rightsFallback).join(rightsToken)
+    : swapped.text;
+  const restoreRightsFallback = (value) => String(value || '').split(rightsToken).join(rightsFallback);
   const metadata = {
     sourceLanguage: CORE_AGENT_RESPONSE_LANGUAGE,
     targetLanguage: targetLanguage || CORE_AGENT_RESPONSE_LANGUAGE,
@@ -1242,13 +1267,15 @@ async function applyOutgoingTranslation(response = {}, targetLanguage = CORE_AGE
 
   const finalized = {
     ...response,
-    reply: originalResponse,
+    reply: restoreRightsFallback(originalResponse),
   };
 
+  const remainder = originalResponse.split(rightsToken).join(' ').trim();
   if (
     !originalResponse.trim()
     || metadata.targetLanguage === CORE_AGENT_RESPONSE_LANGUAGE
-    || deliveredTextAlreadyInLanguage(originalResponse, metadata.targetLanguage)
+    || !remainder
+    || deliveredTextAlreadyInLanguage(remainder, metadata.targetLanguage)
   ) {
     Object.defineProperty(finalized, OUTGOING_TRANSLATION_METADATA, {
       value: {
@@ -1275,7 +1302,7 @@ async function applyOutgoingTranslation(response = {}, targetLanguage = CORE_AGE
     if (result.failureType) metadata.failureType = result.failureType;
 
     if (result.translated && !result.fallbackUsed) {
-      finalized.reply = protectedResponse.restore(result.translatedText);
+      finalized.reply = restoreRightsFallback(protectedResponse.restore(result.translatedText));
     }
   } catch (error) {
     metadata.fallbackUsed = true;
@@ -1566,6 +1593,27 @@ async function processWebMessage(messageContext = {}) {
   }
 
   const deliverResponse = async (response) => {
+    const domainCategories = new Set(['Jobs', 'Housing', 'Money', 'Documents', 'Services']);
+    const asked = `${originalQuestion}\n${question}`;
+    if (domainCategories.has(response.category) || containsUnsupportedStatutoryClaim(response.reply || '')) {
+      const guarded = guardLegalReply(response.reply, {
+        question: asked,
+        language: userLanguage,
+        output: response.structuredOutput || (
+          response.category === 'Jobs' && Array.isArray(response.jobs)
+            ? { capability: 'jobs.search', jobs: response.jobs }
+            : response.category === 'Housing' && response.housing && Array.isArray(response.housing.listings)
+              ? { capability: 'housing.support', listings: response.housing.listings }
+              : undefined
+        ),
+      });
+      if (guarded !== String(response.reply || '').trim()) {
+        response = {
+          ...response,
+          reply: guarded,
+        };
+      }
+    }
     try {
       memoryLifecycleService.notifyRequestCompleted(conversationId, {
         waitingForUser: /NEEDS|ONBOARDING/i.test(response.status || '') || /\?\s*$/.test(response.reply || ''),
@@ -2386,7 +2434,21 @@ async function processWebMessage(messageContext = {}) {
     error: '',
   };
 
-  if (shouldUseAiProvider(question, knowledgeResult)) {
+  const asked = `${originalQuestion}\n${question}`;
+  const verifiedRecords = knowledgeResult.relevantKnowledge || [];
+  const legalSegment = looksLikeLegalOrRightsQuestion(asked) || isLegalCategory(knowledgeResult.category);
+  // A legal segment is never given to the model to compose. The only legal
+  // text is a gate-approved record's own answer, copied with its source.
+  let withholdLegalTranslation = legalSegment;
+  if (legalSegment) {
+    reply = guardGeneratedLegalOutput('', {
+      question: asked,
+      language: userLanguage,
+      legalSegment: true,
+      verifiedRecords,
+    });
+    finalStatus = reply === createRightsUnverifiedFallback(userLanguage) ? 'LEGAL_UNVERIFIED' : 'LEGAL_VERIFIED';
+  } else if (shouldUseAiProvider(question, knowledgeResult)) {
     ai.attempted = true;
 
     try {
@@ -2395,14 +2457,21 @@ async function processWebMessage(messageContext = {}) {
         budgetKey: getConversationKey(userContext),
         userLanguage,
         userProfile,
-        relevantKnowledge: knowledgeResult.relevantKnowledge || [],
+        relevantKnowledge: knowledgeSafeForAi(knowledgeResult.relevantKnowledge || []).filter((item) => !isLegalCategory(item && item.category) && item.domain !== 'employment'),
         recentConversation: getRecentConversation(userContext),
         conversationContext,
         memorySnapshot,
         workingMemory,
       });
 
-      reply = aiResult.text;
+      const guardedReply = guardGeneratedLegalOutput(aiResult.text, {
+        question: asked,
+        language: userLanguage,
+        legalSegment,
+        verifiedRecords,
+      });
+      if (guardedReply !== aiResult.text) withholdLegalTranslation = true;
+      reply = guardedReply;
       finalStatus = 'AI_PROVIDER';
       ai.used = true;
       ai.provider = aiResult.provider;
@@ -2444,6 +2513,7 @@ async function processWebMessage(messageContext = {}) {
 
   return deliverResponse({
     reply,
+    ...(withholdLegalTranslation ? { skipOutgoingTranslation: true, replyLanguage: userLanguage } : {}),
     category: knowledgeResult.category,
     status: finalStatus,
     ai,
@@ -2474,6 +2544,8 @@ module.exports = {
   FRIENDLY_FALLBACK,
   createAiPausedReply,
   createFriendlyFallback,
+  createRightsUnverifiedFallback,
+  shouldUseAiProvider,
   forgetConversation,
   coordinateAgents,
   getOnboardingStatus: onboardingService.getStatus,

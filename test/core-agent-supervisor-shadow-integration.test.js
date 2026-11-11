@@ -139,7 +139,8 @@ test('normal single-intent Web Chat message preserves live response and runs sha
   }, async () => {
     const response = await coreAgentService.processWebMessage(messageContext);
 
-    assert.equal(response.reply, 'Workers should keep written records and ask for help if wages are unpaid.');
+    assert.match(response.reply, /I do not have verified information on this yet/);
+    assert.doesNotMatch(response.reply, /Workers should keep written records/);
     assert.equal(response.category, 'Rights');
     assert.equal(composeCalls, 1);
     assert.equal(messageContext.supervisorShadow.mode, 'shadow');
@@ -195,7 +196,8 @@ test('shadow output does not replace live response', async () => {
   };
   const response = await coreAgentService.processWebMessage(messageContext);
 
-  assert.equal(response.reply, 'How much do you want to send?');
+  assert.match(response.reply, /I do not have verified information on this yet/);
+  assert.doesNotMatch(response.reply, /How much do you want to send/);
   assert.notEqual(response.reply, messageContext.supervisorShadow.composedResponse);
   assert.equal(Object.hasOwn(response, 'supervisorShadow'), false);
 });
@@ -219,7 +221,8 @@ test('shadow failure preserves live response and hides internal error details', 
       };
       const response = await coreAgentService.processWebMessage(messageContext);
 
-      assert.equal(response.reply, 'Workers should keep written records and ask for help if wages are unpaid.');
+      assert.match(response.reply, /I do not have verified information on this yet/);
+    assert.doesNotMatch(response.reply, /Workers should keep written records/);
       assert.deepEqual(messageContext.supervisorShadow, {
         mode: 'shadow',
         failed: true,
@@ -378,7 +381,8 @@ test('single-intent backward compatibility and existing flags remain compatible'
   };
   const response = await coreAgentService.processWebMessage(messageContext);
 
-  assert.equal(response.reply, 'Workers should keep written records and ask for help if wages are unpaid.');
+  assert.match(response.reply, /I do not have verified information on this yet/);
+    assert.doesNotMatch(response.reply, /Workers should keep written records/);
   assert.equal(messageContext.supervisorShadow, undefined);
 });
 

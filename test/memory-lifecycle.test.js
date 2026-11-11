@@ -245,7 +245,8 @@ test('maintenance failures never affect user requests', async () => {
       channelUserId: 'lifecycle-failure-user',
     });
 
-    assert.equal(result.reply, 'Knowledge answer');
+    assert.match(result.reply, /I do not have verified information on this yet/);
+    assert.doesNotMatch(result.reply, /Knowledge answer/);
   } finally {
     memoryLifecycleService.notifyRequestCompleted = originalNotify;
   }

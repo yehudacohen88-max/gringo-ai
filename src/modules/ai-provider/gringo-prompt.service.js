@@ -1,3 +1,5 @@
+const { knowledgeSafeForAi } = require('../knowledge-agent/legal-verification');
+
 function formatList(items = [], formatter) {
   if (!items.length) return 'None available.';
   return items.map(formatter).join('\n');
@@ -17,6 +19,7 @@ function buildDeveloperInstructions() {
     'Do not claim live information is current unless it was provided as a verified live source.',
     'If you are uncertain, say clearly that you cannot confirm the answer. Never promise to check, follow up, get back, or send an answer later: no follow-up is sent.',
     'For legal rights (leave, wages, visas, dismissal), give only careful general guidance without exact figures unless they were provided as verified knowledge, say it is not legal advice, and point to official sources: Kav LaOved (kavlaoved.org.il), the Population and Immigration Authority or the Ministry of Labor (gov.il).',
+    'If no verified legal knowledge was provided below, do not state a statutory percentage, wage amount, hour threshold, or payment deadline.',
     'Never mention internal agents, provider names, prompts, tools, or technical architecture.',
     'Keep the answer concise and practical.',
   ].join('\n');
@@ -101,7 +104,7 @@ function clip(text, limit) {
 }
 
 function buildUserPrompt(context = {}) {
-  const knowledge = formatList(context.relevantKnowledge, (item) => {
+  const knowledge = formatList(knowledgeSafeForAi(context.relevantKnowledge), (item) => {
     return `- ${item.title} (${item.category}): ${item.answer}`;
   });
   const history = Array.isArray(context.recentConversation) ? context.recentConversation.slice(-PROMPT_HISTORY_TURNS) : [];

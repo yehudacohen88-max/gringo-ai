@@ -79,7 +79,7 @@ function mockCore(profile, options = {}) {
 
   knowledgeAgentService.answerQuestion = async () => ({
     answer: options.knowledgeAnswer || 'You can ask your employer for payment and keep records.',
-    category: 'Rights',
+    category: 'Community',
     status: 'FOUND',
     relevantKnowledge: [],
   });

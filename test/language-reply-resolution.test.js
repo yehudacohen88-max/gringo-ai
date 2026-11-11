@@ -147,25 +147,31 @@ test('resolver: emoji or digits fall back to the channel language, then English'
 test('saved Thai plus a Hebrew question: Thai reply, Hebrew switch notice, Hebrew is still the source text', async () => {
   const state = mock(profileWith({ preferredLanguage: 'th', language: 'th', languageSource: 'explicit' }));
   const result = await send(HE_Q, 'en');
-  assert.deepEqual(state.translate, ['he->en', 'en->th']);
-  assert.match(result.reply, /^\[th\]/);
+  assert.equal(state.translate.includes('he->en'), true);
+  assert.equal(state.translate.includes('en->th'), false);
+  assert.match(result.reply, /ตอนนี้ฉันยังไม่มีข้อมูลที่ยืนยันแล้ว/);
   assert.match(result.reply, /התשובה בתאית/);
   assert.match(result.reply, /שלח: עברית/);
+  assert.doesNotMatch(result.reply, /Workers in Israel generally/);
 });
 
 test('saved Thai plus a Thai question: no conflict notice', async () => {
   mock(profileWith({ preferredLanguage: 'th', language: 'th', languageSource: 'explicit' }));
   const result = await send('สิทธิของฉันในฐานะคนงานก่อสร้าง', 'th', 'tg-thai-match');
+  assert.match(result.reply, /ตอนนี้ฉันยังไม่มีข้อมูลที่ยืนยันแล้ว/);
   assert.doesNotMatch(result.reply, /התשובה/);
   assert.doesNotMatch(result.reply, /The answer is in/);
+  assert.doesNotMatch(result.reply, /Workers in Israel generally/);
 });
 
 test('saved Hebrew plus a Hebrew question on an English phone: Hebrew reply, no notice', async () => {
   const state = mock(profileWith({ preferredLanguage: 'he', language: 'he', languageSource: 'explicit' }));
   const result = await send(HE_Q, 'en', 'tg-he-match');
-  assert.deepEqual(state.translate, ['he->en', 'en->he']);
-  assert.match(result.reply, /^\[he\]/);
+  assert.equal(state.translate.includes('he->en'), true);
+  assert.equal(state.translate.includes('en->he'), false);
+  assert.match(result.reply, /אין לי מידע מאומת/);
   assert.doesNotMatch(result.reply, /התשובה ב/);
+  assert.doesNotMatch(result.reply, /Workers in Israel generally/);
 });
 
 test('language switches via עברית, ไทย, English and /language he|th|en', async () => {
@@ -198,10 +204,12 @@ test('preferredLanguage th with languageSource text or missing stays with the He
   ]) {
     const state = mock(profileWith(extra));
     const result = await send(HE_Q, 'en', `tg-not-explicit-${extra.languageSource || 'missing'}`);
-    assert.deepEqual(state.translate, ['he->en', 'en->he']);
-    assert.match(result.reply, /^\[he\]/);
-    assert.doesNotMatch(result.reply, /^\[th\]/);
+    assert.equal(state.translate.includes('he->en'), true);
+    assert.equal(state.translate.includes('en->th'), false);
+    assert.match(result.reply, /אין לי מידע מאומת/);
+    assert.doesNotMatch(result.reply, /\[th\]/);
     assert.doesNotMatch(result.reply, /התשובה בתאית/);
+    assert.doesNotMatch(result.reply, /Workers in Israel generally/);
   }
 });
 
@@ -229,7 +237,7 @@ test('fallback and daily-limit replies use the saved language and carry the conf
     throw new Error('provider down');
   };
   const fallbackResult = await send(HE_Q, 'en', 'tg-fallback');
-  assert.match(fallbackResult.reply, /ตอนนี้ฉันยังไม่มีคำตอบที่ยืนยันได้/);
+  assert.match(fallbackResult.reply, /ตอนนี้ฉันยังไม่มีข้อมูลที่ยืนยันแล้ว/);
   assert.match(fallbackResult.reply, /התשובה בתאית/);
   assert.equal(fallback.translate.includes('he->en'), true);
 
@@ -238,7 +246,7 @@ test('fallback and daily-limit replies use the saved language and carry the conf
   aiProviderService.generateReply = async () => {
     throw new AiBudgetError('user_daily_limit');
   };
-  const limited = await send('What are my rights as a construction worker?', 'th', 'tg-limit');
+  const limited = await send('hello there', 'th', 'tg-limit');
   assert.match(limited.reply, /הגעת למגבלת השאלות היומית/);
   assert.match(limited.reply, /The answer is in Hebrew/);
   assert.match(limited.reply, /send: English/);

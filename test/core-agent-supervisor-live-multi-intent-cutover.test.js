@@ -187,14 +187,15 @@ test('missing salary and money transfer multi-intent preserves Employment and Fi
     assert.equal(observed.results[0].output.employmentIntent, 'missing_salary');
     assert.equal(observed.results[0].output.knownPaymentFrequency, undefined);
     assert.equal(observed.synthesis.items.length, 2);
-    assert.match(response.reply, /For monthly pay in Israel/i);
-    assert.match(response.reply, /Salary for a month is due at the end of that month/i);
-    assert.match(response.reply, /Delayed-salary timing/i);
+    assert.match(response.reply, /I do not have verified information on this yet/i);
+    assert.doesNotMatch(response.reply, /For monthly pay in Israel/i);
+    assert.doesNotMatch(response.reply, /ninth day/i);
+    assert.doesNotMatch(response.reply, /125%|150%/);
     assert.doesNotMatch(response.reply, /Are you paid monthly, hourly, daily, or another way\?/i);
     assert.match(response.reply, /not currently have enough real reported observations for ILS → THB/i);
     assert.equal(response.reply.includes('employment_salary_agent'), false);
     assert.equal(response.reply.includes('finance_consumer_agent'), false);
-    assert.equal(response.reply.indexOf('For monthly pay in Israel') < response.reply.indexOf('not currently have enough real reported observations'), true);
+    assert.equal(response.reply.indexOf('not currently have enough real reported observations') < response.reply.indexOf('I do not have verified information on this yet'), true);
   }))));
 });
 
@@ -210,10 +211,10 @@ test('missing salary hourly multi-intent does not apply monthly rule and preserv
   });
 
   assert.equal(response.status, 'SUPERVISOR_MULTI_INTENT_PARTIAL');
-  assert.match(response.reply, /I only have verified missing-salary knowledge for monthly-paid workers right now/i);
+  assert.match(response.reply, /I do not have verified information on this yet/i);
   assert.doesNotMatch(response.reply, /Salary for a month is due at the end of that month/i);
+  assert.doesNotMatch(response.reply, /ninth day/i);
   assert.match(response.reply, /not currently have enough real reported observations for ILS → THB/i);
-  assert.equal(response.reply.indexOf('monthly-paid workers') < response.reply.indexOf('not currently have enough real reported observations'), true);
 });
 
 test('salary calculation and money transfer multi-intent preserves salary facts and Finance result', async () => {
@@ -453,12 +454,13 @@ test('regression: three-domain salary money and clinic message preserves all liv
       assert.deepEqual(observed.synthesis.items.map((result) => result.taskId), observed.results.map((result) => result.taskId));
       assert.equal(response.reply, observed.composedResponse);
 
-      const employmentIndex = response.reply.indexOf('If you are paid monthly');
+      assert.doesNotMatch(response.reply, /If you are paid monthly/i);
       const financeIndex = response.reply.indexOf('not currently have enough real reported observations');
       const healthIndex = response.reply.indexOf('general information only');
-      assert.equal(employmentIndex >= 0, true);
-      assert.equal(financeIndex > employmentIndex, true);
+      const fallbackIndex = response.reply.indexOf('I do not have verified information on this yet');
+      assert.equal(financeIndex >= 0, true);
       assert.equal(healthIndex > financeIndex, true);
+      assert.equal(fallbackIndex > healthIndex, true);
       assert.equal(state.savedConversations.length, 1);
       assert.equal(state.savedConversations[0].answer, response.reply);
       assert.equal(state.memoryExtractions.length, 1);

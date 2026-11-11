@@ -260,19 +260,19 @@ test('English input preserves existing English Employment behavior', async () =>
   assert.equal(callsTo(state, 'en').length, 0);
   assert.equal(metadata.translated, false);
   assert.equal(result.category, 'Supervisor');
-  assert.match(result.reply, /paid|salary|monthly|hourly|daily/i);
+  assert.match(result.reply, /I do not have verified information on this yet/i);
+  assert.doesNotMatch(result.reply, /Are you paid monthly|Which month's salary/i);
 });
 
 test('supported Hebrew missing-salary input uses existing translation path and returns Hebrew delivery', async () => {
   const { result, state, metadata } = await ask(HE_SALARY, completeProfile({ preferredLanguage: 'he' }));
 
   assert.equal(callsTo(state, 'en').length, 1);
-  assert.equal(callsTo(state, 'he').length, 1);
-  assert.equal(metadata.translated, true);
-  assert.equal(metadata.fallbackUsed, false);
-  assert.match(result.reply, /^עברית:/);
-  assert.match(metadata.originalResponse, /paid|salary|monthly|hourly|daily/i);
-  assert.doesNotMatch(metadata.originalResponse, /until the 9th/i);
+  assert.equal(callsTo(state, 'he').length, 0);
+  assert.equal(metadata.translated, false);
+  assert.match(result.reply, /אין לי מידע מאומת/);
+  assert.doesNotMatch(result.reply, /until the 9th/i);
+  assert.doesNotMatch(result.reply, /Are you paid monthly|Which month's salary/i);
 });
 
 test('supported Hebrew housing problem reaches current-housing fallback, not housing search', async () => {
@@ -346,9 +346,10 @@ test('source message and task isolation are preserved after translated multi-int
 
   assert.equal(callsTo(state, 'en').length, 1);
   assert.equal(state.savedEvents.at(-1).question, HE_SALARY_TRANSFER);
-  assert.match(metadata.originalResponse, /salary|paid/i);
-  assert.match(metadata.originalResponse, /transfer|send money|provider/i);
-  assert.match(result.reply, /^עברית:/);
+  assert.match(metadata.originalResponse, /__GRINGO_LEGAL_FALLBACK__/);
+  assert.match(metadata.originalResponse, /transfer|send money|provider|Thailand|ILS/i);
+  assert.match(result.reply, /אין לי מידע מאומת/);
+  assert.doesNotMatch(result.reply, /Are you paid monthly|Which month's salary/i);
 });
 
 test('Supervisor task creation preserves translated sourceMessage and isolated clauses', () => {
@@ -396,14 +397,16 @@ test('English Finance Housing urgent Health relevance and multi-intent behavior 
   assert.equal(financeTasks[0].capability, 'finance.transfer');
   assert.match(housing.result.reply, /hot water/i);
   assert.match(urgent.result.reply, /emergency services/i);
-  assert.match(multi.result.reply, /paid|salary/i);
+  assert.match(multi.result.reply, /I do not have verified information on this yet/i);
+  assert.doesNotMatch(multi.result.reply, /Are you paid monthly|Which month's salary/i);
   assert.match(multi.result.reply, /hot water/i);
 });
 
 test('Thai currently has deterministic translation-path coverage in existing test architecture', async () => {
   const { result, state, metadata } = await ask('I did not receive my salary.', completeProfile({ preferredLanguage: 'th' }));
 
-  assert.equal(callsTo(state, 'th').length, 1);
-  assert.equal(metadata.translated, true);
-  assert.match(result.reply, /^TH:/);
+  assert.equal(callsTo(state, 'th').length, 0);
+  assert.equal(metadata.translated, false);
+  assert.match(result.reply, /ตอนนี้ฉันยังไม่มีข้อมูลที่ยืนยันแล้ว/);
+  assert.doesNotMatch(result.reply, /Are you paid monthly|Which month's salary/i);
 });

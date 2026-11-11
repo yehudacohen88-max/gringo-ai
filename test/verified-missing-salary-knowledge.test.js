@@ -117,12 +117,9 @@ test('existing missing_salary handler uses verified knowledge when required fact
 
   assert.equal(result.status, 'success');
   assert.equal(result.output.employmentIntent, 'missing_salary');
-  assert.equal(result.output.knowledgeId, MISSING_SALARY_RECORD_ID);
-  assert.equal(result.output.needsVerifiedRule, false);
-  assert.match(result.output.message, /Salary for a month is due at the end of that month/i);
-  assert.match(result.output.message, /Delayed-salary timing/i);
-  assert.match(result.output.message, /reached the verified delayed-salary timing/i);
-  assert.match(result.output.message, /Source: Wage Protection Law, 5718-1958/i);
+  assert.equal(result.output.needsVerifiedRule, true);
+  assert.match(result.output.message, /should not guess/i);
+  assert.doesNotMatch(result.output.message, /ninth day/i);
   assert.doesNotMatch(result.output.message, /compensation/i);
   assert.doesNotMatch(result.output.message, /broke the law|violated/i);
 });

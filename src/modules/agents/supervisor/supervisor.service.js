@@ -1,5 +1,7 @@
 const { randomUUID } = require('node:crypto');
 const { employmentSalaryAgent } = require('../domains/employment-salary.agent');
+const { guardLegalReply, joinGuardedParts, looksLikeLegalOrRightsQuestion, swapRightsFallbackToLanguage } = require('../../knowledge-agent/legal-question-guard');
+const { createRightsUnverifiedFallback } = require('../../knowledge-agent/rights-unverified-fallback');
 const { financeConsumerAgent } = require('../domains/finance-consumer.agent');
 const { healthLifeCommunityAgent } = require('../domains/health-life-community.agent');
 const { translationService } = require('../../translation');
@@ -362,6 +364,47 @@ function transferResponseAlreadyComplete(domainResults = []) {
 
   return spoken.length > 0
     && spoken.every((result) => cleanText(result?.output?.capability) === 'finance.transfer');
+}
+
+const LEGAL_EMPLOYMENT_INTENTS = new Set([
+  'missing_salary',
+  'salary_payment_timing',
+  'overtime',
+  'payslip',
+  'rest_days',
+  'employer_issue',
+]);
+
+function collectVerifiedRecords(output) {
+  if (!output || typeof output !== 'object') return [];
+  const records = [];
+  if (Array.isArray(output.verifiedRecords)) records.push(...output.verifiedRecords);
+  if (Array.isArray(output.relevantKnowledge)) records.push(...output.relevantKnowledge);
+  const knowledge = output.knowledge;
+  if (knowledge && Array.isArray(knowledge.relevantKnowledge)) records.push(...knowledge.relevantKnowledge);
+  return records;
+}
+
+function segmentLooksLegal(question, output) {
+  if (looksLikeLegalOrRightsQuestion(question)) return true;
+  if (output && LEGAL_EMPLOYMENT_INTENTS.has(cleanText(output.employmentIntent))) return true;
+  return false;
+}
+
+function guardedLegalFollowUp(question, domainResults = [], language = 'en') {
+  const asked = cleanText(question);
+  if (!asked) return '';
+  const owner = domainResults.find((result) => (
+    Array.isArray(result.followUpQuestions) && result.followUpQuestions.includes(asked)
+  ));
+  if (!owner || !segmentLooksLegal(owner.sourceQuestion, owner.output)) return '';
+  return guardLegalReply(asked, {
+    question: cleanText(owner.sourceQuestion),
+    language,
+    legalSegment: true,
+    verifiedRecords: collectVerifiedRecords(owner.output),
+    output: owner.output,
+  });
 }
 
 function outputText(output = {}) {
@@ -956,6 +999,7 @@ function normalizeTaskResult(task = {}, result = {}, fallbackStatus = 'failed', 
     followUpQuestions: Array.isArray(result.followUpQuestions) ? [...result.followUpQuestions] : [],
     warnings: Array.isArray(result.warnings) ? [...result.warnings] : [fallbackWarning],
     completedAt: result.completedAt || new Date().toISOString(),
+    sourceQuestion: cleanText(task.input?.question || task.input?.query || task.metadata?.sourceMessage),
   };
 
   validateResultContract(normalized);
@@ -1897,28 +1941,31 @@ class SupervisorService {
     };
   }
 
-  composeResponse(synthesis = {}) {
+  composeResponse(synthesis = {}, options = {}) {
     const safeSynthesis = isPlainObject(synthesis) ? synthesis : {};
     const status = cleanText(safeSynthesis.status) || 'empty';
     const items = Array.isArray(safeSynthesis.items) ? safeSynthesis.items : [];
+    const language = cleanText(options.language) || 'en';
     const parts = items
       .map((result) => {
         const resultStatus = cleanText(result.status);
-
-        if (['success', 'partial'].includes(resultStatus)) {
-          return outputText(result.output);
-        }
-
-        if (resultStatus === 'blocked') {
-          return firstUniqueQuestion(result.followUpQuestions);
-        }
-
-        return '';
+        const raw = ['success', 'partial'].includes(resultStatus)
+          ? outputText(result.output)
+          : resultStatus === 'blocked'
+            ? firstUniqueQuestion(result.followUpQuestions)
+            : '';
+        return guardLegalReply(raw, {
+          question: cleanText(result.sourceQuestion),
+          language,
+          legalSegment: segmentLooksLegal(result.sourceQuestion, result.output),
+          verifiedRecords: collectVerifiedRecords(result.output),
+          output: result.output,
+        });
       })
       .filter(Boolean);
 
     if (parts.length) {
-      return parts.join('\n\n');
+      return joinGuardedParts(parts, language);
     }
 
     if (status === 'empty') {
@@ -2116,10 +2163,16 @@ class SupervisorService {
       const normalizedStatus = taskStatus === 'success' ? 'completed' : taskStatus;
       const domain = cleanText(task.domain);
 
+      const sourceQuestion = cleanText(task.input?.question || task.input?.query || task.result.sourceQuestion);
+      const followUps = Array.isArray(task.result.followUpQuestions)
+        ? task.result.followUpQuestions.map((item) => cleanText(item)).filter(Boolean)
+        : [];
       domainResults.push({
         taskId: cleanText(task.taskId || task.result.taskId),
         domain,
         status: normalizedStatus,
+        ...(sourceQuestion ? { sourceQuestion } : {}),
+        ...(followUps.length ? { followUpQuestions: followUps } : {}),
         output: cloneValue(task.result.output),
       });
 
@@ -2148,13 +2201,20 @@ class SupervisorService {
     };
   }
 
-  composeEnglishResponse(aggregatedResult = {}) {
+  composeEnglishResponse(aggregatedResult = {}, options = {}) {
     const safeResult = isPlainObject(aggregatedResult) ? aggregatedResult : {};
     const status = cleanText(safeResult.status) || 'empty';
     const domainResults = Array.isArray(safeResult.domainResults) ? safeResult.domainResults : [];
+    const language = cleanText(options.language) || 'en';
     const usefulResults = domainResults
       .filter((result) => ['completed', 'success', 'partial'].includes(cleanText(result.status)))
-      .map((result) => outputText(result.output))
+      .map((result) => guardLegalReply(outputText(result.output), {
+        question: cleanText(result.sourceQuestion),
+        language,
+        legalSegment: segmentLooksLegal(result.sourceQuestion, result.output),
+        verifiedRecords: collectVerifiedRecords(result.output),
+        output: result.output,
+      }))
       .filter(Boolean);
     const suppressGenericFollowUp = domainResults.some((result) => result.output?.suppressGenericFollowUp === true);
     const suppressTransferPartialNotice = transferResponseAlreadyComplete(domainResults);
@@ -2162,6 +2222,8 @@ class SupervisorService {
     const question = firstUniqueQuestion(safeResult.followUpQuestions);
 
     if (status === 'blocked') {
+      const guarded = guardedLegalFollowUp(question, domainResults, language);
+      if (guarded) return guarded;
       return question || 'I need one more detail before I can help. What should I check first?';
     }
 
@@ -2176,7 +2238,7 @@ class SupervisorService {
     const parts = [];
 
     if (usefulResults.length) {
-      parts.push(usefulResults[0]);
+      parts.push(joinGuardedParts(usefulResults, language));
     } else if (Array.isArray(safeResult.combinedFacts) && safeResult.combinedFacts.length) {
       parts.push(cleanText(safeResult.combinedFacts[0]));
     } else {
@@ -2192,7 +2254,7 @@ class SupervisorService {
     }
 
     if (question) {
-      parts.push(question);
+      parts.push(guardedLegalFollowUp(question, domainResults, language) || question);
     } else if (status === 'completed' && !suppressGenericFollowUp) {
       parts.push('Tell me which detail you want to check next.');
     } else if (status === 'partial' && !suppressTransferPartialNotice) {
@@ -2215,18 +2277,24 @@ class SupervisorService {
   }
 
   async buildUserResponse(aggregatedResult = {}, context = {}) {
-    const englishResponse = this.composeEnglishResponse(aggregatedResult);
     const targetLanguage = this.resolveResponseLanguage(context);
+    const englishResponse = this.composeEnglishResponse(aggregatedResult, { language: targetLanguage });
+    const localized = swapRightsFallbackToLanguage(englishResponse, targetLanguage).text;
 
-    if (!englishResponse || targetLanguage === DEFAULT_RESPONSE_LANGUAGE) {
-      return englishResponse;
+    if (!localized || targetLanguage === DEFAULT_RESPONSE_LANGUAGE) {
+      return localized;
     }
 
+    const token = '__GRINGO_LEGAL_FALLBACK__';
+    const masked = localized.includes(createRightsUnverifiedFallback(targetLanguage))
+      ? localized.split(createRightsUnverifiedFallback(targetLanguage)).join(token)
+      : localized;
     try {
-      const result = await translationService.translateText(englishResponse, DEFAULT_RESPONSE_LANGUAGE, targetLanguage);
-      return result.translated && !result.fallbackUsed ? result.translatedText : englishResponse;
+      const result = await translationService.translateText(masked, DEFAULT_RESPONSE_LANGUAGE, targetLanguage);
+      const translated = result.translated && !result.fallbackUsed ? result.translatedText : masked;
+      return translated.split(token).join(createRightsUnverifiedFallback(targetLanguage));
     } catch (error) {
-      return englishResponse;
+      return localized;
     }
   }
 }

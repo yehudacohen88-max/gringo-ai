@@ -289,6 +289,7 @@ async function setPreferredLanguage(userId, language) {
   const updates = {
     preferredLanguage,
     languageSource: 'explicit',
+    language: preferredLanguage,
   };
 
   if (!hasChanged(record.profile, updates)) {

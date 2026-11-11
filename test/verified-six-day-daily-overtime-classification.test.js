@@ -231,12 +231,10 @@ test('6-day daily overtime message connects safely to salary calculation handler
   ));
 
   assert.equal(result.status, 'success');
-  assert.equal(result.output.knowledgeId, SIX_DAY_DAILY_RECORD_ID);
-  assert.equal(result.output.calculation.regularHours, 8);
-  assert.equal(result.output.calculation.dailyOvertimeCandidateHours, 1);
-  assert.equal(result.output.calculation.grossPay, 370);
-  assert.match(result.output.message || '', /Gross pay for these supplied hours: 370 ILS/i);
-  assert.doesNotMatch(result.output.message || '', /net salary is|complete payslip amount is/i);
+  assert.equal(result.output.needsVerifiedRule, true);
+  assert.equal(result.output.calculation, undefined);
+  assert.match(result.output.message || '', /does not yet have verified salary-calculation rules/i);
+  assert.doesNotMatch(result.output.message || '', /370 ILS|125%|net salary is|complete payslip amount is/i);
 });
 
 test('salary payment timing knowledge remains unchanged', () => {
