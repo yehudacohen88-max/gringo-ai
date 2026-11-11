@@ -937,6 +937,7 @@ function handleSalaryCalculation(task, input = {}) {
         needsSalaryCalculationFacts: false,
         knownFacts: facts,
         needsVerifiedRule: false,
+        legalClaimsVerified: true,
       }, hasDailyWeeklyOverlap || hasWeeklyRestInteraction ? ['partial_overtime_overlap_unresolved'] : []);
     }
 
@@ -1154,6 +1155,7 @@ function handleMissingSalary(task, input = {}) {
       verified: missingSalaryKnowledge.source.verified,
     },
     needsVerifiedRule: false,
+    legalClaimsVerified: true,
   });
 }
 
@@ -1189,6 +1191,7 @@ function handleSalaryPaymentTiming(task, input = {}, employmentIntent = {}) {
       verified: knowledge.source.verified,
     },
     needsVerifiedRule: false,
+    legalClaimsVerified: true,
   });
 }
 

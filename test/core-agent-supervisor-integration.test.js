@@ -1089,7 +1089,8 @@ test('active Supervisor blocked salary-payment follow-up resumes original task w
   });
 
   assert.equal(second.status, 'SUPERVISOR_COMPLETED');
-  assert.match(second.reply, /should not guess/i);
+  assert.match(second.reply, /I do not have verified information on this yet/i);
+  assert.match(second.reply, /not legal advice/i);
   assert.doesNotMatch(second.reply, /ninth day after the payment date/i);
   assert.doesNotMatch(second.reply, /Wage Protection Law/i);
   assert.doesNotMatch(second.reply, /employer has until the 9th to pay/i);

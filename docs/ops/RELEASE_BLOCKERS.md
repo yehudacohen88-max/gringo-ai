@@ -59,6 +59,14 @@ Thai, Sinhala and Hindi strings added or already shipped for users are pending n
 
 Hebrew and English rights-fallback, `/start`, and `/help` strings are the ones written for this change. Onboarding copy is still only Hebrew, English and Thai (`onboarding.i18n.js`). Sinhala and Hindi speakers can set the language with `/language si`, `/language hi`, `සිංහල`, or `हिंदी` after setup, but onboarding itself does not offer those languages yet.
 
+## Legal questions that do not say "rights"
+
+A separate check runs before any free model answer and again on supervisor synthesis, other domain replies, and the outgoing translation step. It does not depend on the question being classified as Workers Rights. It looks for indirect and mixed-language signals (passport kept by an employer, dismissal while sick, Saturday pay, Hebrew זכויות / דרכון / מגיע לי, and Thai, Sinhala, and Hindi phrases that are still pending native-speaker review).
+
+When that check matches and no record has passed the verification gate, the legal part is the fixed fallback. Job listings, transfer help, a clarifying question, and arithmetic on numbers the user already supplied stay in the reply. Text that states a statutory percentage (125%, 150%, 175%, 200%), the ninth-day deadline, or a named wage or hours statute is removed even if another agent produced it.
+
+The check is a heuristic. A legal question that shares none of those words can still reach the model, and the output check only catches the statutory shapes listed above, not a paraphrase that avoids them. Thai, Sinhala, and Hindi patterns in `legal-question-guard.js` are pending native-speaker review.
+
 ## What this does not unblock
 
 - No construction-sector legal answer

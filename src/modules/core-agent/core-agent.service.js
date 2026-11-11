@@ -17,8 +17,16 @@ const moneyService = require('../money/money.service');
 const serviceService = require('../services/service.service');
 const taskService = require('../tasks/task.service');
 const { knowledgeAgentService } = require('../knowledge-agent');
-const { knowledgeSafeForAi } = require('../knowledge-agent/legal-verification');
+const { knowledgeSafeForAi, passesLegalVerification } = require('../knowledge-agent/legal-verification');
 const { createRightsUnverifiedFallback } = require('../knowledge-agent/rights-unverified-fallback');
+const {
+  containsUnsupportedStatutoryClaim,
+  guardGeneratedLegalOutput,
+  guardLegalReply,
+  looksLikeLegalOrRightsQuestion,
+  replyContainsRightsFallback,
+  swapRightsFallbackToLanguage,
+} = require('../knowledge-agent/legal-question-guard');
 const { languageDetectionService } = require('../language');
 const {
   appendLanguageConflictNotice,
@@ -480,6 +488,7 @@ async function buildActiveSupervisorResponse({
     const replyLanguage = explicitDomainReplyLanguage(aggregatedResult);
     return {
       reply,
+      ...(replyContainsRightsFallback(reply) ? { skipOutgoingTranslation: true, replyLanguage: userLanguage } : {}),
       ...(replyLanguage ? { replyLanguage } : {}),
       category: 'Supervisor',
       status: `SUPERVISOR_${String(aggregatedResult.status || 'partial').toUpperCase()}`,
@@ -633,7 +642,7 @@ async function buildLiveMultiIntentSupervisorResponse({
       },
     });
     const synthesis = supervisorService.synthesizeResults(results);
-    let reply = supervisorService.composeResponse(synthesis);
+    let reply = supervisorService.composeResponse(synthesis, { language: userLanguage });
     let status = `SUPERVISOR_MULTI_INTENT_${String(synthesis.status || 'partial').toUpperCase()}`;
 
     if (incomingTranslationUncertain) {
@@ -649,6 +658,7 @@ async function buildLiveMultiIntentSupervisorResponse({
 
     return {
       reply,
+      ...(replyContainsRightsFallback(reply) ? { skipOutgoingTranslation: true, replyLanguage: userLanguage } : {}),
       category: 'Supervisor',
       status,
       multiIntent: {
@@ -1227,7 +1237,7 @@ async function resolveIncomingProcessingText(originalText, languageResolution) {
 function protectOutgoingText(text = '') {
   const protectedValues = [];
   const pattern =
-    /(`[^`]+`|https?:\/\/[^\s)]+|\b[A-Z]{2,}[-_][A-Z0-9_-]+\b|\b[A-Z0-9]{6,}\b|\b\d{4}-\d{2}-\d{2}\b|\b\d+(?:[,.]\d+)?\s?(?:NIS|ILS|THB|USD|EUR|LKR|INR|PHP)\b|\+?\d[\d\s().-]{6,}\d)/g;
+    /(`[^`]+`|__GRINGO_LEGAL_FALLBACK__|https?:\/\/[^\s)]+|\b[A-Z]{2,}[-_][A-Z0-9_-]+\b|\b[A-Z0-9]{6,}\b|\b\d{4}-\d{2}-\d{2}\b|\b\d+(?:[,.]\d+)?\s?(?:NIS|ILS|THB|USD|EUR|LKR|INR|PHP)\b|\+?\d[\d\s().-]{6,}\d)/g;
   const protectedText = String(text || '').replace(pattern, (value) => {
     const token = `__GRINGO_KEEP_${protectedValues.length}__`;
     protectedValues.push({ token, value });
@@ -1243,7 +1253,13 @@ function protectOutgoingText(text = '') {
 }
 
 async function applyOutgoingTranslation(response = {}, targetLanguage = CORE_AGENT_RESPONSE_LANGUAGE) {
-  const originalResponse = String(response.reply || '');
+  const swapped = swapRightsFallbackToLanguage(response.reply, targetLanguage || CORE_AGENT_RESPONSE_LANGUAGE);
+  const rightsFallback = createRightsUnverifiedFallback(targetLanguage || CORE_AGENT_RESPONSE_LANGUAGE);
+  const rightsToken = '__GRINGO_LEGAL_FALLBACK__';
+  const originalResponse = swapped.text.includes(rightsFallback)
+    ? swapped.text.split(rightsFallback).join(rightsToken)
+    : swapped.text;
+  const restoreRightsFallback = (value) => String(value || '').split(rightsToken).join(rightsFallback);
   const metadata = {
     sourceLanguage: CORE_AGENT_RESPONSE_LANGUAGE,
     targetLanguage: targetLanguage || CORE_AGENT_RESPONSE_LANGUAGE,
@@ -1254,13 +1270,14 @@ async function applyOutgoingTranslation(response = {}, targetLanguage = CORE_AGE
 
   const finalized = {
     ...response,
-    reply: originalResponse,
+    reply: restoreRightsFallback(originalResponse),
   };
 
   if (
     !originalResponse.trim()
     || metadata.targetLanguage === CORE_AGENT_RESPONSE_LANGUAGE
-    || deliveredTextAlreadyInLanguage(originalResponse, metadata.targetLanguage)
+    || !swapped.text.split(rightsFallback).join('').trim()
+    || deliveredTextAlreadyInLanguage(restoreRightsFallback(originalResponse), metadata.targetLanguage)
   ) {
     Object.defineProperty(finalized, OUTGOING_TRANSLATION_METADATA, {
       value: {
@@ -1287,7 +1304,7 @@ async function applyOutgoingTranslation(response = {}, targetLanguage = CORE_AGE
     if (result.failureType) metadata.failureType = result.failureType;
 
     if (result.translated && !result.fallbackUsed) {
-      finalized.reply = protectedResponse.restore(result.translatedText);
+      finalized.reply = restoreRightsFallback(protectedResponse.restore(result.translatedText));
     }
   } catch (error) {
     metadata.fallbackUsed = true;
@@ -1578,6 +1595,24 @@ async function processWebMessage(messageContext = {}) {
   }
 
   const deliverResponse = async (response) => {
+    const domainCategories = new Set(['Jobs', 'Housing', 'Money', 'Documents', 'Services']);
+    const asked = `${originalQuestion}\n${question}`;
+    if (domainCategories.has(response.category) || containsUnsupportedStatutoryClaim(response.reply || '')) {
+      const guarded = guardLegalReply(response.reply, {
+        question: asked,
+        language: userLanguage,
+        verifiedLegalContext: false,
+        appendWhenLegalQuestion: domainCategories.has(response.category),
+      });
+      if (guarded !== String(response.reply || '').trim()) {
+        response = {
+          ...response,
+          reply: guarded,
+          skipOutgoingTranslation: true,
+          replyLanguage: userLanguage,
+        };
+      }
+    }
     try {
       memoryLifecycleService.notifyRequestCompleted(conversationId, {
         waitingForUser: /NEEDS|ONBOARDING/i.test(response.status || '') || /\?\s*$/.test(response.reply || ''),
@@ -2398,7 +2433,16 @@ async function processWebMessage(messageContext = {}) {
     error: '',
   };
 
-  if (knowledgeResult.legalFallback) {
+  const verifiedLegalContext = (knowledgeResult.relevantKnowledge || []).some((item) => passesLegalVerification(item));
+  const legalQuestion = looksLikeLegalOrRightsQuestion(originalQuestion) || looksLikeLegalOrRightsQuestion(question);
+  // Block free generation. A non-statutory answer already retrieved stays;
+  // statutory wording in it is removed by the output guard below.
+  const blockFreeLegalAnswer = Boolean(
+    knowledgeResult.legalFallback
+    || (legalQuestion && !verifiedLegalContext && shouldUseAiProvider(question, knowledgeResult))
+  );
+  let withholdLegalTranslation = blockFreeLegalAnswer;
+  if (blockFreeLegalAnswer) {
     reply = createRightsUnverifiedFallback(userLanguage);
     finalStatus = 'LEGAL_UNVERIFIED';
   } else if (shouldUseAiProvider(question, knowledgeResult)) {
@@ -2417,7 +2461,12 @@ async function processWebMessage(messageContext = {}) {
         workingMemory,
       });
 
-      reply = aiResult.text;
+      const guardedReply = guardGeneratedLegalOutput(aiResult.text, {
+        language: userLanguage,
+        verifiedLegalContext,
+      });
+      if (guardedReply !== aiResult.text) withholdLegalTranslation = true;
+      reply = guardedReply;
       finalStatus = 'AI_PROVIDER';
       ai.used = true;
       ai.provider = aiResult.provider;
@@ -2459,7 +2508,7 @@ async function processWebMessage(messageContext = {}) {
 
   return deliverResponse({
     reply,
-    ...(knowledgeResult.legalFallback ? { skipOutgoingTranslation: true, replyLanguage: userLanguage } : {}),
+    ...(withholdLegalTranslation ? { skipOutgoingTranslation: true, replyLanguage: userLanguage } : {}),
     category: knowledgeResult.category,
     status: finalStatus,
     ai,

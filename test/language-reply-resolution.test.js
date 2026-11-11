@@ -229,7 +229,7 @@ test('fallback and daily-limit replies use the saved language and carry the conf
     throw new Error('provider down');
   };
   const fallbackResult = await send(HE_Q, 'en', 'tg-fallback');
-  assert.match(fallbackResult.reply, /ตอนนี้ฉันยังไม่มีคำตอบที่ยืนยันได้/);
+  assert.match(fallbackResult.reply, /ตอนนี้ฉันยังไม่มีข้อมูลที่ยืนยันแล้ว/);
   assert.match(fallbackResult.reply, /התשובה בתאית/);
   assert.equal(fallback.translate.includes('he->en'), true);
 
@@ -238,7 +238,7 @@ test('fallback and daily-limit replies use the saved language and carry the conf
   aiProviderService.generateReply = async () => {
     throw new AiBudgetError('user_daily_limit');
   };
-  const limited = await send('What are my rights as a construction worker?', 'th', 'tg-limit');
+  const limited = await send('hello there', 'th', 'tg-limit');
   assert.match(limited.reply, /הגעת למגבלת השאלות היומית/);
   assert.match(limited.reply, /The answer is in Hebrew/);
   assert.match(limited.reply, /send: English/);
