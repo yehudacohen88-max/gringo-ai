@@ -61,9 +61,7 @@ Hebrew and English rights-fallback, `/start`, and `/help` strings are the ones w
 
 ## Legal questions that do not say "rights"
 
-A legal segment is decided on the way in, by the question detector or by a rights classification, not by scanning the answer for percentages. If that segment has no gate-approved record whose topic matches the claim (passport or documents, dismissal, deductions, leave, overtime, or wages), the segment is the fixed fallback. The model's wording is not shown, including a sentence with no percentage, deadline, or statute name. A `legalClaimsVerified` flag, or a verified record about a different topic, does not authorize the claim.
-
-Job listings, housing, money-transfer help, clarifying questions, and arithmetic on numbers the user already supplied stay. Those replies can sit next to the fallback when the same request also asks a legal question.
+A legal segment is decided on the way in. Free text is not kept because it also contains a question, a job sentence, or an arithmetic phrase. The only legal words that can be shown are a gate-approved record's own answer, copied with its source. A matching topic does not let the model write a different sentence, and legal records are not given to the model to rewrite. Structured job, housing, and transfer results from our own code, and basic arithmetic on numbers the user supplied, can sit next to the fallback.
 
 Patterns for 125%, the ninth day, and named statutes remain only as a backup for a non-legal segment that still states one. The input detector is still a word list: a legal question that shares none of those words can be missed. Thai, Sinhala, and Hindi patterns in `legal-question-guard.js` are pending native-speaker review.
 

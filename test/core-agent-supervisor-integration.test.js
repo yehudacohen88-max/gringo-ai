@@ -1076,8 +1076,9 @@ test('active Supervisor blocked salary-payment follow-up resumes original task w
   assert.equal(first.status, 'SUPERVISOR_BLOCKED');
   assert.equal(
     first.reply,
-    'If you are paid monthly, I can explain the monthly salary-payment rule. Are you paid monthly, hourly, daily, or another way?'
+    'I do not have verified information on this yet, and I will not guess. For official information, use the official websites of the government bodies responsible for labor and for population and immigration. Keep your contract, payslips, and a record of your hours. This is not legal advice.'
   );
+  assert.doesNotMatch(first.reply, /If you are paid monthly/i);
 
   const waitingPlan = supervisorService.getPlan('req_active_salary_frequency_start');
   assert.equal(waitingPlan.status, 'waiting_for_user');

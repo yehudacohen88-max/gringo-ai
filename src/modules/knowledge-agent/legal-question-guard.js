@@ -130,27 +130,65 @@ function containsUnsupportedStatutoryClaim(text = '') {
   return UNSUPPORTED_STATUTORY_PATTERNS.some((pattern) => pattern.test(value));
 }
 
-function isClarifyingOnly(text = '') {
-  const value = String(text || '').trim();
-  if (!value || !value.includes('?')) return false;
-  if (value.length > 500) return false;
-  if (containsUnsupportedStatutoryClaim(value)) return false;
-  if (/should not guess|do not yet have verified|wage protection|generally have rights/i.test(value)) return false;
-  return true;
+// Structured results from our own services. Free-text `message` is never trusted
+// on a legal segment, even if it mentions jobs, a question, or an arithmetic phrase.
+function trustedStructuredText(output) {
+  if (!output || typeof output !== 'object' || Array.isArray(output)) return '';
+  const capability = String(output.capability || '');
+  if (Array.isArray(output.listings) && capability === 'housing.support') {
+    return output.listings.slice(0, 5).map((listing, index) => {
+      if (!listing || typeof listing !== 'object') return '';
+      const title = String(listing.title || '').trim();
+      const city = String(listing.city || '').trim();
+      if (!title) return '';
+      return `${index + 1}. ${title}${city ? ` - ${city}` : ''}`;
+    }).filter(Boolean).join('\n');
+  }
+  if (Array.isArray(output.jobs) && /^(jobs\.search|jobs\.match)$/.test(capability)) {
+    return output.jobs.slice(0, 5).map((job, index) => {
+      if (!job || typeof job !== 'object') return '';
+      const title = String(job.title || '').trim();
+      const city = String(job.city || '').trim();
+      if (!title) return '';
+      return `${index + 1}. ${title}${city ? ` - ${city}` : ''}`;
+    }).filter(Boolean).join('\n');
+  }
+  const calc = output.calculation;
+  if (
+    calc && typeof calc === 'object'
+    && typeof calc.basicGrossPay === 'number'
+    && typeof calc.regularHours === 'number'
+    && typeof calc.hourlyRate === 'number'
+    && calc.overtimeAt125Hours == null
+    && calc.overtimeGrossPay == null
+  ) {
+    const currency = String(calc.currency || '').trim();
+    return `For ${calc.regularHours} regular hours at ${calc.hourlyRate}${currency ? ` ${currency}` : ''} per hour, basic gross pay is ${calc.basicGrossPay}${currency ? ` ${currency}` : ''}.`;
+  }
+  if (Array.isArray(output.reportedQuotes) && capability === 'finance.transfer') {
+    const message = String(output.message || '').trim();
+    if (message && !looksLikeLegalOrRightsQuestion(message) && !containsUnsupportedStatutoryClaim(message)) {
+      return message;
+    }
+  }
+  return '';
 }
 
-function isSafeNonLegalAssistance(text = '', output) {
-  const value = String(text || '');
-  if (!value.trim() || containsUnsupportedStatutoryClaim(value)) return false;
-  const capability = output && typeof output === 'object' ? String(output.capability || '') : '';
-  if (/^(finance\.|jobs\.search|jobs\.match|housing\.|consumer\.|community\.|health\.|life\.)/.test(capability)) return true;
-  return (
-    /relevant jobs|job alerts|looking for jobs|which city would you like to work/i.test(value)
-    || /not currently have enough real reported observations|demo provider ranking|exchange rate/i.test(value)
-    || /basic gross pay for those regular hours/i.test(value)
-    || /no results right now|this service is unavailable|demo data only/i.test(value)
-    || /relevant housing/i.test(value)
-  );
+function verbatimReviewedAnswers(records = [], topics = []) {
+  const approved = (Array.isArray(records) ? records : []).filter((record) => passesLegalVerification(record));
+  const needed = topics.length ? topics : ['rights'];
+  const lines = [];
+  for (const record of approved) {
+    const covered = new Set(recordTopics(record));
+    if (!needed.some((topic) => topicCovered(topic, covered))) continue;
+    const answer = String(record.answer || '').trim();
+    const source = record.source && typeof record.source === 'object' ? record.source : {};
+    const url = String(source.url || '').trim();
+    const title = String(source.title || '').trim();
+    if (!answer || !url) continue;
+    lines.push(`${answer}\n\nSource: ${[title, url].filter(Boolean).join(' ')}`);
+  }
+  return lines;
 }
 
 function looksLikeUnverifiedLegalAnswer(text = '') {
@@ -169,27 +207,18 @@ function guardLegalReply(text = '', options = {}) {
   const language = options.language || 'en';
   const fallback = createRightsUnverifiedFallback(language);
   const legal = segmentIsLegal(question, options);
-  const covered = legal && recordsCoverClaim(approvedRecords(options), claimTopics(question));
-  if (covered) return reply;
-  if (reply.includes(fallback)) return reply;
-
-  // Primary boundary: a legal segment with no topic-matched verified record
-  // does not emit free text. Job, housing, money, and user-supplied arithmetic
-  // stay, with the fallback added for the legal part.
-  if (legal) {
-    if (!reply) return fallback;
-    if (isClarifyingOnly(reply)) return reply;
-    if (isSafeNonLegalAssistance(reply, options.output) || options.appendWhenLegalQuestion) {
-      return reply.includes(fallback) ? reply : `${reply}\n\n${fallback}`;
-    }
-    return fallback;
+  if (!legal) {
+    if (containsUnsupportedStatutoryClaim(reply) || looksLikeUnverifiedLegalAnswer(reply)) return fallback;
+    return reply;
   }
 
-  // Secondary only: a non-legal segment that still states a known statute.
-  if (containsUnsupportedStatutoryClaim(reply) || looksLikeUnverifiedLegalAnswer(reply)) {
-    return fallback;
-  }
-  return reply;
+  // Fail closed. Topic overlap does not license model text. The only legal
+  // words allowed are a gate-approved record's own answer, copied with its source.
+  const reviewed = verbatimReviewedAnswers(approvedRecords(options), claimTopics(question));
+  const trusted = trustedStructuredText(options.output);
+  const parts = reviewed.length ? [...reviewed] : [fallback];
+  if (trusted) parts.push(trusted);
+  return joinGuardedParts(parts, language);
 }
 
 function joinGuardedParts(parts = [], language = 'en') {
@@ -216,12 +245,13 @@ function joinGuardedParts(parts = [], language = 'en') {
 function guardGeneratedLegalOutput(text = '', options = {}) {
   const question = String(options.question || '');
   const legal = segmentIsLegal(question, options);
-  const covered = legal && recordsCoverClaim(approvedRecords(options), claimTopics(question));
-  if (legal && !covered) return createRightsUnverifiedFallback(options.language || 'en');
-  const reply = String(text || '');
-  if (containsUnsupportedStatutoryClaim(reply) && !recordsCoverClaim(approvedRecords(options), claimTopics(question || reply))) {
+  if (legal) {
+    const reviewed = verbatimReviewedAnswers(approvedRecords(options), claimTopics(question));
+    if (reviewed.length) return reviewed.join('\n\n');
     return createRightsUnverifiedFallback(options.language || 'en');
   }
+  const reply = String(text || '');
+  if (containsUnsupportedStatutoryClaim(reply)) return createRightsUnverifiedFallback(options.language || 'en');
   return reply;
 }
 
@@ -248,7 +278,6 @@ module.exports = {
   containsUnsupportedStatutoryClaim,
   guardGeneratedLegalOutput,
   guardLegalReply,
-  isSafeNonLegalAssistance,
   joinGuardedParts,
   looksLikeLegalOrRightsQuestion,
   recordsCoverClaim,

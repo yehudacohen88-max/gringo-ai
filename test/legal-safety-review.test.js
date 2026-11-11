@@ -160,12 +160,16 @@ test('mixed supervisor replies keep arithmetic and polite help without statutory
       {
         status: 'success',
         sourceQuestion: 'How much overtime should I get for 10 hours at 40 ILS?',
-        output: { message: 'For 10 regular hours at 40 ILS per hour, your basic gross pay for those regular hours is 400 ILS.' },
+        output: {
+          calculation: { basicGrossPay: 400, regularHours: 10, hourlyRate: 40, currency: 'ILS' },
+          message: 'Your employer can keep your passport if you agree.',
+        },
       },
     ],
   }, { language: 'he' });
-  assert.match(overtime, /basic gross pay for those regular hours/);
+  assert.match(overtime, /basic gross pay is 400 ILS/);
   assert.match(overtime, /אין לי מידע מאומת/);
+  assert.doesNotMatch(overtime, /if you agree/);
   assert.doesNotMatch(overtime, STATUTE);
 
   const wages = supervisorService.composeResponse({
@@ -359,6 +363,68 @@ test('mixed intent keeps job listings and user-supplied arithmetic, and still fa
   assert.match(arithmetic, /basic gross pay for those regular hours/);
   assert.match(arithmetic, /אין לי מידע מאומת/);
   assert.doesNotMatch(arithmetic, /deducted from your wage/);
+});
+
+test('mixed free text is not kept just because it also mentions a job or asks a question', () => {
+  const mixed = 'Relevant jobs: Helper in Tel Aviv. Your employer can keep your passport if you agree.';
+  for (const language of ['en', 'he', 'th']) {
+    const reply = guardLegalReply(mixed, {
+      question: 'find me a job and can my boss keep my passport?',
+      language,
+      legalSegment: true,
+    });
+    assert.equal(reply, RIGHTS_UNVERIFIED_FALLBACK[language], language);
+    assert.equal(reply.includes('keep your passport'), false, language);
+    assert.equal(reply.includes('Relevant jobs'), false, language);
+  }
+  for (const language of ['en', 'he', 'th']) {
+    const embedded = guardLegalReply('Since your employer may deduct housing, how much do you pay?', {
+      question: 'can they deduct for housing?',
+      language,
+      legalSegment: true,
+    });
+    assert.equal(embedded, RIGHTS_UNVERIFIED_FALLBACK[language], language);
+    assert.equal(embedded.includes('deduct housing'), false, language);
+  }
+});
+
+test('structured job results stay beside the fallback, and only a record answer may state the law', () => {
+  const jobs = guardLegalReply('Your employer can keep your passport if you agree.', {
+    question: 'find me a job and can my boss keep my passport?',
+    language: 'en',
+    legalSegment: true,
+    output: {
+      capability: 'jobs.search',
+      jobs: [{ title: 'Helper', city: 'Tel Aviv' }],
+    },
+  });
+  assert.match(jobs, /1\. Helper - Tel Aviv/);
+  assert.match(jobs, /I do not have verified information on this yet/);
+  assert.doesNotMatch(jobs, /if you agree/);
+
+  const overtime = {
+    id: 'overtime-reviewed',
+    topic: 'overtime_pay_multipliers',
+    title: 'Overtime pay multipliers',
+    answer: 'Reviewed overtime answer from the record.',
+    source: {
+      verified: true,
+      title: 'Hours of Work and Rest Law',
+      url: 'https://example.test/overtime',
+      verifiedAt: '2026-11-01',
+      contentStatus: 'approved',
+      reviewedBy: 'legal-review',
+    },
+  };
+  const invented = guardGeneratedLegalOutput('Overtime is whatever the employer decides.', {
+    question: 'what is my overtime?',
+    language: 'en',
+    legalSegment: true,
+    verifiedRecords: [overtime],
+  });
+  assert.match(invented, /Reviewed overtime answer from the record/);
+  assert.match(invented, /https:\/\/example\.test\/overtime/);
+  assert.doesNotMatch(invented, /whatever the employer decides/);
 });
 
 test('privacy consent and onboarding language set stay as they were', () => {

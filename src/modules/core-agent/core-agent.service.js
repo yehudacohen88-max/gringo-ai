@@ -21,12 +21,9 @@ const { isLegalCategory, knowledgeSafeForAi } = require('../knowledge-agent/lega
 const { createRightsUnverifiedFallback } = require('../knowledge-agent/rights-unverified-fallback');
 const {
   containsUnsupportedStatutoryClaim,
-  claimTopics,
   guardGeneratedLegalOutput,
   guardLegalReply,
   looksLikeLegalOrRightsQuestion,
-  recordsCoverClaim,
-  replyContainsRightsFallback,
   swapRightsFallbackToLanguage,
 } = require('../knowledge-agent/legal-question-guard');
 const { languageDetectionService } = require('../language');
@@ -490,7 +487,6 @@ async function buildActiveSupervisorResponse({
     const replyLanguage = explicitDomainReplyLanguage(aggregatedResult);
     return {
       reply,
-      ...(replyContainsRightsFallback(reply) ? { skipOutgoingTranslation: true, replyLanguage: userLanguage } : {}),
       ...(replyLanguage ? { replyLanguage } : {}),
       category: 'Supervisor',
       status: `SUPERVISOR_${String(aggregatedResult.status || 'partial').toUpperCase()}`,
@@ -660,7 +656,6 @@ async function buildLiveMultiIntentSupervisorResponse({
 
     return {
       reply,
-      ...(replyContainsRightsFallback(reply) ? { skipOutgoingTranslation: true, replyLanguage: userLanguage } : {}),
       category: 'Supervisor',
       status,
       multiIntent: {
@@ -1275,11 +1270,12 @@ async function applyOutgoingTranslation(response = {}, targetLanguage = CORE_AGE
     reply: restoreRightsFallback(originalResponse),
   };
 
+  const remainder = originalResponse.split(rightsToken).join(' ').trim();
   if (
     !originalResponse.trim()
     || metadata.targetLanguage === CORE_AGENT_RESPONSE_LANGUAGE
-    || !swapped.text.split(rightsFallback).join('').trim()
-    || deliveredTextAlreadyInLanguage(restoreRightsFallback(originalResponse), metadata.targetLanguage)
+    || !remainder
+    || deliveredTextAlreadyInLanguage(remainder, metadata.targetLanguage)
   ) {
     Object.defineProperty(finalized, OUTGOING_TRANSLATION_METADATA, {
       value: {
@@ -1603,15 +1599,18 @@ async function processWebMessage(messageContext = {}) {
       const guarded = guardLegalReply(response.reply, {
         question: asked,
         language: userLanguage,
-        verifiedLegalContext: false,
-        appendWhenLegalQuestion: domainCategories.has(response.category),
+        output: response.structuredOutput || (
+          response.category === 'Jobs' && Array.isArray(response.jobs)
+            ? { capability: 'jobs.search', jobs: response.jobs }
+            : response.category === 'Housing' && response.housing && Array.isArray(response.housing.listings)
+              ? { capability: 'housing.support', listings: response.housing.listings }
+              : undefined
+        ),
       });
       if (guarded !== String(response.reply || '').trim()) {
         response = {
           ...response,
           reply: guarded,
-          skipOutgoingTranslation: true,
-          replyLanguage: userLanguage,
         };
       }
     }
@@ -2438,14 +2437,17 @@ async function processWebMessage(messageContext = {}) {
   const asked = `${originalQuestion}\n${question}`;
   const verifiedRecords = knowledgeResult.relevantKnowledge || [];
   const legalSegment = looksLikeLegalOrRightsQuestion(asked) || isLegalCategory(knowledgeResult.category);
-  const claimCovered = legalSegment && recordsCoverClaim(verifiedRecords, claimTopics(asked));
-  // A legal segment with no topic-matched verified record is not sent to the
-  // model and is not shown as a retrieved answer.
-  const blockFreeLegalAnswer = Boolean(legalSegment && !claimCovered);
-  let withholdLegalTranslation = blockFreeLegalAnswer;
-  if (blockFreeLegalAnswer) {
-    reply = createRightsUnverifiedFallback(userLanguage);
-    finalStatus = 'LEGAL_UNVERIFIED';
+  // A legal segment is never given to the model to compose. The only legal
+  // text is a gate-approved record's own answer, copied with its source.
+  let withholdLegalTranslation = legalSegment;
+  if (legalSegment) {
+    reply = guardGeneratedLegalOutput('', {
+      question: asked,
+      language: userLanguage,
+      legalSegment: true,
+      verifiedRecords,
+    });
+    finalStatus = reply === createRightsUnverifiedFallback(userLanguage) ? 'LEGAL_UNVERIFIED' : 'LEGAL_VERIFIED';
   } else if (shouldUseAiProvider(question, knowledgeResult)) {
     ai.attempted = true;
 
@@ -2455,7 +2457,7 @@ async function processWebMessage(messageContext = {}) {
         budgetKey: getConversationKey(userContext),
         userLanguage,
         userProfile,
-        relevantKnowledge: knowledgeSafeForAi(knowledgeResult.relevantKnowledge || []),
+        relevantKnowledge: knowledgeSafeForAi(knowledgeResult.relevantKnowledge || []).filter((item) => !isLegalCategory(item && item.category) && item.domain !== 'employment'),
         recentConversation: getRecentConversation(userContext),
         conversationContext,
         memorySnapshot,

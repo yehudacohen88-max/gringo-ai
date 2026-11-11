@@ -226,8 +226,10 @@ test('Hebrew salary plus transfer with successful translation still handles both
     assert.equal(calls.some((call) => call.sourceLanguage === 'he' && call.targetLanguage === 'en'), true);
     assert.equal(response.status.startsWith('SUPERVISOR_MULTI_INTENT_'), true);
     assert.notEqual(response.status, 'SUPERVISOR_COMPLETED');
-    assert.match(outgoing.text, /salary|paid|monthly/i);
+    assert.ok(outgoing);
+    assert.doesNotMatch(outgoing.text, /Are you paid monthly|Which month's salary/i);
     assert.match(outgoing.text, /Thailand|ILS|transfer|reports/i);
+    assert.match(response.reply, /אין לי מידע מאומת/);
     assert.equal(outgoing.text.includes(HEBREW_NOTICE), false);
     assert.equal(response.reply.includes(HEBREW_NOTICE), false);
     assert.equal(response.reply.includes('PROVIDER_RATE_LIMIT'), false);

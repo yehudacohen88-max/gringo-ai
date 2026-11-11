@@ -203,7 +203,8 @@ test('salary and no hot water multi-intent preserves Employment then Housing res
 
   assert.deepEqual(results.map((result) => result.domain), ['employment_salary', 'health_life_community']);
   assert.equal(results[1].output.genericHousingProblemType, 'no_hot_water');
-  assert.match(response, /salary|paid|payment/i);
+  assert.match(response, /I do not have verified information on this yet/i);
+  assert.doesNotMatch(response, /Which month's salary or payment period/i);
   assert.match(response, /hot water/i);
 });
 

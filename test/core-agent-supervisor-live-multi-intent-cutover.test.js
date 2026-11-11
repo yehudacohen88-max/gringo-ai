@@ -454,12 +454,13 @@ test('regression: three-domain salary money and clinic message preserves all liv
       assert.deepEqual(observed.synthesis.items.map((result) => result.taskId), observed.results.map((result) => result.taskId));
       assert.equal(response.reply, observed.composedResponse);
 
-      const employmentIndex = response.reply.indexOf('If you are paid monthly');
+      assert.doesNotMatch(response.reply, /If you are paid monthly/i);
       const financeIndex = response.reply.indexOf('not currently have enough real reported observations');
       const healthIndex = response.reply.indexOf('general information only');
-      assert.equal(employmentIndex >= 0, true);
-      assert.equal(financeIndex > employmentIndex, true);
+      const fallbackIndex = response.reply.indexOf('I do not have verified information on this yet');
+      assert.equal(financeIndex >= 0, true);
       assert.equal(healthIndex > financeIndex, true);
+      assert.equal(fallbackIndex > healthIndex, true);
       assert.equal(state.savedConversations.length, 1);
       assert.equal(state.savedConversations[0].answer, response.reply);
       assert.equal(state.memoryExtractions.length, 1);

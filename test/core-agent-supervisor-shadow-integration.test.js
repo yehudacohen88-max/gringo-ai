@@ -196,7 +196,8 @@ test('shadow output does not replace live response', async () => {
   };
   const response = await coreAgentService.processWebMessage(messageContext);
 
-  assert.equal(response.reply, 'How much do you want to send?');
+  assert.match(response.reply, /I do not have verified information on this yet/);
+  assert.doesNotMatch(response.reply, /How much do you want to send/);
   assert.notEqual(response.reply, messageContext.supervisorShadow.composedResponse);
   assert.equal(Object.hasOwn(response, 'supervisorShadow'), false);
 });

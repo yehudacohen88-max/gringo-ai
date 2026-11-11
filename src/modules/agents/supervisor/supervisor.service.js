@@ -391,6 +391,22 @@ function segmentLooksLegal(question, output) {
   return false;
 }
 
+function guardedLegalFollowUp(question, domainResults = [], language = 'en') {
+  const asked = cleanText(question);
+  if (!asked) return '';
+  const owner = domainResults.find((result) => (
+    Array.isArray(result.followUpQuestions) && result.followUpQuestions.includes(asked)
+  ));
+  if (!owner || !segmentLooksLegal(owner.sourceQuestion, owner.output)) return '';
+  return guardLegalReply(asked, {
+    question: cleanText(owner.sourceQuestion),
+    language,
+    legalSegment: true,
+    verifiedRecords: collectVerifiedRecords(owner.output),
+    output: owner.output,
+  });
+}
+
 function outputText(output = {}) {
   if (!isPlainObject(output)) return '';
 
@@ -2148,11 +2164,15 @@ class SupervisorService {
       const domain = cleanText(task.domain);
 
       const sourceQuestion = cleanText(task.input?.question || task.input?.query || task.result.sourceQuestion);
+      const followUps = Array.isArray(task.result.followUpQuestions)
+        ? task.result.followUpQuestions.map((item) => cleanText(item)).filter(Boolean)
+        : [];
       domainResults.push({
         taskId: cleanText(task.taskId || task.result.taskId),
         domain,
         status: normalizedStatus,
         ...(sourceQuestion ? { sourceQuestion } : {}),
+        ...(followUps.length ? { followUpQuestions: followUps } : {}),
         output: cloneValue(task.result.output),
       });
 
@@ -2202,6 +2222,8 @@ class SupervisorService {
     const question = firstUniqueQuestion(safeResult.followUpQuestions);
 
     if (status === 'blocked') {
+      const guarded = guardedLegalFollowUp(question, domainResults, language);
+      if (guarded) return guarded;
       return question || 'I need one more detail before I can help. What should I check first?';
     }
 
@@ -2232,7 +2254,7 @@ class SupervisorService {
     }
 
     if (question) {
-      parts.push(question);
+      parts.push(guardedLegalFollowUp(question, domainResults, language) || question);
     } else if (status === 'completed' && !suppressGenericFollowUp) {
       parts.push('Tell me which detail you want to check next.');
     } else if (status === 'partial' && !suppressTransferPartialNotice) {
