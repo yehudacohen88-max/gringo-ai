@@ -186,11 +186,25 @@ function trustedStructuredText(output) {
     const currency = String(calc.currency || '').trim();
     return `For ${calc.regularHours} regular hours at ${calc.hourlyRate}${currency ? ` ${currency}` : ''} per hour, basic gross pay is ${calc.basicGrossPay}${currency ? ` ${currency}` : ''}.`;
   }
-  if (Array.isArray(output.reportedQuotes) && capability === 'finance.transfer') {
+  if (capability === 'finance.transfer' && Array.isArray(output.reportedQuotes)) {
     const message = String(output.message || '').trim();
     if (message && !looksLikeLegalOrRightsQuestion(message) && !containsUnsupportedStatutoryClaim(message)) {
       return message;
     }
+    return output.reportedQuotes.slice(0, 3).map((row, index) => {
+      if (!row || typeof row !== 'object') return '';
+      const name = String(row.providerName || row.name || '').trim();
+      if (!name) return '';
+      const received = row.recipientAmount == null ? '' : ` recipient ${row.recipientAmount}`;
+      const currency = String(row.targetCurrency || '').trim();
+      return `${index + 1}. ${name}${received}${currency ? ` ${currency}` : ''}`;
+    }).filter(Boolean).join('\n');
+  }
+  if (capability === 'finance.rate' && output.rate && typeof output.rate === 'object') {
+    const value = output.rate.value;
+    const from = String(output.rate.sourceCurrency || '').trim();
+    const to = String(output.rate.targetCurrency || '').trim();
+    if (typeof value === 'number' && from && to) return `1 ${from} = ${value} ${to}`;
   }
   return '';
 }

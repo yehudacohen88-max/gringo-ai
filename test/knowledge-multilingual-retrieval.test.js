@@ -116,9 +116,9 @@ test('existing legal records fail the verification gate and are not served', asy
   assert.equal(english.withheldUnverifiedIds.includes('workers-rights-001'), true);
 });
 
-test('a record is presentable only with source, date, approved status and review metadata', () => {
+test('metadata alone does not make a legal record presentable', () => {
   const record = approvedRecord();
-  assert.equal(passesLegalVerification(record), true);
+  assert.equal(passesLegalVerification(record), false);
   assert.equal(passesLegalVerification(approvedRecord({ source: { ...record.source, url: 'https://example.test/only-url', verifiedAt: '', contentStatus: '', reviewedBy: '' } })), false);
   assert.equal(passesLegalVerification(approvedRecord({ source: { ...record.source, verifiedAt: '' } })), false);
   assert.equal(passesLegalVerification(approvedRecord({ source: { ...record.source, contentStatus: 'draft' } })), false);
@@ -130,7 +130,7 @@ test('unverified legal knowledge is removed before it can reach the AI prompt', 
   const generic = kb.loadKnowledgeItems().find((item) => item.id === 'workers-rights-001');
   const housing = { id: 'housing-1', category: 'Housing', title: 'Room', answer: 'A shared room may be available.' };
   const safe = knowledgeSafeForAi([generic, housing, approvedRecord()]);
-  assert.deepEqual(safe.map((item) => item.id), ['housing-1', 'future-reviewed-rights']);
+  assert.deepEqual(safe.map((item) => item.id), ['housing-1']);
   const prompt = buildUserPrompt({
     message: 'What are my rights as a construction worker?',
     relevantKnowledge: [generic],

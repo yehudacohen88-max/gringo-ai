@@ -13,12 +13,11 @@ const MENU_LABEL = /^(employment\s*(&|and)\s*salary|jobs?|housing|money|document
 
 function practicalFlags(text) {
   const value = String(text || '');
-  const job = /find me (a )?job|looking for (a )?(job|work)|job in |construction job|new construction job|מחפש עבודה|יש משרה|משרה חדשה|หางาน|งานก่อสร้างใหม่|नौकरी खोज/i.test(value);
+  const job = /find me (a )?job|looking for (a )?(job|work)|job in |construction job|new construction job|מחפש עבודה|יש משרה|משרה חדשה|หางาน|งานก่อสร้างใหม่|नौकरी खोज|රැකියාවක් සොය/i.test(value);
   const housingSearch = /looking for (a )?(room|apartment|housing)|place to live|מחפש (דירה|חדר)|หาห้อง|หาที่พัก/i.test(value)
     && !/deduct|ניכוי|לנכות|מוריד|หัก|workers in one room|עובדים בחדר/i.test(value);
-  const money = /exchange rate|rate to send|send money|money transfer|transfer cost|cheapest way to send|להעביר|שולח את המשכורת|לשלוח את המשכורת|ส่งเงิน|ส่งค่าจ้างกลับ|पैसे कैसे निकाल|कैसे निकाल/i.test(value);
-  const healthLocation = /where is the (nearest )?(hospital|clinic)|איפה .*בית חולים|בית חולים|โรงพยาบาลอยู่ที่ไหน|अस्पताल कहाँ|nearest clinic/i.test(value)
-    && !/insurance|ביטוח|ประกันสุขภาพ|बीमा|රක්ෂණ/i.test(value);
+  const money = /exchange rate|rate to send|send money|money transfer|transfer cost|cheapest way to send|send money home|להעביר|שולח את המשכורת|לשלוח את המשכורת|לשלוח כסף|כסף הביתה|ส่งเงิน|ส่งค่าจ้างกลับ|पैसे कैसे निकाल|कैसे निकाल|पैसे भेज|මුදල් යව/i.test(value);
+  const healthLocation = /where is the (nearest )?(hospital|clinic)|בית החולים|בית חולים|โรงพยาบาลอยู่ที่ไหน|अस्पताल कहाँ|nearest clinic|where is the hospital|රෝහල/i.test(value);
   const documentsLogistics = /embassy|שגרירות|สถานทูต|दूतावास|තානාපති|איפה מחדשים דרכון|מחדשים דרכון|renew my passport|passport renewal|lost my passport|איבדתי את הדרכון/i.test(value);
   const transport = /אוטובוס|\b(bus|train)\b|רכבת|תחבורה/i.test(value);
   const shopping = /שוק|बाज़ार|market\b|חנות\b/i.test(value) && /פתוח|खुला|open\b/i.test(value);
@@ -96,7 +95,7 @@ function detectLegalTopic(text, flags) {
     return topicResult('deductions', '10', 'piba');
   }
 
-  if (!flags.healthLocation && /health insurance|medical insurance|ביטוח רפואי|ביטוח בריאות|ประกันสุขภาพ|स्वास्थ्य बीमा|සෞඛ්‍ය රක්ෂණ|insurance company refuses|מסרבת לשלם|บริษัทประกัน/i.test(value)) {
+  if (/health insurance|medical insurance|ביטוח רפואי|ביטוח בריאות|ประกันสุขภาพ|स्वास्थ्य बीमा|සෞඛ්‍ය රක්ෂණ|insurance company refuses|מסרבת לשלם|บริษัทประกัน/i.test(value)) {
     return topicResult('medical_insurance', '5', 'piba');
   }
 
@@ -114,7 +113,11 @@ function detectLegalTopic(text, flags) {
   }
 
   const wageComplaint = /minimum wage|שכר מינימום|שכר המינימום|ค่าแรงขั้นต่ำ|न्यूनतम वेतन|not paid|hasn't paid|has not paid|did not pay|didn't pay|did not receive|didn't receive|לא\s+שיל[מם]|לא קיבלתי את המשכורת|לא קיבלתי משכורת|ไม่จ่ายเงินเดือน|පඩි ගෙව|वेतन नहीं|payslip|תלוש|สลิปเงินเดือน|in cash|במזומן|เงินสดไม่โอน|payday|by what date must|when should i receive my (salary|pay|wages)|עד איזה תאריך|ภายในวันที่|מגיע לי שכר|has not given me work|לא נותן לי עבודה|לא נותנת לי עבודה|ไม่ให้งาน|still get paid|how much should i (get paid|be paid)/i.test(value);
-  if (wageComplaint && !flags.money && !flags.transport) {
+  // A wage complaint stays legal even when the same message also asks to
+  // send money, look for a job, or find a hospital. Practical flags do not
+  // cancel it. Bare "salary" inside a transfer or exchange question is not
+  // a wage complaint, so those stay practical.
+  if (wageComplaint && !flags.transport) {
     return topicResult('wages', '9', 'piba');
   }
 

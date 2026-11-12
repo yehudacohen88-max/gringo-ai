@@ -6,7 +6,12 @@
 // claims array) ignore status and legalClaimsVerified. They pass only when
 // knowledge/approvals has a matching content hash, reviewer, and date.
 
-const { isSourceGroundedRecord, passesSourceGroundedApproval } = require('./source-grounded-record');
+const {
+  contentHash,
+  isSourceGroundedRecord,
+  loadApprovalEntries,
+  passesSourceGroundedApproval,
+} = require('./source-grounded-record');
 
 function clean(value) {
   return value === undefined || value === null ? '' : String(value).trim();
@@ -58,9 +63,7 @@ function reviewMetadata(item = {}) {
   return reviewer;
 }
 
-function passesLegalVerification(item = {}, options = {}) {
-  if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
-  if (isSourceGroundedRecord(item)) return passesSourceGroundedApproval(item, options);
+function legacyMetadataComplete(item = {}) {
   const source = item.source;
   if (!source || typeof source !== 'object' || Array.isArray(source)) return false;
   if (source.verified !== true) return false;
@@ -71,10 +74,35 @@ function passesLegalVerification(item = {}, options = {}) {
   return true;
 }
 
-function knowledgeSafeForAi(items) {
+function approvalMatchesContent(item, options = {}) {
+  const approvals = Array.isArray(options.approvals)
+    ? options.approvals
+    : loadApprovalEntries(options.approvalsDir);
+  const match = approvals.find((entry) => clean(entry.recordId) === clean(item.id));
+  if (!match) return false;
+  if (clean(match.contentHash).toLowerCase() !== contentHash(item)) return false;
+  const reviewer = clean(match.reviewer);
+  if (reviewer.length < 2 || /^(pending|unreviewed|todo|tbd|unknown)$/i.test(reviewer)) return false;
+  const date = clean(match.date);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const parsed = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) return false;
+  return true;
+}
+
+function passesLegalVerification(item = {}, options = {}) {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
+  // legalClaimsVerified is never read. Metadata fields alone never approve.
+  if (isSourceGroundedRecord(item)) return passesSourceGroundedApproval(item, options);
+  if (!isLegalKnowledgeItem(item) && !item.source) return false;
+  if (!legacyMetadataComplete(item)) return false;
+  return approvalMatchesContent(item, options);
+}
+
+function knowledgeSafeForAi(items, options = {}) {
   return (Array.isArray(items) ? items : []).filter((item) => {
     if (!isLegalKnowledgeItem(item)) return true;
-    return passesLegalVerification(item);
+    return passesLegalVerification(item, options);
   });
 }
 

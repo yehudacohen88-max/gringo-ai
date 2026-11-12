@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-const { LEGAL_DISCLAIMER, legalDisclaimerText } = require('../src/modules/knowledge-agent/legal-disclaimer');
+const { ENGLISH_HANDBOOK_DISCLAIMER, ENGLISH_NOT_LEGAL_ADVICE, LEGAL_DISCLAIMER, legalDisclaimerText } = require('../src/modules/knowledge-agent/legal-disclaimer');
 const { guardLegalReply } = require('../src/modules/knowledge-agent/legal-question-guard');
 const { createRightsUnverifiedFallback } = require('../src/modules/knowledge-agent/rights-unverified-fallback');
 
@@ -34,7 +34,9 @@ function walk(dir, files = []) {
 test('every legal reply in five languages includes the disclaimer, and ordinary replies do not', () => {
   assert.equal(LEGAL_DISCLAIMER.he.text, OWNER_HEBREW);
   assert.equal(LEGAL_DISCLAIMER.he.reviewStatus, 'owner_supplied');
-  assert.equal(LEGAL_DISCLAIMER.en.reviewStatus, 'handbook_verbatim');
+  assert.equal(LEGAL_DISCLAIMER.en.reviewStatus, 'handbook_verbatim_and_owner_english');
+  assert.ok(legalDisclaimerText('en').includes(ENGLISH_HANDBOOK_DISCLAIMER));
+  assert.ok(legalDisclaimerText('en').includes(ENGLISH_NOT_LEGAL_ADVICE));
   for (const language of ['th', 'si', 'hi']) {
     assert.equal(LEGAL_DISCLAIMER[language].reviewStatus, 'pending_native_review', language);
   }

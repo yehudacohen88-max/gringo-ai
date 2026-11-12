@@ -7,6 +7,7 @@
 const { HANDBOOK_PDF_URLS, HANDBOOK_RETRIEVED_AT } = require('./handbook-links');
 
 const ENGLISH_HANDBOOK_DISCLAIMER = 'This summary is provided for general informational purposes only, and is not a substitute for the wording of the relevant laws, regulations, procedures and extension orders, which are binding.';
+const ENGLISH_NOT_LEGAL_ADVICE = 'This is not legal advice. The information is general only and does not replace professional advice concerning the circumstances of your case.';
 
 const LEGAL_DISCLAIMER = Object.freeze({
   he: Object.freeze({
@@ -15,14 +16,16 @@ const LEGAL_DISCLAIMER = Object.freeze({
     source: null,
   }),
   en: Object.freeze({
-    text: ENGLISH_HANDBOOK_DISCLAIMER,
-    reviewStatus: 'handbook_verbatim',
+    text: `${ENGLISH_HANDBOOK_DISCLAIMER}\n\n${ENGLISH_NOT_LEGAL_ADVICE}`,
+    reviewStatus: 'handbook_verbatim_and_owner_english',
     source: Object.freeze({
       url: HANDBOOK_PDF_URLS.en,
       section: 'Introduction',
       quote: ENGLISH_HANDBOOK_DISCLAIMER,
       language: 'en',
       sourceRetrievedAt: HANDBOOK_RETRIEVED_AT,
+      addedSentence: ENGLISH_NOT_LEGAL_ADVICE,
+      addedSentenceStatus: 'owner_english_faithful_to_hebrew',
     }),
   }),
   th: Object.freeze({
@@ -65,6 +68,7 @@ function withLegalDisclaimer(text, language) {
 
 module.exports = {
   ENGLISH_HANDBOOK_DISCLAIMER,
+  ENGLISH_NOT_LEGAL_ADVICE,
   LEGAL_DISCLAIMER,
   disclaimerLanguage,
   legalDisclaimerText,

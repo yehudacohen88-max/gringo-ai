@@ -1633,7 +1633,11 @@ async function processWebMessage(messageContext = {}) {
             ? { capability: 'jobs.search', jobs: response.jobs }
             : response.category === 'Housing' && response.housing && Array.isArray(response.housing.listings)
               ? { capability: 'housing.support', listings: response.housing.listings }
-              : undefined
+              : response.category === 'Money' && response.money && Array.isArray(response.money.results)
+                ? { capability: 'finance.transfer', reportedQuotes: response.money.results, message: response.reply }
+                : response.category === 'Money' && response.money && response.money.rate
+                  ? { capability: 'finance.rate', rate: response.money.rate }
+                  : undefined
         ),
       });
       if (guarded !== String(response.reply || '').trim()) {

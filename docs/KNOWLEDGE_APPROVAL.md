@@ -16,7 +16,7 @@ A usable draft quotes the handbook verbatim (Unicode NFC, whitespace collapsed) 
 4. Add `knowledge/approvals/<record-id>.json` with `recordId`, `contentHash`, `reviewer`, and `date` (`YYYY-MM-DD`).
 5. Open the pull request. CI runs the quote check and the test suite. Do not set `status` to approved in application code. The approvals file is the only switch, and a hash mismatch keeps the record hidden.
 
-`legalClaimsVerified` on a model reply is ignored. A verified record is shown only when its topic matches the question, and only its own answer text is copied, with the source URL.
+`legalClaimsVerified` on a model reply is ignored. So are `source.verified`, `verifiedAt`, `contentStatus`, and `reviewedBy` by themselves. Older records in `workers-rights.json` use the same rule: those fields may be present, and the record stays hidden until `knowledge/approvals/` has a matching content hash. A verified record is shown only when its topic matches the question, and only its own answer text is copied, with the source URL. See `docs/LEGAL_PRESENTATION_AUDIT.md`.
 
 ## What a rights reply contains
 

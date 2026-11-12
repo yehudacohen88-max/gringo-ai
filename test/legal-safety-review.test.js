@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { passesLegalVerification, knowledgeSafeForAi } = require('../src/modules/knowledge-agent/legal-verification');
+const { contentHash } = require('../src/modules/knowledge-agent/source-grounded-record');
 const {
   containsUnsupportedStatutoryClaim,
   guardGeneratedLegalOutput,
@@ -97,7 +98,7 @@ test('job search and money transfer questions are not treated as legal claims', 
 
 test('partial or forged legal metadata is rejected on every presentation path', async () => {
   const record = approved();
-  assert.equal(passesLegalVerification(record), true);
+  assert.equal(passesLegalVerification(record), false);
   assert.equal(passesLegalVerification(approved({ source: { ...record.source, reviewedBy: '' } })), false);
   assert.equal(passesLegalVerification(approved({ source: { ...record.source, reviewedBy: 'pending' } })), false);
   assert.equal(passesLegalVerification(approved({ source: { ...record.source, verifiedAt: '2026-13-40' } })), false);
@@ -417,11 +418,24 @@ test('structured job results stay beside the fallback, and only a record answer 
       reviewedBy: 'legal-review',
     },
   };
+  const withheld = guardGeneratedLegalOutput('Overtime is whatever the employer decides.', {
+    question: 'what is my overtime?',
+    language: 'en',
+    legalSegment: true,
+    verifiedRecords: [overtime],
+  });
+  assert.equal(withheld.includes('Reviewed overtime answer from the record'), false);
   const invented = guardGeneratedLegalOutput('Overtime is whatever the employer decides.', {
     question: 'what is my overtime?',
     language: 'en',
     legalSegment: true,
     verifiedRecords: [overtime],
+    approvals: [{
+      recordId: overtime.id,
+      contentHash: contentHash(overtime),
+      reviewer: 'Yehuda Cohen',
+      date: '2026-11-11',
+    }],
   });
   assert.match(invented, /Reviewed overtime answer from the record/);
   assert.match(invented, /https:\/\/example\.test\/overtime/);
