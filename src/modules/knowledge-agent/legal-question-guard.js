@@ -7,7 +7,13 @@
 // Ordinary job search and money-transfer wording is intentionally absent.
 
 const { passesLegalVerification } = require('./legal-verification');
-const { createRightsUnverifiedFallback, RIGHTS_UNVERIFIED_FALLBACK } = require('./rights-unverified-fallback');
+const { classifyUserQuestion } = require('./legal-topic-detector');
+const { withLegalDisclaimer } = require('./legal-disclaimer');
+const {
+  createRightsUnverifiedFallback,
+  formatRightsFallback,
+  RIGHTS_UNVERIFIED_FALLBACK,
+} = require('./rights-unverified-fallback');
 
 const PENDING_NATIVE_SPEAKER_REVIEW = Object.freeze(['th', 'si', 'hi']);
 
@@ -98,8 +104,8 @@ function topicCovered(needed, covered) {
   return false;
 }
 
-function recordsCoverClaim(records = [], topics = []) {
-  const approved = (Array.isArray(records) ? records : []).filter((record) => passesLegalVerification(record));
+function recordsCoverClaim(records = [], topics = [], options = {}) {
+  const approved = (Array.isArray(records) ? records : []).filter((record) => passesLegalVerification(record, options));
   if (!approved.length) return false;
   const needed = topics.length ? topics : ['rights'];
   const covered = new Set();
@@ -110,7 +116,10 @@ function recordsCoverClaim(records = [], topics = []) {
 }
 
 function approvedRecords(options = {}) {
-  return (Array.isArray(options.verifiedRecords) ? options.verifiedRecords : []).filter((record) => passesLegalVerification(record));
+  const verification = { approvals: options.approvals, approvalsDir: options.approvalsDir };
+  return (Array.isArray(options.verifiedRecords) ? options.verifiedRecords : []).filter((record) => (
+    passesLegalVerification(record, verification)
+  ));
 }
 
 function segmentIsLegal(question, options = {}) {
@@ -121,7 +130,19 @@ function segmentIsLegal(question, options = {}) {
 function looksLikeLegalOrRightsQuestion(text = '') {
   const value = String(text || '');
   if (!value.trim()) return false;
-  return LEGAL_QUESTION_PATTERNS.some((pattern) => pattern.test(value));
+  // Context-aware detector. The word list above is kept as documentation of
+  // the older signals; it is not the decision.
+  return classifyUserQuestion(value).disposition === 'legal'
+    || classifyUserQuestion(value).disposition === 'uncertain';
+}
+
+function rightsFallbackFor(question, language) {
+  const classified = classifyUserQuestion(question);
+  return formatRightsFallback(language, {
+    section: classified.section,
+    trafficking: classified.trafficking,
+    uncertain: classified.disposition === 'uncertain',
+  });
 }
 
 function containsUnsupportedStatutoryClaim(text = '') {
@@ -165,17 +186,31 @@ function trustedStructuredText(output) {
     const currency = String(calc.currency || '').trim();
     return `For ${calc.regularHours} regular hours at ${calc.hourlyRate}${currency ? ` ${currency}` : ''} per hour, basic gross pay is ${calc.basicGrossPay}${currency ? ` ${currency}` : ''}.`;
   }
-  if (Array.isArray(output.reportedQuotes) && capability === 'finance.transfer') {
+  if (capability === 'finance.transfer' && Array.isArray(output.reportedQuotes)) {
     const message = String(output.message || '').trim();
     if (message && !looksLikeLegalOrRightsQuestion(message) && !containsUnsupportedStatutoryClaim(message)) {
       return message;
     }
+    return output.reportedQuotes.slice(0, 3).map((row, index) => {
+      if (!row || typeof row !== 'object') return '';
+      const name = String(row.providerName || row.name || '').trim();
+      if (!name) return '';
+      const received = row.recipientAmount == null ? '' : ` recipient ${row.recipientAmount}`;
+      const currency = String(row.targetCurrency || '').trim();
+      return `${index + 1}. ${name}${received}${currency ? ` ${currency}` : ''}`;
+    }).filter(Boolean).join('\n');
+  }
+  if (capability === 'finance.rate' && output.rate && typeof output.rate === 'object') {
+    const value = output.rate.value;
+    const from = String(output.rate.sourceCurrency || '').trim();
+    const to = String(output.rate.targetCurrency || '').trim();
+    if (typeof value === 'number' && from && to) return `1 ${from} = ${value} ${to}`;
   }
   return '';
 }
 
-function verbatimReviewedAnswers(records = [], topics = []) {
-  const approved = (Array.isArray(records) ? records : []).filter((record) => passesLegalVerification(record));
+function verbatimReviewedAnswers(records = [], topics = [], options = {}) {
+  const approved = (Array.isArray(records) ? records : []).filter((record) => passesLegalVerification(record, options));
   const needed = topics.length ? topics : ['rights'];
   const lines = [];
   for (const record of approved) {
@@ -183,8 +218,9 @@ function verbatimReviewedAnswers(records = [], topics = []) {
     if (!needed.some((topic) => topicCovered(topic, covered))) continue;
     const answer = String(record.answer || '').trim();
     const source = record.source && typeof record.source === 'object' ? record.source : {};
-    const url = String(source.url || '').trim();
-    const title = String(source.title || '').trim();
+    const claim = Array.isArray(record.claims) ? record.claims.find((item) => item && item.sourceUrl) : null;
+    const url = String(source.url || (claim && claim.sourceUrl) || record.sourceUrl || '').trim();
+    const title = String(source.title || (record.schema === 'source-grounded' ? "PIBA Foreign Workers' Rights Handbook 2026" : '')).trim();
     if (!answer || !url) continue;
     lines.push(`${answer}\n\nSource: ${[title, url].filter(Boolean).join(' ')}`);
   }
@@ -205,7 +241,7 @@ function guardLegalReply(text = '', options = {}) {
   const reply = String(text || '').trim();
   const question = String(options.question || '');
   const language = options.language || 'en';
-  const fallback = createRightsUnverifiedFallback(language);
+  const fallback = rightsFallbackFor(question, language);
   const legal = segmentIsLegal(question, options);
   if (!legal) {
     if (containsUnsupportedStatutoryClaim(reply) || looksLikeUnverifiedLegalAnswer(reply)) return fallback;
@@ -214,11 +250,11 @@ function guardLegalReply(text = '', options = {}) {
 
   // Fail closed. Topic overlap does not license model text. The only legal
   // words allowed are a gate-approved record's own answer, copied with its source.
-  const reviewed = verbatimReviewedAnswers(approvedRecords(options), claimTopics(question));
+  const reviewed = verbatimReviewedAnswers(approvedRecords(options), claimTopics(question), options);
   const trusted = trustedStructuredText(options.output);
   const parts = reviewed.length ? [...reviewed] : [fallback];
   if (trusted) parts.push(trusted);
-  return joinGuardedParts(parts, language);
+  return withLegalDisclaimer(joinGuardedParts(parts, language), language);
 }
 
 function joinGuardedParts(parts = [], language = 'en') {
@@ -246,28 +282,68 @@ function guardGeneratedLegalOutput(text = '', options = {}) {
   const question = String(options.question || '');
   const legal = segmentIsLegal(question, options);
   if (legal) {
-    const reviewed = verbatimReviewedAnswers(approvedRecords(options), claimTopics(question));
-    if (reviewed.length) return reviewed.join('\n\n');
-    return createRightsUnverifiedFallback(options.language || 'en');
+    const reviewed = verbatimReviewedAnswers(approvedRecords(options), claimTopics(question), options);
+    if (reviewed.length) return withLegalDisclaimer(reviewed.join('\n\n'), options.language || 'en');
+    return rightsFallbackFor(question, options.language || 'en');
   }
   const reply = String(text || '');
-  if (containsUnsupportedStatutoryClaim(reply)) return createRightsUnverifiedFallback(options.language || 'en');
+  if (containsUnsupportedStatutoryClaim(reply)) return rightsFallbackFor(question, options.language || 'en');
   return reply;
 }
 
 function swapRightsFallbackToLanguage(text = '', language = 'en') {
-  const target = createRightsUnverifiedFallback(language);
-  let next = String(text || '');
+  const {
+    CLARIFICATION,
+    SECTION_LINE,
+    TRAFFICKING_NOTICE,
+  } = require('./rights-unverified-fallback');
+  const original = String(text || '');
+  const targetBase = createRightsUnverifiedFallback(language);
+  const hasOtherLanguageFallback = Object.values(RIGHTS_UNVERIFIED_FALLBACK).some((value) => value !== targetBase && original.includes(value));
+  if (original.includes(targetBase) && !hasOtherLanguageFallback) {
+    return { text: original, found: true };
+  }
+  let next = original;
   let found = false;
+  let section = '';
+  let trafficking = false;
+  let uncertain = false;
   for (const value of Object.values(RIGHTS_UNVERIFIED_FALLBACK)) {
-    if (value !== target && next.includes(value)) {
-      next = next.split(value).join(target);
-      found = true;
-    } else if (next.includes(value)) {
+    if (next.includes(value)) {
+      next = next.split(value).join('\n');
       found = true;
     }
   }
-  return { text: next, found };
+  for (const value of Object.values(TRAFFICKING_NOTICE)) {
+    if (next.includes(value)) {
+      next = next.split(value).join('\n');
+      trafficking = true;
+      found = true;
+    }
+  }
+  for (const value of Object.values(CLARIFICATION)) {
+    if (next.includes(value)) {
+      next = next.split(value).join('\n');
+      uncertain = true;
+      found = true;
+    }
+  }
+  for (const [lang, lineFor] of Object.entries(SECTION_LINE)) {
+    const sample = lineFor('__SECTION__');
+    const [prefix, suffix] = sample.split('__SECTION__');
+    if (!prefix || !suffix || !next.includes(prefix)) continue;
+    const pattern = new RegExp(`${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([0-9]{1,2}[A-Za-z]?)${suffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
+    const match = next.match(pattern);
+    if (!match) continue;
+    section = section || match[1];
+    next = next.replace(pattern, '\n');
+    found = true;
+    void lang;
+  }
+  if (!found) return { text: String(text || ''), found: false };
+  const rebuilt = formatRightsFallback(language, { section, trafficking, uncertain });
+  const rest = next.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  return { text: [rest, rebuilt].filter(Boolean).join('\n\n'), found: true };
 }
 
 module.exports = {

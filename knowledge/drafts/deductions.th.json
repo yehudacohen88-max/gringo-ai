@@ -1,0 +1,17 @@
+{
+  "schema": "source-grounded",
+  "id": "draft-piba2026-deductions-th",
+  "language": "th",
+  "topic": "deductions",
+  "section": "10",
+  "authorityId": "piba",
+  "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/oreign_workers_handbook_thai2026.pdf",
+  "sourceRetrievedAt": "2026-11-11",
+  "handbookEdition": "2026",
+  "nativeReviewRequired": true,
+  "status": "extraction_unreliable",
+  "extraction": "unreliable",
+  "answer": "",
+  "informationLabel": "",
+  "claims": []
+}

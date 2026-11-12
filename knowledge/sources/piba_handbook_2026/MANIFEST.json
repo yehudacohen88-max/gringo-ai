@@ -1,0 +1,67 @@
+{
+  "title": "PIBA Foreign Workers' Rights Handbook 2026",
+  "publisher": "Population and Immigration Authority (gov.il)",
+  "retrievedAt": "2026-11-11",
+  "files": [
+    {
+      "language": "he",
+      "url": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+      "pdf": "he.pdf",
+      "txt": "he.txt",
+      "pdfSha256": "43f74b37c6758c406aae01bb88e377347550914768794849be8239122a0a7f01",
+      "txtSha256": "023c4d36d17262c2b3c66c95afe06faeed03688e9720d52ef29e78d8f9cdc9bc",
+      "retrievedAt": "2026-11-11",
+      "extractor": "pdftotext -layout -enc UTF-8 (poppler 24.02.0)",
+      "extraction": "ok",
+      "notes": "pdftotext -layout. Hebrew letters are readable. Bidirectional control characters remain in the text layer."
+    },
+    {
+      "language": "en",
+      "url": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdf": "en.pdf",
+      "txt": "en.txt",
+      "pdfSha256": "a193555d71db6a359f66e5aff19ba90a82b4ced191ba55fcc96f3a7482c3a867",
+      "txtSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f",
+      "retrievedAt": "2026-11-11",
+      "extractor": "pdftotext -layout -enc UTF-8 (poppler 24.02.0)",
+      "extraction": "ok",
+      "notes": "pdftotext -layout. Latin text is readable."
+    },
+    {
+      "language": "th",
+      "url": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/oreign_workers_handbook_thai2026.pdf",
+      "pdf": "th.pdf",
+      "txt": "th.txt",
+      "pdfSha256": "7454b5a53c8187382015eb2dddf34109f1ad8da76cf29c3ab2877e6d380dfb9d",
+      "txtSha256": "8ecdeb830a16b00c36b60b66c03fcc3978790f9246da1ce98241c01df1c84069",
+      "retrievedAt": "2026-11-11",
+      "extractor": "pdftotext -layout -enc UTF-8 (poppler 24.02.0)",
+      "extraction": "unreliable",
+      "notes": "pdftotext -layout reordered Thai vowels and tone marks (for example ทางาน with no ทำงาน, and spaces inside words). Not reliable for quotes."
+    },
+    {
+      "language": "hi",
+      "url": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_handbook_hindi.pdf",
+      "pdf": "hi.pdf",
+      "txt": "hi.txt",
+      "pdfSha256": "5e0743678ecac98340f4d37399bf000d9fcde1fff7adece4017654634612f136",
+      "txtSha256": "caab87a0bf3623d62060530b00a85980ed8be65a638a3298a5adae372b1b455d",
+      "retrievedAt": "2026-11-11",
+      "extractor": "pdftotext -layout -enc UTF-8 (poppler 24.02.0)",
+      "extraction": "unreliable",
+      "notes": "pdftotext -layout produced legacy-font artefacts (for example पासपोटा). Not reliable for quotes."
+    },
+    {
+      "language": "si",
+      "url": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_handbook_sin2026.pdf",
+      "pdf": "si.pdf",
+      "txt": "si.txt",
+      "pdfSha256": "5e29fa4d7bc7d20e027f2c8200834f7159556dc82e6af011cda2d7a491fed05a",
+      "txtSha256": "52a66588db8d70bc337858354b5da5604c8b115fc8f4845bbaeddc87161af96c",
+      "retrievedAt": "2026-11-11",
+      "extractor": "pdftotext -layout -enc UTF-8 (poppler 24.02.0)",
+      "extraction": "unreliable",
+      "notes": "pdftotext -layout is partly garbled (Israel is usually spelled ඊශ්‍රොයල rather than ඊශ්‍රායල). Not reliable for quotes."
+    }
+  ]
+}
