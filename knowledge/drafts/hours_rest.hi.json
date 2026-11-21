@@ -1,0 +1,17 @@
+{
+  "schema": "source-grounded",
+  "id": "draft-piba2026-hours_rest-hi",
+  "language": "hi",
+  "topic": "hours_rest",
+  "section": "11",
+  "authorityId": "piba",
+  "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_handbook_hindi.pdf",
+  "sourceRetrievedAt": "2026-11-11",
+  "handbookEdition": "2026",
+  "nativeReviewRequired": true,
+  "status": "extraction_unreliable",
+  "extraction": "unreliable",
+  "answer": "",
+  "informationLabel": "",
+  "claims": []
+}

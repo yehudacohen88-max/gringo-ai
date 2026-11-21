@@ -1,0 +1,26 @@
+{
+  "schema": "source-grounded",
+  "id": "draft-piba2026-medical_insurance-en",
+  "language": "en",
+  "topic": "medical_insurance",
+  "section": "5",
+  "authorityId": "piba",
+  "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+  "sourceRetrievedAt": "2026-11-11",
+  "handbookEdition": "2026",
+  "nativeReviewRequired": false,
+  "status": "draft",
+  "extraction": "ok",
+  "answer": "The handbook states that employers of foreign workers are obligated to provide private medical insurance throughout the employment period.",
+  "informationLabel": "This summary is provided for general informational purposes only, and is not a substitute for the wording of the relevant laws, regulations, procedures and extension orders, which are binding.",
+  "claims": [
+    {
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "section": "5",
+      "quote": "Employers of foreign workers are obligated to provide foreign workers with private medical insurance throughout the employment period.",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    }
+  ]
+}

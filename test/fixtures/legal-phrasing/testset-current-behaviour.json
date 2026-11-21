@@ -1,0 +1,1109 @@
+[
+ {
+  "id": "Q01",
+  "lang": "he",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "DOCUMENTS_UNAVAILABLE"
+ },
+ {
+  "id": "Q01",
+  "lang": "en",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "DOCUMENTS_UNAVAILABLE"
+ },
+ {
+  "id": "Q01",
+  "lang": "th",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q01",
+  "lang": "si",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q01",
+  "lang": "hi",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q02",
+  "lang": "he",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "DOCUMENTS_UNAVAILABLE"
+ },
+ {
+  "id": "Q02",
+  "lang": "en",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "DOCUMENTS_UNAVAILABLE"
+ },
+ {
+  "id": "Q02",
+  "lang": "th",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q03",
+  "lang": "he",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q03",
+  "lang": "en",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q03",
+  "lang": "th",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q03",
+  "lang": "si",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q03",
+  "lang": "hi",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q04",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q04",
+  "lang": "en",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "JOBS_NOT_FOUND"
+ },
+ {
+  "id": "Q04",
+  "lang": "th",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q04",
+  "lang": "hi",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q05",
+  "lang": "he",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "JOBS_NOT_FOUND"
+ },
+ {
+  "id": "Q05",
+  "lang": "en",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "JOBS_NOT_FOUND"
+ },
+ {
+  "id": "Q05",
+  "lang": "th",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q06",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q06",
+  "lang": "en",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "JOBS_NOT_FOUND"
+ },
+ {
+  "id": "Q06",
+  "lang": "th",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q07",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q07",
+  "lang": "en",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q07",
+  "lang": "th",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q07",
+  "lang": "hi",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q08",
+  "lang": "he",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q08",
+  "lang": "en",
+  "detectorLegal": false,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q08",
+  "lang": "th",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q09",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q09",
+  "lang": "en",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q09",
+  "lang": "th",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q09",
+  "lang": "si",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q09",
+  "lang": "hi",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q10",
+  "lang": "he",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q10",
+  "lang": "en",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "DOCUMENTS_UNAVAILABLE"
+ },
+ {
+  "id": "Q10",
+  "lang": "th",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q11",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q11",
+  "lang": "en",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "SERVICES_NOT_FOUND"
+ },
+ {
+  "id": "Q11",
+  "lang": "th",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q12",
+  "lang": "he",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q12",
+  "lang": "en",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q12",
+  "lang": "th",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q13",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "HOUSING_NEEDS_DETAILS"
+ },
+ {
+  "id": "Q13",
+  "lang": "en",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "HOUSING_NEEDS_DETAILS"
+ },
+ {
+  "id": "Q13",
+  "lang": "th",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q13",
+  "lang": "si",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q13",
+  "lang": "hi",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q14",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "HOUSING_NOT_FOUND"
+ },
+ {
+  "id": "Q14",
+  "lang": "en",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "HOUSING_NOT_FOUND"
+ },
+ {
+  "id": "Q14",
+  "lang": "th",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q15",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q15",
+  "lang": "en",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "DOCUMENTS_UNAVAILABLE"
+ },
+ {
+  "id": "Q15",
+  "lang": "th",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q15",
+  "lang": "si",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q15",
+  "lang": "hi",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q16",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q16",
+  "lang": "en",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "SERVICES_NOT_FOUND"
+ },
+ {
+  "id": "Q16",
+  "lang": "th",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q17",
+  "lang": "he",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q17",
+  "lang": "en",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "DOCUMENTS_UNAVAILABLE"
+ },
+ {
+  "id": "Q17",
+  "lang": "th",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q18",
+  "lang": "he",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q18",
+  "lang": "en",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "JOBS_NOT_FOUND"
+ },
+ {
+  "id": "Q18",
+  "lang": "th",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q19",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q19",
+  "lang": "en",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "JOBS_NOT_FOUND"
+ },
+ {
+  "id": "Q19",
+  "lang": "th",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q20",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q20",
+  "lang": "en",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q20",
+  "lang": "th",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q21",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q21",
+  "lang": "en",
+  "detectorLegal": false,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q21",
+  "lang": "th",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q22",
+  "lang": "he",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q22",
+  "lang": "en",
+  "detectorLegal": false,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q22",
+  "lang": "th",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q23",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q23",
+  "lang": "en",
+  "detectorLegal": false,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q23",
+  "lang": "th",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q24",
+  "lang": "he",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q24",
+  "lang": "en",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q24",
+  "lang": "th",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q25",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q25",
+  "lang": "en",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q25",
+  "lang": "th",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q26",
+  "lang": "he",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q26",
+  "lang": "en",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q26",
+  "lang": "th",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q27",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q27",
+  "lang": "en",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "FOUND"
+ },
+ {
+  "id": "Q27",
+  "lang": "th",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q27",
+  "lang": "hi",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q28",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "JOBS_NOT_FOUND"
+ },
+ {
+  "id": "Q28",
+  "lang": "en",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q28",
+  "lang": "th",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q29",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "DOCUMENTS_UNAVAILABLE"
+ },
+ {
+  "id": "Q29",
+  "lang": "en",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "DOCUMENTS_UNAVAILABLE"
+ },
+ {
+  "id": "Q29",
+  "lang": "th",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q30",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "DOCUMENTS_UNAVAILABLE"
+ },
+ {
+  "id": "Q30",
+  "lang": "en",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "DOCUMENTS_UNAVAILABLE"
+ },
+ {
+  "id": "Q30",
+  "lang": "th",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q31",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "JOBS_NOT_FOUND"
+ },
+ {
+  "id": "Q31",
+  "lang": "en",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q31",
+  "lang": "th",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q32",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q32",
+  "lang": "en",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q32",
+  "lang": "th",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q33",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q33",
+  "lang": "en",
+  "detectorLegal": false,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q33",
+  "lang": "th",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q33",
+  "lang": "si",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q33",
+  "lang": "hi",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q34",
+  "lang": "he",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "HOUSING_NEEDS_DETAILS"
+ },
+ {
+  "id": "Q34",
+  "lang": "en",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "HOUSING_NEEDS_DETAILS"
+ },
+ {
+  "id": "Q34",
+  "lang": "th",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ },
+ {
+  "id": "Q35",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "JOBS_NOT_FOUND"
+ },
+ {
+  "id": "Q35",
+  "lang": "en",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "DOCUMENTS_UNAVAILABLE"
+ },
+ {
+  "id": "Q35",
+  "lang": "th",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": true,
+  "aiTextShown": true,
+  "status": "AI_PROVIDER"
+ },
+ {
+  "id": "Q36",
+  "lang": "he",
+  "detectorLegal": false,
+  "fallback": false,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "JOBS_NOT_FOUND"
+ },
+ {
+  "id": "Q36",
+  "lang": "en",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "JOBS_NOT_FOUND"
+ },
+ {
+  "id": "Q36",
+  "lang": "th",
+  "detectorLegal": true,
+  "fallback": true,
+  "aiCalled": false,
+  "aiTextShown": false,
+  "status": "LEGAL_UNVERIFIED"
+ }
+]

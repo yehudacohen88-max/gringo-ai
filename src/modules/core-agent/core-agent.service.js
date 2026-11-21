@@ -18,7 +18,12 @@ const serviceService = require('../services/service.service');
 const taskService = require('../tasks/task.service');
 const { knowledgeAgentService } = require('../knowledge-agent');
 const { isLegalCategory, knowledgeSafeForAi } = require('../knowledge-agent/legal-verification');
-const { createRightsUnverifiedFallback } = require('../knowledge-agent/rights-unverified-fallback');
+const {
+  CLARIFICATION,
+  SECTION_LINE,
+  TRAFFICKING_NOTICE,
+  createRightsUnverifiedFallback,
+} = require('../knowledge-agent/rights-unverified-fallback');
 const {
   containsUnsupportedStatutoryClaim,
   guardGeneratedLegalOutput,
@@ -26,6 +31,7 @@ const {
   looksLikeLegalOrRightsQuestion,
   swapRightsFallbackToLanguage,
 } = require('../knowledge-agent/legal-question-guard');
+const { classifyUserQuestion } = require('../knowledge-agent/legal-topic-detector');
 const { languageDetectionService } = require('../language');
 const {
   appendLanguageConflictNotice,
@@ -1253,10 +1259,33 @@ async function applyOutgoingTranslation(response = {}, targetLanguage = CORE_AGE
   const swapped = swapRightsFallbackToLanguage(response.reply, targetLanguage || CORE_AGENT_RESPONSE_LANGUAGE);
   const rightsFallback = createRightsUnverifiedFallback(targetLanguage || CORE_AGENT_RESPONSE_LANGUAGE);
   const rightsToken = '__GRINGO_LEGAL_FALLBACK__';
-  const originalResponse = swapped.text.includes(rightsFallback)
-    ? swapped.text.split(rightsFallback).join(rightsToken)
-    : swapped.text;
-  const restoreRightsFallback = (value) => String(value || '').split(rightsToken).join(rightsFallback);
+  const sectionToken = '__GRINGO_RIGHTS_SECTION__';
+  const savedSections = [];
+  let originalResponse = swapped.text;
+  const rightsPieces = [
+    rightsFallback,
+    ...Object.values(TRAFFICKING_NOTICE),
+    ...Object.values(CLARIFICATION),
+  ];
+  for (const piece of rightsPieces) {
+    if (piece && originalResponse.includes(piece)) originalResponse = originalResponse.split(piece).join(rightsToken);
+  }
+  for (const lineFor of Object.values(SECTION_LINE)) {
+    const sample = lineFor('__SECTION__');
+    const [prefix, suffix] = sample.split('__SECTION__');
+    if (!prefix || !suffix) continue;
+    const pattern = new RegExp(`${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[0-9]{1,2}[A-Za-z]?${suffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g');
+    originalResponse = originalResponse.replace(pattern, (match) => {
+      savedSections.push(match);
+      return sectionToken;
+    });
+  }
+  const restoreRightsFallback = (value) => {
+    let index = 0;
+    return String(value || '')
+      .split(rightsToken).join(rightsFallback)
+      .replace(new RegExp(sectionToken, 'g'), () => savedSections[index++] || '');
+  };
   const metadata = {
     sourceLanguage: CORE_AGENT_RESPONSE_LANGUAGE,
     targetLanguage: targetLanguage || CORE_AGENT_RESPONSE_LANGUAGE,
@@ -1270,7 +1299,7 @@ async function applyOutgoingTranslation(response = {}, targetLanguage = CORE_AGE
     reply: restoreRightsFallback(originalResponse),
   };
 
-  const remainder = originalResponse.split(rightsToken).join(' ').trim();
+  const remainder = originalResponse.split(rightsToken).join(' ').split(sectionToken).join(' ').trim();
   if (
     !originalResponse.trim()
     || metadata.targetLanguage === CORE_AGENT_RESPONSE_LANGUAGE
@@ -1604,7 +1633,11 @@ async function processWebMessage(messageContext = {}) {
             ? { capability: 'jobs.search', jobs: response.jobs }
             : response.category === 'Housing' && response.housing && Array.isArray(response.housing.listings)
               ? { capability: 'housing.support', listings: response.housing.listings }
-              : undefined
+              : response.category === 'Money' && response.money && Array.isArray(response.money.results)
+                ? { capability: 'finance.transfer', reportedQuotes: response.money.results, message: response.reply }
+                : response.category === 'Money' && response.money && response.money.rate
+                  ? { capability: 'finance.rate', rate: response.money.rate }
+                  : undefined
         ),
       });
       if (guarded !== String(response.reply || '').trim()) {
@@ -1932,6 +1965,9 @@ async function processWebMessage(messageContext = {}) {
   }
 
   const answeredPendingNeed = hasMeaningfulProfileUpdates(personalization.pendingUpdates);
+  const rightsClass = classifyUserQuestion(`${originalQuestion}\n${question}`);
+  const rightsBlocked = rightsClass.disposition === 'legal' || rightsClass.disposition === 'uncertain';
+  const practical = rightsClass.practical;
   const jobIntent = isJobSearchMessage(question) || (answeredPendingNeed && userProfile?.lookingForJob === 'Yes');
   const housingIntent = isHousingMessage(question) || (answeredPendingNeed && userProfile?.lookingForHousing === 'Yes');
   const moneyIntent = isMoneyMessage(question) || (answeredPendingNeed && userProfile?.interestedInMoneyTransfers === 'Yes');
@@ -1975,7 +2011,7 @@ async function processWebMessage(messageContext = {}) {
     });
   }
 
-  if (jobIntent) {
+  if (jobIntent && !(rightsBlocked && !practical.job)) {
     const searchContext = extractJobSearchContext(question, userProfile || {});
     const missing = [];
 
@@ -2050,7 +2086,7 @@ async function processWebMessage(messageContext = {}) {
     });
   }
 
-  if (housingIntent) {
+  if (housingIntent && !(rightsBlocked && !practical.housing)) {
     const housingContext = extractHousingContext(question, userProfile || {});
     const missing = [];
 
@@ -2168,7 +2204,7 @@ async function processWebMessage(messageContext = {}) {
     });
   }
 
-  if (moneyIntent) {
+  if (moneyIntent && !(rightsBlocked && !practical.money)) {
     const moneyContext = extractMoneyContext(question, userProfile || {});
     const asksOnlyRate = /\b(exchange rate|baht rate|baht)\b|\u05db\u05de\u05d4 \u05e9\u05d5\u05d5\u05d4 \u05d1\u05d0\u05d8|\u05d1\u05d0\u05d8/.test(
       question.toLowerCase()
@@ -2272,7 +2308,7 @@ async function processWebMessage(messageContext = {}) {
     });
   }
 
-  if (documentIntent) {
+  if (documentIntent && !(rightsBlocked && !practical.documentsLogistics)) {
     const userId = personalization.user.userId;
     let documents = await documentService.getUserDocuments(userId);
     if (documents.catalogState === 'unavailable') {
@@ -2378,7 +2414,7 @@ async function processWebMessage(messageContext = {}) {
     });
   }
 
-  if (serviceIntent) {
+  if (serviceIntent && !(rightsBlocked && !(practical.healthLocation || practical.transport || practical.shopping || practical.documentsLogistics))) {
     const search = serviceService.inferServiceSearch(question, userProfile || {});
     const services = await serviceService.findMatchingServices(userProfile || {}, search);
     const reply = serviceService.formatServicesForChat(services, { language: userLanguage });
@@ -2436,7 +2472,10 @@ async function processWebMessage(messageContext = {}) {
 
   const asked = `${originalQuestion}\n${question}`;
   const verifiedRecords = knowledgeResult.relevantKnowledge || [];
-  const legalSegment = looksLikeLegalOrRightsQuestion(asked) || isLegalCategory(knowledgeResult.category);
+  const askedClass = classifyUserQuestion(asked);
+  const legalSegment = askedClass.disposition === 'legal'
+    || askedClass.disposition === 'uncertain'
+    || (isLegalCategory(knowledgeResult.category) && askedClass.disposition !== 'practical');
   // A legal segment is never given to the model to compose. The only legal
   // text is a gate-approved record's own answer, copied with its source.
   let withholdLegalTranslation = legalSegment;
@@ -2447,7 +2486,7 @@ async function processWebMessage(messageContext = {}) {
       legalSegment: true,
       verifiedRecords,
     });
-    finalStatus = reply === createRightsUnverifiedFallback(userLanguage) ? 'LEGAL_UNVERIFIED' : 'LEGAL_VERIFIED';
+    finalStatus = reply.includes(createRightsUnverifiedFallback(userLanguage)) ? 'LEGAL_UNVERIFIED' : 'LEGAL_VERIFIED';
   } else if (shouldUseAiProvider(question, knowledgeResult)) {
     ai.attempted = true;
 

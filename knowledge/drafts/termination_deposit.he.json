@@ -1,0 +1,34 @@
+{
+  "schema": "source-grounded",
+  "id": "draft-piba2026-termination_deposit-he",
+  "language": "he",
+  "topic": "termination_deposit",
+  "section": "12",
+  "authorityId": "piba",
+  "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+  "sourceRetrievedAt": "2026-11-11",
+  "handbookEdition": "2026",
+  "nativeReviewRequired": false,
+  "status": "draft",
+  "extraction": "ok",
+  "answer": "בזכותון נכתב שעובד אשר מפוטר לאחר שנה אחת או יותר אצל מעסיק אחד או במקום עבודה אחד זכאי לפיצויי פיטורין, ושההפקדה לא תהיה קטנה מ-12.5% משכר של משרה מלאה.",
+  "informationLabel": "תקציר זה נועד לידיעה כללית בלבד ואינו מהווה תחליף לנוסח החוק‪ ,‬התקנות‪ ,‬הנהלים וצווי‬ ‫ההרחבה הרלוונטיים המחייבים",
+  "claims": [
+    {
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+      "section": "12",
+      "quote": "עובד אשר מפוטר מעבודתו לאחר שעבד אצל מעסיק אחד או במקום עבודה אחד במשך תקופה של‬ ‫שנה אחת או יותר‪ ,‬זכאי לפיצויי פיטורין",
+      "language": "he",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "023c4d36d17262c2b3c66c95afe06faeed03688e9720d52ef29e78d8f9cdc9bc"
+    },
+    {
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+      "section": "12",
+      "quote": "לא תהיה קטנה מ‪ 12.5%-‬משכרו החודשי של העובד במשרה מלאה",
+      "language": "he",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "023c4d36d17262c2b3c66c95afe06faeed03688e9720d52ef29e78d8f9cdc9bc"
+    }
+  ]
+}

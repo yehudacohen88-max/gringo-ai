@@ -764,14 +764,20 @@ async function searchKnowledgeBase(classifiedQuestion) {
   const question = String(classifiedQuestion?.questionContext?.question || '');
   const category = classifiedQuestion?.category || 'Other';
   const relevantKnowledge = findRelevantKnowledge(question, category).filter((match) => {
-    if (match.score <= 0) return false;
-    return hasPositiveRelevanceEvidence(match, question, category);
+    if (hasPositiveRelevanceEvidence(match, question, category)) return true;
+    // A legal category match is kept for the gate even without a keyword hit,
+    // so an unverified record is withheld instead of disappearing. It is not
+    // served as an answer unless it also has positive relevance evidence.
+    return isLegalCategory(category)
+      && isLegalKnowledgeItem(match)
+      && normalizeText(match.category) === normalizeText(category);
   });
   const withheldUnverifiedIds = [];
   const presentable = [];
   for (const match of relevantKnowledge) {
-    if (isLegalKnowledgeItem(match) && !passesLegalVerification(match)) {
-      withheldUnverifiedIds.push(match.id);
+    const categoryOnly = !hasPositiveRelevanceEvidence(match, question, category);
+    if ((isLegalKnowledgeItem(match) && !passesLegalVerification(match)) || categoryOnly) {
+      if (match.id) withheldUnverifiedIds.push(match.id);
     } else {
       presentable.push(match);
     }

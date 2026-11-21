@@ -1074,10 +1074,9 @@ test('active Supervisor blocked salary-payment follow-up resumes original task w
   });
 
   assert.equal(first.status, 'SUPERVISOR_BLOCKED');
-  assert.equal(
-    first.reply,
-    'I do not have verified information on this yet, and I will not guess. For official information, use the official websites of the government bodies responsible for labor and for population and immigration. Keep your contract, payslips, and a record of your hours. This is not legal advice.'
-  );
+  assert.match(first.reply, /I do not have verified information on this yet, and I will not guess/);
+  assert.match(first.reply, /not legal advice/i);
+  assert.match(first.reply, /foreign_workers_rights_booklets_en2026\.pdf/);
   assert.doesNotMatch(first.reply, /If you are paid monthly/i);
 
   const waitingPlan = supervisorService.getPlan('req_active_salary_frequency_start');

@@ -1,0 +1,26 @@
+{
+  "schema": "source-grounded",
+  "id": "draft-piba2026-hours_rest-he",
+  "language": "he",
+  "topic": "hours_rest",
+  "section": "11",
+  "authorityId": "piba",
+  "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+  "sourceRetrievedAt": "2026-11-11",
+  "handbookEdition": "2026",
+  "nativeReviewRequired": false,
+  "status": "draft",
+  "extraction": "ok",
+  "answer": "בזכותון נכתב על מנוחה שבועית של 36 שעות לפחות, הכוללת את יום שישי, את יום שבת או את יום ראשון.",
+  "informationLabel": "תקציר זה נועד לידיעה כללית בלבד ואינו מהווה תחליף לנוסח החוק‪ ,‬התקנות‪ ,‬הנהלים וצווי‬ ‫ההרחבה הרלוונטיים המחייבים",
+  "claims": [
+    {
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+      "section": "11",
+      "quote": "36‬שעות לפחות‪ ,‬אשר חייבת לכלול או את יום שישי‪ ,‬או את יום שבת או את יום ראשון",
+      "language": "he",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "023c4d36d17262c2b3c66c95afe06faeed03688e9720d52ef29e78d8f9cdc9bc"
+    }
+  ]
+}
