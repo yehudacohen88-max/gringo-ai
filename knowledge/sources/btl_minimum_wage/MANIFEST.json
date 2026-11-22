@@ -1,0 +1,11 @@
+{
+  "title": "שכר מינימום - נתונים כלליים",
+  "publisher": "National Insurance Institute (btl.gov.il)",
+  "url": "https://www.btl.gov.il/Mediniyut/GeneralData/Pages/%D7%A9%D7%9B%D7%A8%20%D7%9E%D7%99%D7%A0%D7%99%D7%9E%D7%95%D7%9D.aspx",
+  "retrievedAt": "2026-11-22",
+  "html": "page.html",
+  "txt": "page.txt",
+  "htmlSha256": "2bb40e4b818b587a9e03ea99d636989e6ce2a450b6bc2c0e17bf064f277486c8",
+  "txtSha256": "40a8c3e26d40a6e0290619d7509a0d1bf96c176e045c52544b509d4d9400f4c9",
+  "notes": "Visible list extracted from the downloaded HTML by stripping tags and decoding entities. The quote used in drafts is this list. The table lower on the page repeats the same 01.04.2026 row, with the monthly amount written 6443.85 without a thousands comma."
+}

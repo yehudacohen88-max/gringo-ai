@@ -74,7 +74,11 @@ function detectLegalTopic(text, flags) {
     return topicResult('construction_transfer', '1C', 'piba');
   }
 
-  if (/severance|פיצויי|pitzuy|ค่าชดเชยเลิกจ้าง|notice must i give|how much notice|want to quit|אני רוצה לעזוב|כמה זמן מראש|ลาออก|הודעה מוקדמת/i.test(value)
+  if (/severance|פיצויי|pitzuy|ค่าชดเชยเลיקจ้าง/i.test(value)) {
+    return topicResult('severance', '12', 'piba');
+  }
+
+  if (/notice must i give|how much notice|want to quit|אני רוצה לעזוב|כמה זמן מראש|ลาออก|הודעה מוקדמת/i.test(value)
     || /fire me|fires me|\bfired\b|\bdismiss|פיטר|פיטור|לפטר|מפוטר|ไล่.{0,12}ออก|ถูกไล่/i.test(value)) {
     return topicResult('termination', '12', 'piba');
   }
@@ -103,16 +107,31 @@ function detectLegalTopic(text, flags) {
     return topicResult('housing', '7', 'piba');
   }
 
-  if (/overtime|שעות נוספות|שבעה ימים בשבוע|seven days a week|7 days a week|7 วัน|12 hours a day|12 שעות|ค่าล่วงเวลา|paid for saturday|עבודה בשבת|(saturday|שבת).{0,32}(pay|paid|work|עבודה)|(pay|paid|work|עבודה|מגיע).{0,32}(saturday|שבת)/i.test(value)
+  if (/weekly rest|מנוחה שבועית|שבעה ימים בשבוע|seven days a week|7 days a week/i.test(value) && !flags.shopping) {
+    return topicResult('weekly_rest', '11', 'piba');
+  }
+
+  if (/overtime|שעות נוספות|7 วัน|12 hours a day|12 שעות|ค่าล่วงเวลา|paid for saturday|עבודה בשבת|(saturday|שבת).{0,32}(pay|paid|work|עבודה)|(pay|paid|work|עבודה|מגיע).{0,32}(saturday|שבת)/i.test(value)
     && !flags.shopping) {
     return topicResult('hours_rest', '11', 'piba');
   }
 
-  if (!flags.shopping && !flags.healthLocation && /vacation day|paid vacation|ימי חופשה|חופשה בתשלום|วันหยุดพักร้อน|sick leave|ימי מחלה|חופשת מחלה|sick for|הייתי חולה|חולה שלוש|ป่วยสาม|do i get paid|convalescence|dmei havraah|הבראה|ค่าพักฟื้น|songkran|סונגקראן|สงกรานต์|religious holiday|יום חג/i.test(value)) {
-    return topicResult('vacation_sick', '11', 'piba');
+  if (/convalescence|dmei havraah|הבראה|ค่าพักฟื้น/i.test(value)) {
+    return topicResult('wages', '9', 'piba');
   }
 
-  const wageComplaint = /minimum wage|שכר מינימום|שכר המינימום|ค่าแรงขั้นต่ำ|न्यूनतम वेतन|not paid|hasn't paid|has not paid|did not pay|didn't pay|did not receive|didn't receive|לא\s+שיל[מם]|לא קיבלתי את המשכורת|לא קיבלתי משכורת|ไม่จ่ายเงินเดือน|පඩි ගෙව|वेतन नहीं|payslip|תלוש|สลิปเงินเดือน|in cash|במזומן|เงินสดไม่โอน|payday|by what date must|when should i receive my (salary|pay|wages)|עד איזה תאריך|ภายในวันที่|מגיע לי שכר|has not given me work|לא נותן לי עבודה|לא נותנת לי עבודה|ไม่ให้งาน|still get paid|how much should i (get paid|be paid)/i.test(value);
+  if (!flags.shopping && !flags.healthLocation) {
+    const sickLeave = /sick leave|ימי מחלה|חופשת מחלה|sick for|הייתי חולה|חולה שלוש|ป่วยสาม/i.test(value);
+    const annualLeave = /vacation day|paid vacation|annual leave|ימי חופשה|חופשה בתשלום|วันหยุดพักร้อน|songkran|סונגקראן|สงกรานต์|religious holiday|יום חג/i.test(value);
+    if (sickLeave) return topicResult('sick_leave', '11', 'piba');
+    if (annualLeave) return topicResult('annual_leave', '11', 'piba');
+  }
+
+  if (/minimum wage|שכר מינימום|שכר המינימום|ค่าแรงขั้นต่ำ|न्यूनतम वेतन/i.test(value) && !flags.transport) {
+    return topicResult('minimum_wage', '9', 'piba');
+  }
+
+  const wageComplaint = /not paid|hasn't paid|has not paid|did not pay|didn't pay|did not receive|didn't receive|לא\s+שיל[מם]|לא קיבלתי את המשכורת|לא קיבלתי משכורת|ไม่จ่ายเงินเดือน|පඩි ගෙව|वेतन नहीं|payslip|תלוש|สลิปเงินเดือน|in cash|במזומן|เงินสดไม่โอน|payday|by what date must|when should i receive my (salary|pay|wages)|עד איזה תאריך|ภายในวันที่|מגיע לי שכר|has not given me work|לא נותן לי עבודה|לא נותנת לי עבודה|ไม่ให้งาน|still get paid|how much should i (get paid|be paid)|do i get paid/i.test(value);
   // A wage complaint stays legal even when the same message also asks to
   // send money, look for a job, or find a hospital. Practical flags do not
   // cancel it. Bare "salary" inside a transfer or exchange question is not

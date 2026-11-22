@@ -5,22 +5,79 @@
   "topic": "complaints",
   "section": "13",
   "authorityId": "ministry_of_labour_ombudsperson",
+  "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
   "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
   "sourceRetrievedAt": "2026-11-11",
+  "checkedAt": "2026-11-22",
+  "pdfPage": 31,
   "handbookEdition": "2026",
+  "reviewGroup": "blocked",
   "nativeReviewRequired": false,
   "status": "draft",
   "extraction": "ok",
-  "answer": "The handbook states that a worker can file a complaint with the Ombudsperson for Foreign Workers’ Labour Rights in the Ministry of Labour.",
+  "answer": "Answer: A worker whose employer has not met duties under labour law can file a complaint with the Ombudsperson for Foreign Workers’ Labour Rights in the Ministry of Labour. A worker may also contact the PIBA call center for information or to complain about an employer or a placement bureau. The two editions do not print the same website for the online form, and this record does not decide which site is the current channel.\n\nConditions and exceptions: The law, as the handbook states it, prohibits dismissing an employee or reducing salary or conditions because of a complaint or claim filed in good faith, or because the employee helped another employee file one. The English edition prints www.molsa.gov.il. The Hebrew text line breaks the link; a link embedded in the PDF goes to https://www.gov.il/he/departments/Units/foreign-workers-rights-at-work.\n\nWhat you can do: File the complaint with the Ombudsperson or the PIBA call center through the official page, without relying on a phone number here. Phone numbers and email addresses printed in the handbook are not repeated here.\n\nSource: PIBA Foreign Workers' Rights Handbook 2026, the handbook section. https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf\n\nThis summary is provided for general informational purposes only, and is not a substitute for the wording of the relevant laws, regulations, procedures and extension orders, which are binding.\n\nThis is not legal advice. The information is general only and does not replace professional advice concerning the circumstances of your case.",
   "informationLabel": "This summary is provided for general informational purposes only, and is not a substitute for the wording of the relevant laws, regulations, procedures and extension orders, which are binding.",
   "claims": [
     {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
       "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 31,
       "section": "13",
       "quote": "can file a complaint with the Ombudsperson for Foreign Workers’ Labour Rights in the Ministry of Labour",
       "language": "en",
       "sourceRetrievedAt": "2026-11-11",
       "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 31,
+      "section": "13",
+      "quote": "A complaint can also be filed with the ombudsperson through an online form on the Labour Ministry website: www.molsa.gov.il.",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 31,
+      "section": "13",
+      "quote": "foreign workers in Israel may also contact the PIBA call center to receive information or to file complaints concerning employers or Placement Bureaus. -The call center phone number is:",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 31,
+      "section": "13",
+      "quote": "The law prohibits an employer from dismissing an employee or reducing his salary or terms of employment as a result of any complaint or claim filed by the employee, or as a result of the fact that he assisted another employee, in good faith, to file such a complaint or claim. An employer who behaves in this manner towards his foreign worker has committed a criminal offense for which a complaint can be filed as above.",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 31,
+      "section": "13",
+      "quote": "ORKERS' RIGHTS HANDBOOK 2026",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 31,
+      "section": "13",
+      "quote": "www.molsa.gov.il",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
     }
-  ]
+  ],
+  "reviewNote": "המהדורה העברית והאנגלית אינן נותנות אותו קישור לטופס המקוון."
 }

@@ -1,0 +1,53 @@
+{
+  "schema": "source-grounded",
+  "id": "draft-piba2026-annual_leave-he",
+  "language": "he",
+  "topic": "annual_leave",
+  "section": "11",
+  "authorityId": "piba",
+  "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+  "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+  "sourceRetrievedAt": "2026-11-11",
+  "checkedAt": "2026-11-22",
+  "pdfPage": 19,
+  "handbookEdition": "2026",
+  "reviewGroup": "blocked",
+  "nativeReviewRequired": false,
+  "status": "draft",
+  "extraction": "ok",
+  "answer": "תשובה: שתי המהדורות אומרות שכל עובד זכאי לימי חופשה בתשלום, ואז חלוקות על מול מי נספר הוותק. העברית אומרת \"אצל אותו מטופל\". האנגלית אומרת \"for the employer\". הרשומה הזאת אינה מכריעה ביניהן.\n\nתנאים וחריגים: המספרים המודפסים בשתי המהדורות הם 16 ימים בכל אחת מחמש השנים הראשונות, 18 בשנה השישית, 21 בשביעית, ויום נוסף בכל שנה מהשמינית עד 28. אלה ימים קלנדריים שכוללים את סוף השבוע, ולכן בשבוע של חמישה ימים מדובר ב-12 ימי עבודה ובשבוע של שישה ימים ב-14, בחמש השנים הראשונות. בדרך כלל מנצלים את החופשה עד סוף השנה. אם המעסיק מסכים, אפשר לנצל רק 7 ימים בשנה ולצבור את היתרה לשנה הבאה או לשנה שאחריה.\n\nמה אפשר לעשות: אין כאן צעד מעשי אחד, כי לא הוכרע אם הספירה היא מול המטופל או מול המעסיק.\n\nמקור: זכותון 2026, הסעיף המתאים בזכותון. https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf\n\nאין לראות באמור ייעוץ משפטי. המידע הוא כללי בלבד ואינו מחליף ייעוץ מקצועי המתייחס לנסיבות המקרה.",
+  "informationLabel": "תקציר זה נועד לידיעה כללית בלבד ואינו מהווה תחליף לנוסח החוק‪ ,‬התקנות‪ ,‬הנהלים וצווי‬ ‫ההרחבה הרלוונטיים המחייבים",
+  "claims": [
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+      "pdfPage": 19,
+      "section": "11",
+      "quote": "חופשה בתשלום – כל עובד זכאי לימי חופשה בתשלום מדי שנה‪ ,‬בהתאם למפורט להלן‪:‬‬ ‫עבור כל אחת מחמש השנים הראשונות אצל אותו מטופל – ‪ 16‬ימי חופשה בתשלום בשנה‪.‬‬ ‫עבור השנה השישית של העסקה אצל אותו מטופל‪ 18 :‬ימי חופשה בשנה‬ ‫עבור השנה השביעית של העסקה אצל אותו מטופל‪ 21 :‬ימי חופשה בשנה‬ ‫עבור השנה השמינית ואילך של העסקה אצל אותו מטופל‪ :‬יום חופשה נוסף לכל שנת עבודה עד‬ ‫לחופשה מרבית של ‪ 28‬יום בשנה‪.‬‬ ‫שימו לב‪ :‬מספר ימי החופשה המפורטים לעיל הם ימים קלנדריים‪ ,‬הכוללים גם את ימי סוף השבוע‪,‬‬ ‫והם אינם ימי עבודה בפועל‪ .‬לכן‪ ,‬אדם שעובד שבוע עבודה בן חמישה ימים בשבוע יקבל בפועל‬ ‫במשך חמש שנות עבודתו הראשונות ‪ 12‬ימי חופשה בתשלום‪ ,‬ואדם שעובד שבוע עבודה בן שישה‬ ‫ימים‪ ,‬יקבל בפועל במשך חמש שנות עבודתו הראשונות ‪ 14‬ימי עבודה בתשלום‪ ,‬וכך הלאה‪.‬‬ ‫",
+      "language": "he",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "023c4d36d17262c2b3c66c95afe06faeed03688e9720d52ef29e78d8f9cdc9bc"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+      "pdfPage": 19,
+      "section": "11",
+      "quote": "‬‬ ‫בדרך כלל יש לנצל את החופשה בסוף שנת העבודה שבגינה ניתנת החופשה‪ .‬על אף האמור לעיל‪ ,‬אם‬ ‫העובד מעוניין לצבור את ימי החופשה ולנצלם במהלך שנת העבודה העוקבת או בשנה שלאחר מכן‪,‬‬ ‫ואם המעסיק מסכים לכך‪ ,‬רשאי העובד לנצל בכל שנה רק ‪ 7‬ימי חופשה‪ ,‬ולצבור את יתר הימים לשימוש‬ ‫במהלך השנה הבאה או בשנה השלישית‪.‬‬ ‫",
+      "language": "he",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "023c4d36d17262c2b3c66c95afe06faeed03688e9720d52ef29e78d8f9cdc9bc"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+      "pdfPage": 19,
+      "section": "11",
+      "quote": "‫זכותון לעובדים זרים‬ ‫‪2026",
+      "language": "he",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "023c4d36d17262c2b3c66c95afe06faeed03688e9720d52ef29e78d8f9cdc9bc"
+    }
+  ],
+  "reviewNote": "העברית מונה את הוותק אצל אותו מטופל, והאנגלית אצל המעסיק. אין הכרעה."
+}

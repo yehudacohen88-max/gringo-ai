@@ -1,0 +1,43 @@
+{
+  "schema": "source-grounded",
+  "id": "draft-piba2026-annual_leave-en",
+  "language": "en",
+  "topic": "annual_leave",
+  "section": "11",
+  "authorityId": "piba",
+  "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+  "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+  "sourceRetrievedAt": "2026-11-11",
+  "checkedAt": "2026-11-22",
+  "pdfPage": 26,
+  "handbookEdition": "2026",
+  "reviewGroup": "blocked",
+  "nativeReviewRequired": false,
+  "status": "draft",
+  "extraction": "ok",
+  "answer": "Answer: Both editions say every worker is entitled to paid vacation days, and they do not use the same word for who the seniority is counted with. The Hebrew edition says \"with the same patient\". The English edition says \"for the employer\". This record does not decide between them.\n\nConditions and exceptions: The numbers printed in both editions are 16 days in each of the first five years, 18 in the sixth year, 21 in the seventh, and one more day each year from the eighth year up to 28. These are calendar days, including the weekend, so a five-day week is 12 workdays and a six-day week is 14 workdays in the first five years. The days are usually used by the end of the year. If the employer agrees, the worker may use only 7 days in a year and save the rest for the next year or the year after that.\n\nWhat you can do: There is no single practical step here, because the record does not decide whether the count is with the patient or with the employer.\n\nSource: PIBA Foreign Workers' Rights Handbook 2026, the handbook section. https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf\n\nThis summary is provided for general informational purposes only, and is not a substitute for the wording of the relevant laws, regulations, procedures and extension orders, which are binding.\n\nThis is not legal advice. The information is general only and does not replace professional advice concerning the circumstances of your case.",
+  "informationLabel": "This summary is provided for general informational purposes only, and is not a substitute for the wording of the relevant laws, regulations, procedures and extension orders, which are binding.",
+  "claims": [
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 26,
+      "section": "11",
+      "quote": "Paid Vacation: every worker is entitled to an annual quota of paid vacation days as detailed below: • For each of the first five years of work for the employer: 16 paid vacation days per year. • For the sixth year of employment by the employer: 18 paid vacation days per year • For the seventh year of employment by the employer: 21 paid vacation days per year • For the eighth year of employment by the employer onwards: one additional paid vacation day for each year of work up to a maximum of 28 paid vacation days per year. Please note: the number of vacation days listed above refers to actual calendar days, which also include weekend days, which are not actual work days Therefore, a person working five days a week will actually receive 12 paid vacation workdays during the first five years of employment, while a worker working six days per week will actually receive 14 paid vacation workdays during the first five years of employment etc. Usually the vacation entitlement must be used by the end of the year for which the vacation days are given. Nonetheless, if the worker would like to save up his vacation and use it the following year or the year after that, and if the employer agrees, the worker can use only 7 vacation days each year and save the rest for use in the following year or in the third year.",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 26,
+      "section": "11",
+      "quote": "ORKERS' RIGHTS HANDBOOK 2026",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    }
+  ],
+  "reviewNote": "העברית מונה את הוותק אצל אותו מטופל, והאנגלית אצל המעסיק. אין הכרעה."
+}

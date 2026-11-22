@@ -1,0 +1,42 @@
+{
+  "schema": "source-grounded",
+  "id": "draft-piba2026-sick_leave-en",
+  "language": "en",
+  "topic": "sick_leave",
+  "section": "11",
+  "authorityId": "piba",
+  "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+  "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+  "sourceRetrievedAt": "2026-11-11",
+  "checkedAt": "2026-11-22",
+  "pdfPage": 27,
+  "handbookEdition": "2026",
+  "reviewGroup": "ready",
+  "nativeReviewRequired": false,
+  "status": "draft",
+  "extraction": "ok",
+  "answer": "Answer: An employee is entitled to sick pay according to the length of employment with the current employer: a day and a half for each month worked, up to 90 days, upon a doctor’s note stating the need to be absent.\n\nConditions and exceptions: There is no pay for the first day of illness. For the second and third days the employer pays 50% of the regular salary. From the fourth day the employer pays the regular salary, up to the maximum period.\n\nWhat you can do: Present a doctor’s note that states the need to be absent from work, as the handbook requires.\n\nSource: PIBA Foreign Workers' Rights Handbook 2026, the handbook section. https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf\n\nThis summary is provided for general informational purposes only, and is not a substitute for the wording of the relevant laws, regulations, procedures and extension orders, which are binding.\n\nThis is not legal advice. The information is general only and does not replace professional advice concerning the circumstances of your case.",
+  "informationLabel": "This summary is provided for general informational purposes only, and is not a substitute for the wording of the relevant laws, regulations, procedures and extension orders, which are binding.",
+  "claims": [
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 27,
+      "section": "11",
+      "quote": "Sick Pay: employees are entitled to sick pay according to the length of their employment with the current employer (a day and a half for each month worked) up to a total of 90 days, upon presenting a doctor’s note stating the need for absence from work. Employees are not entitled to payment for the first day of illness. For the second and third days of illness, the employer must pay the employee 50% of his regular salary, and from the fourth day on, pay the regular salary, up to the maximum period.",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 27,
+      "section": "11",
+      "quote": "ORKERS' RIGHTS HANDBOOK 2026",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "schema": "source-grounded",
+  "id": "draft-piba2026-deposit-he",
+  "language": "he",
+  "topic": "deposit",
+  "section": "12",
+  "authorityId": "piba",
+  "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+  "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+  "sourceRetrievedAt": "2026-11-11",
+  "checkedAt": "2026-11-22",
+  "pdfPage": 21,
+  "handbookEdition": "2026",
+  "reviewGroup": "blocked",
+  "nativeReviewRequired": false,
+  "status": "draft",
+  "extraction": "ok",
+  "answer": "תשובה: הזכותון מתאר איך מקבלים את כספי הפיקדון ביציאה חוקית וקבועה. שתי המהדורות אינן אומרות אותו דבר על הבסיס לניכוי בגלל שהייה לא חוקית, והרשומה הזאת אינה מכריעה.\n\nתנאים וחריגים: ההפקדה חלה על ענפים שהזכותון מונה, לרבות בניין, מלונות, מסעדות למעט שפים אתניים מומחים, תעשייה, מסחר ושירותים, מוסדות סיעוד ופרויקטים בטכנולוגיה מיוחדת, וגם על חברות סיעוד. המינימום בזכותון אינו קטן מ-12.5% משכר חודשי של משרה מלאה, ובחודש הראשון והאחרון אפשר סכום יחסי. ההפקדה היא מעל השכר ואינה מנוכה ממנו. ביציאה חוקית וקבועה העובד מקבל את הצבירה כולל ריבית, פחות עמלות בנק ופחות מס של 15%. אחרי קבלת הכסף אי אפשר לחזור לישראל. בשהייה לא חוקית העברית אומרת שהניכוי הוא מיתרת 25% ושאחרי 12 חודשים אובדת יתרת 75%. האנגלית אומרת שהניכוי הוא מיתרת 75% ושאחרי 12 חודשים מופקעים 75%. אין כאן הכרעה.\n\nמה אפשר לעשות: לקבל דולרים או יורו בבנק בשדה התעופה אחרי ביקורת הגבולות, אם הוגשה בקשה לרשות לפחות 10 ימי עבודה לפני היציאה, או העברה לחשבון בחו\"ל בתוך 30 ימי עבודה מהגשת הבקשה. בקשת ויתור על ניכוי, אם השהייה נבעה מטעות בתום לב או מסיבה מוצדקת אחרת, היא בקשה בכתב לרשות. כתובת הדוא\"ל שבזכותון אינה מפורסמת כאן. המהדורה האנגלית מקשרת לנוהל: https://www.gov.il/en/departments/policies/deposit_monies_foreign_workers_constructions_technology_procedure\n\nמקור: זכותון 2026, הסעיף המתאים בזכותון. https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf\n\nאין לראות באמור ייעוץ משפטי. המידע הוא כללי בלבד ואינו מחליף ייעוץ מקצועי המתייחס לנסיבות המקרה.",
+  "informationLabel": "תקציר זה נועד לידיעה כללית בלבד ואינו מהווה תחליף לנוסח החוק‪ ,‬התקנות‪ ,‬הנהלים וצווי‬ ‫ההרחבה הרלוונטיים המחייבים",
+  "claims": [
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+      "pdfPage": 21,
+      "section": "12",
+      "quote": "תשלומי מעסיקים על חשבון פיצויי פיטורין‪ ,‬קרן פנסיה וקרן השתלמות וכד' (להלן‪ :‬תשלום עבור תנאי‬ ‫העבודה מטעם המעסיק) לעובדים זרים בענפי הבניין‪ ,‬בתי המלון‪ ,‬המסעדות (מלבד שפים מומחים‬ ‫אתניים)‪ ,‬התעשייה‪ ,‬המסחר והשירותים‪ ,‬מוסדות סיעוד‪ ,‬ופרויקטים הדורשים טכנולוגיה ומיכון ייחודיים‪,‬‬ ‫חייבים להיות מופקדים על ידי המעסיקים‪ ,‬בחשבון פיקדון המנוהל על ידי רשות האוכלוסין על שמו של‬ ‫כל עובד זר כאמור‪ .‬חברות סיעוד גם מחויבות בתשלומים הנ\"ל‪ ,‬בגין על עובד זר שהן מעסיקות בבתי‬ ‫מטופלים סיעודיים‪.‬‬ ‫הסכום שיש להעבירו בכול חודש לחשבון הפיקדון על ידי המעסיק‪ ,‬מחושב לפי הסכום שכול מעסיק‬ ‫חייב לשלם עבור תנאי העבודה המוזכרים לעיל‪ ,‬כפי שנקבע בהסכם הקיבוצי או בצו ההרחבה הרלוונטי‪,‬‬ ‫או סכום גבוה יותר אם סוכם על כך בהסכם רלוונטי‪ .‬",
+      "language": "he",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "023c4d36d17262c2b3c66c95afe06faeed03688e9720d52ef29e78d8f9cdc9bc"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+      "pdfPage": 21,
+      "section": "12",
+      "quote": "ההפקדה השוטפת המינימלית לקרן הפיקדון‬ ‫שתבוצע על ידי המעסיק לא תהיה קטנה מ‪ 12.5%-‬משכרו החודשי של העובד במשרה מלאה‪ .‬על אף‬ ‫האמור לעיל‪ ,‬עבור חודש העסקה הראשון והאחרון של העובד בלבד‪ ,‬רשאי המעסיק להפקיד סכום‬ ‫יחסי שיחושב לפי ימי העבודה של העובד הזר בחודש הראשון או האחרון של ההעסקה‪.‬‬ ‫",
+      "language": "he",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "023c4d36d17262c2b3c66c95afe06faeed03688e9720d52ef29e78d8f9cdc9bc"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+      "pdfPage": 21,
+      "section": "12",
+      "quote": "העובד הזר יקבל את הסכום שנצבר בחשבון הפיקדון‪ ,‬לרבות ריבית שנצברה עליו‪ ,‬פחות עמלות‬ ‫בנקאיות ופחות מס בשיעור ‪ ,15%‬בעת יציאה חוקית ולצמיתות מישראל‪ .‬העובד יכול לקבל את הסכום‬ ‫בדולר ארה\"ב או ביורו בבנק שבשדה התעופה בישראל לאחר מעבר בביקורת הגבולות (אם‬ ‫העובד או מעסיקו הגישו בקשה מראש לרשות האוכלוסין‪ ,‬לפחות ‪ 10‬ימי עבודה לפני היציאה) או‬ ‫באמצעות העברה בנקאית לחשבון הבנק של העובד בחו\"ל‪ ,‬בתוך ‪ 30‬ימי עבודה ממועד הגשת‬ ‫הבקשה‪ .‬לאחר קבלת כספי הפיקדון כאמור לעיל‪ ,‬העובדים הזרים אינם רשאים לחזור לישראל‪.‬‬ ‫אם העובד לא יוצא מישראל בתום תקופת שהייתו החוקית במדינה‪ ,‬הוא יהא זכאי לקבל רק ‪25%‬‬ ‫מהסכום שהצטבר בחשבון הפיקדון (פחות עמלות בנק ומס כאמור לעיל) ומיתרת ‪ 25%‬ינוכו סכומים‬ ‫על ידי הרשות עבור כל חודש של שהיית יתר שלא כדין של העובד בישראל‪ ,‬לפי השיעורים המפורטים‬ ‫להלן‪ ,‬ולאחר ‪ 12‬חודשי שהיית יתר בלתי חוקית העובד יאבד את כל יתרת ה‪.75% -‬‬ ‫",
+      "language": "he",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "023c4d36d17262c2b3c66c95afe06faeed03688e9720d52ef29e78d8f9cdc9bc"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+      "pdfPage": 21,
+      "section": "12",
+      "quote": "‫זכותון לעובדים זרים‬ ‫‪2026",
+      "language": "he",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "023c4d36d17262c2b3c66c95afe06faeed03688e9720d52ef29e78d8f9cdc9bc"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026 link annotation",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 29,
+      "section": "12",
+      "quote": "https://www.gov.il/en/departments/policies/deposit_monies_foreign_workers_constructions_technology_procedure",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "b75788fa18cf40983d6d8ddb8d863bb3494265f5f1e4a629c7e98a616f2cb3ee",
+      "sourceText": "knowledge/sources/piba_handbook_2026/link-annotations.txt"
+    }
+  ],
+  "reviewNote": "העברית אומרת שהניכוי על שהייה לא חוקית הוא מיתרת 25%, והאנגלית מיתרת 75%. אין הכרעה."
+}

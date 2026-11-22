@@ -1,0 +1,54 @@
+{
+  "schema": "source-grounded",
+  "id": "draft-piba2026-minimum_wage-he",
+  "language": "he",
+  "topic": "minimum_wage",
+  "section": "9",
+  "authorityId": "piba",
+  "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+  "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+  "sourceRetrievedAt": "2026-11-11",
+  "checkedAt": "2026-11-22",
+  "pdfPage": 16,
+  "handbookEdition": "2026",
+  "reviewGroup": "ready",
+  "nativeReviewRequired": false,
+  "status": "draft",
+  "extraction": "ok",
+  "answer": "תשובה: לפי דף שכר המינימום של המוסד לביטוח לאומי, מגיל 18 ומעלה, החל ב-01.04.2026, השכר החודשי הוא 6,443.85 ש\"ח. שכר לשעה בהיקף של 182 שעות בחודש הוא 35.4 ש\"ח, ושכר לשעה בהיקף של 186 שעות בחודש הוא 34.64 ש\"ח.\n\nתנאים וחריגים: אלה שני בסיסי שעה שהביטוח הלאומי מפרסם, לא סכום אחד. הזכותון העברי מדפיס את 6,443.85 ואת 35.4 למשרה מלאה של לכל היותר 182 שעות, וזהה לסכום שבתוקף בדף הביטוח הלאומי. הוא אינו סכום ישן. בענף או במקום עבודה שבהם הסכם קיבוצי או צו הרחבה קובע שכר גבוה יותר, כדוגמת ענף הבניין, חל השכר הגבוה.\n\nמה אפשר לעשות: הזכותון ממליץ לנהל רישום בכתב של שעות העבודה ושל שעות וימי המנוחה.\n\nמקור: המוסד לביטוח לאומי, שכר מינימום, https://www.btl.gov.il/Mediniyut/GeneralData/Pages/%D7%A9%D7%9B%D7%A8%20%D7%9E%D7%99%D7%A0%D7%99%D7%9E%D7%95%D7%9D.aspx וגם זכותון 2026, הסעיף המתאים בזכותון. https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf\n\nאין לראות באמור ייעוץ משפטי. המידע הוא כללי בלבד ואינו מחליף ייעוץ מקצועי המתייחס לנסיבות המקרה.",
+  "informationLabel": "תקציר זה נועד לידיעה כללית בלבד ואינו מהווה תחליף לנוסח החוק‪ ,‬התקנות‪ ,‬הנהלים וצווי‬ ‫ההרחבה הרלוונטיים המחייבים",
+  "claims": [
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+      "pdfPage": 16,
+      "section": "9",
+      "quote": "א‪ .‬שכר מינימום – שכר המינימום החודשי בגין משרה מלאה )לכל היותר ‪ 182‬שעות בחודש(‬ ‫הוא כ‪ 6,443.85 -‬ש”ח‪ .‬שכר המינימום לשעת עבודה הוא ‪ 35.4‬ש”ח‪.‬‬ ‫יודגש כי לגבי עובדים זרים בענפים או במקומות עבודה שבהם הסכם קיבוצי או צו הרחבה קובע שכר‬ ‫גבוה משכר המינימום‪ ,‬כדוגמת ענף הבניין‪ ,‬יחולו השכר הגבוה ותנאי ההעסקה הטובים יותר‪.‬‬ ‫מומלץ לעובדים לנהל רישום בכתב של שעות העבודה היומיות שלהם ושל שעות וימי המנוחה שלהם‪.‬‬ ‫",
+      "language": "he",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "023c4d36d17262c2b3c66c95afe06faeed03688e9720d52ef29e78d8f9cdc9bc"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+      "pdfPage": 16,
+      "section": "9",
+      "quote": "‫זכותון לעובדים זרים‬ ‫‪2026",
+      "language": "he",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "023c4d36d17262c2b3c66c95afe06faeed03688e9720d52ef29e78d8f9cdc9bc"
+    },
+    {
+      "sourceTitle": "שכר מינימום - נתונים כלליים | ביטוח לאומי",
+      "sourceUrl": "https://www.btl.gov.il/Mediniyut/GeneralData/Pages/%D7%A9%D7%9B%D7%A8%20%D7%9E%D7%99%D7%A0%D7%99%D7%9E%D7%95%D7%9D.aspx",
+      "pdfPage": null,
+      "section": "btl-minimum-wage",
+      "quote": "מגיל 18 ומעלה: שכר יומי למועסק 6 ימים בשבוע: 257.75 ש\"ח (החל ב- 01.04.2026) שכר יומי למועסק 5 ימים בשבוע: 297.4 ש\"ח (החל ב- 01.04.2026) שכר לשעה בהיקף של 186 שעות בחודש: 34.64 ש\"ח (החל ב- 01.04.2026) שכר לשעה בהיקף של 182 שעות בחודש: 35.4 ש\"ח (החל ב- 01.04.2026) שכר חודשי: 6,443.85 ש\"ח (החל ב- 01.04.2026)",
+      "language": "he",
+      "sourceRetrievedAt": "2026-11-22",
+      "sourceFileSha256": "40a8c3e26d40a6e0290619d7509a0d1bf96c176e045c52544b509d4d9400f4c9",
+      "sourceText": "knowledge/sources/btl_minimum_wage/page.txt"
+    }
+  ],
+  "effectiveFrom": "2026-04-01"
+}
