@@ -66,8 +66,11 @@ function knowledgeTermMatches(question, term) {
 
 function detectedTopicMatches(item, question) {
   const detected = classifyUserQuestion(question);
-  if (!detected || detected.disposition !== 'legal' || !detected.topic) return false;
-  return String(item && item.topic || '') === detected.topic;
+  if (!detected || detected.disposition !== 'legal') return false;
+  const topics = Array.isArray(detected.topics) && detected.topics.length
+    ? detected.topics
+    : (detected.topic ? [detected.topic] : []);
+  return topics.includes(String(item && item.topic || ''));
 }
 
 function questionSelectsRecordTopic(item, question) {
@@ -131,7 +134,7 @@ function loadStoredKnowledgeItems() {
   return files.flatMap((file) => readJsonArray(path.join(KNOWLEDGE_BASE_DIR, file)));
 }
 
-function loadApprovedDraftRecords() {
+function loadApprovedDraftRecords(options = {}) {
   if (!fs.existsSync(DRAFTS_DIR)) return [];
   const files = fs.readdirSync(DRAFTS_DIR).filter((file) => file.endsWith('.json')).sort();
   const records = [];
@@ -146,7 +149,7 @@ function loadApprovedDraftRecords() {
     // Same gate the reply path uses. A hash miss, a missing approval, a
     // mismatched record id, or extraction_unreliable (Thai, Hindi, Sinhala)
     // leaves the draft out. Metadata on the draft cannot admit it.
-    if (!passesLegalVerification(record)) continue;
+    if (!passesLegalVerification(record, options)) continue;
     records.push(record);
   }
   return records;
@@ -224,6 +227,8 @@ function projectKnowledgeRecord(item, score, question, category) {
   }
   if (item.language) projected.language = item.language;
   if (item.section !== undefined && item.section !== null) projected.section = item.section;
+  if (Object.prototype.hasOwnProperty.call(item, 'pdfPage')) projected.pdfPage = item.pdfPage;
+  if (item.sourceTitle) projected.sourceTitle = item.sourceTitle;
   if (Object.prototype.hasOwnProperty.call(item, 'informationLabel')) {
     projected.informationLabel = item.informationLabel;
   }

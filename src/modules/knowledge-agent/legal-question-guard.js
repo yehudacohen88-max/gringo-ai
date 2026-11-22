@@ -8,7 +8,7 @@
 
 const { isSourceGroundedRecord, passesLegalVerification } = require('./legal-verification');
 const { classifyUserQuestion } = require('./legal-topic-detector');
-const { disclaimerLanguage, withLegalDisclaimer } = require('./legal-disclaimer');
+const { disclaimerLanguage, legalDisclaimerText, withLegalDisclaimer } = require('./legal-disclaimer');
 const {
   createRightsUnverifiedFallback,
   formatRightsFallback,
@@ -223,35 +223,145 @@ function recordLanguageCode(record = {}) {
 // Handbook records are copied only when the detector's topic id is the
 // record's topic id and the reply language is the record's language.
 // The older keyword families stay for records that are not source-grounded.
-function sourceGroundedRecordMayAnswer(record, question, language) {
+const PARTIAL_NOT_ANSWERED = Object.freeze({
+  he: 'חלק מהשאלה לא נענה כאן, כי אין רשומה מאומתת לחלק הזה. מה שמופיע למעלה מתייחס רק לחלק שיש עליו רשומה מאומתת.',
+  en: 'Part of this question is not answered here, because there is no verified record for that part. What appears above covers only the part that has a verified record.',
+});
+
+const SEPARATE_SUBJECTS = Object.freeze({
+  he: 'השאלה כוללת יותר מנושא אחד. כל תשובה למטה מתייחסת רק לנושא שלה.',
+  en: 'This question has more than one subject. Each answer below covers only its own subject.',
+});
+
+function questionTopics(question) {
   const detected = classifyUserQuestion(question);
+  const topics = Array.isArray(detected.topics) && detected.topics.length
+    ? detected.topics
+    : (detected.topic ? [detected.topic] : []);
+  return { detected, topics };
+}
+
+function sourceGroundedRecordMayAnswer(record, question, language) {
+  const { detected, topics } = questionTopics(question);
   if (detected.disposition !== 'legal') return false;
-  if (String(record.topic || '').trim() !== detected.topic) return false;
+  if (!topics.includes(String(record.topic || '').trim())) return false;
   const actual = recordLanguageCode(record);
   const wanted = disclaimerLanguage(language);
   if (!actual || actual !== wanted) return false;
   return true;
 }
 
+function storedText(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  return '';
+}
+
+function presentAnswerBody(answer, language) {
+  const disclaimerParts = legalDisclaimerText(language).split(/\n{2,}/).map((part) => part.trim()).filter(Boolean);
+  const paragraphs = String(answer || '').replace(/\r\n/g, '\n').split(/\n{2,}/);
+  const kept = [];
+  for (const paragraph of paragraphs) {
+    let trimmed = paragraph.trim();
+    if (!trimmed) continue;
+    if (/^(source:|מקור:)/i.test(trimmed)) continue;
+    if (disclaimerParts.some((part) => trimmed.includes(part))) continue;
+    trimmed = trimmed.replace(/הסעיף המתאים בזכותון/g, '').replace(/the handbook section/gi, '').trim();
+    trimmed = trimmed.replace(/[ \t]{2,}/g, ' ').replace(/\s+([.,])/g, '$1').trim();
+    if (!trimmed || /^[,.]$/.test(trimmed)) continue;
+    kept.push(trimmed);
+  }
+  return kept.join('\n\n').trim();
+}
+
+function sourceEntries(record) {
+  const entries = [];
+  const seen = new Set();
+  const add = (name, url, section, page) => {
+    const item = {
+      name: storedText(name),
+      url: storedText(url),
+      section: storedText(section),
+      page: storedText(page),
+    };
+    if (!item.name && !item.url && !item.section && !item.page) return;
+    const key = [item.name, item.url, item.section, item.page].join('|');
+    if (seen.has(key)) return;
+    seen.add(key);
+    entries.push(item);
+  };
+  add(record.sourceTitle || (record.source && record.source.title), record.sourceUrl || (record.source && record.source.url), record.section, record.pdfPage);
+  for (const claim of Array.isArray(record.claims) ? record.claims : []) {
+    if (!claim || typeof claim !== 'object') continue;
+    add(claim.sourceTitle, claim.sourceUrl, claim.section, claim.pdfPage);
+  }
+  return entries;
+}
+
+function formatSourceBlock(record, language) {
+  const hebrew = disclaimerLanguage(language) === 'he';
+  const lines = sourceEntries(record).map((entry) => {
+    const name = entry.name || (hebrew ? 'שם מקור: לא שמור ברשומה' : 'source name: not stored');
+    const section = entry.section
+      ? (hebrew ? `סעיף ${entry.section}` : `section ${entry.section}`)
+      : (hebrew ? 'סעיף: לא שמור ברשומה' : 'section: not stored');
+    const page = entry.page
+      ? (hebrew ? `עמוד PDF ${entry.page}` : `PDF page ${entry.page}`)
+      : (hebrew ? 'עמוד PDF: לא שמור ברשומה' : 'PDF page: not stored');
+    const url = entry.url || (hebrew ? 'קישור: לא שמור ברשומה' : 'link: not stored');
+    return `${name}, ${section}, ${page}. ${url}`;
+  });
+  const heading = hebrew ? 'מקור:' : 'Source:';
+  return `${heading}\n${lines.join('\n')}`.trim();
+}
+
 function verbatimReviewedAnswers(records = [], topics = [], options = {}) {
   const approved = (Array.isArray(records) ? records : []).filter((record) => passesLegalVerification(record, options));
   const needed = topics.length ? topics : ['rights'];
   const question = String(options.question || '');
+  const language = options.language || 'en';
+  const { topics: questionTopicIds } = questionTopics(question);
+  const grounded = [];
   const lines = [];
   for (const record of approved) {
     if (isSourceGroundedRecord(record)) {
-      if (!sourceGroundedRecordMayAnswer(record, question, options.language)) continue;
-    } else {
-      const covered = new Set(recordTopics(record));
-      if (!needed.some((topic) => topicCovered(topic, covered))) continue;
+      if (!sourceGroundedRecordMayAnswer(record, question, language)) continue;
+      const body = presentAnswerBody(record.answer, language);
+      const source = formatSourceBlock(record, language);
+      if (!body || sourceEntries(record).every((entry) => !entry.url)) continue;
+      grounded.push({ topic: String(record.topic || '').trim(), body, source });
+      continue;
     }
+    const covered = new Set(recordTopics(record));
+    if (!needed.some((topic) => topicCovered(topic, covered))) continue;
     const answer = String(record.answer || '').trim();
     const source = record.source && typeof record.source === 'object' ? record.source : {};
     const claim = Array.isArray(record.claims) ? record.claims.find((item) => item && item.sourceUrl) : null;
     const url = String(source.url || (claim && claim.sourceUrl) || record.sourceUrl || '').trim();
-    const title = String(source.title || (record.schema === 'source-grounded' ? "PIBA Foreign Workers' Rights Handbook 2026" : '')).trim();
+    const title = String(source.title || '').trim();
     if (!answer || !url) continue;
     lines.push(`${answer}\n\nSource: ${[title, url].filter(Boolean).join(' ')}`);
+  }
+  if (grounded.length) {
+    const coveredTopics = new Set(grounded.map((item) => item.topic));
+    const unanswered = questionTopicIds.filter((topic) => !coveredTopics.has(topic));
+    const hebrew = disclaimerLanguage(language) === 'he';
+    const notice = questionTopicIds.length > 1
+      ? (unanswered.length ? PARTIAL_NOT_ANSWERED[hebrew ? 'he' : 'en'] : SEPARATE_SUBJECTS[hebrew ? 'he' : 'en'])
+      : '';
+    const bodies = grounded.map((item) => item.body).join('\n\n');
+    const sourceLines = [];
+    const seenSources = new Set();
+    for (const item of grounded) {
+      const body = item.source.split('\n').slice(1).join('\n');
+      if (!body || seenSources.has(body)) continue;
+      seenSources.add(body);
+      sourceLines.push(body);
+    }
+    const heading = hebrew ? 'מקור:' : 'Source:';
+    const sourceBlock = `${heading}\n${sourceLines.join('\n')}`;
+    const ordered = unanswered.length ? [bodies, notice, sourceBlock] : [notice, bodies, sourceBlock];
+    lines.push(ordered.filter(Boolean).join('\n\n'));
   }
   return lines;
 }
@@ -377,7 +487,9 @@ function swapRightsFallbackToLanguage(text = '', language = 'en') {
 
 module.exports = {
   LEGAL_QUESTION_PATTERNS,
+  PARTIAL_NOT_ANSWERED,
   PENDING_NATIVE_SPEAKER_REVIEW,
+  SEPARATE_SUBJECTS,
   UNSUPPORTED_STATUTORY_PATTERNS,
   claimTopics,
   containsUnsupportedStatutoryClaim,

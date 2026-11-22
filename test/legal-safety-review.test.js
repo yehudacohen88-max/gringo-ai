@@ -208,13 +208,36 @@ test('classifier bypass: an indirect legal question does not call the model', as
     channelUserId: 'legal-safety',
   });
   const passport = JSON.parse(fs.readFileSync(path.join(__dirname, '../knowledge/drafts/passport.en.json'), 'utf8'));
+  const lead = passport.answer.trim().split(/\n{2,}/)[0];
 
   assert.equal(calls.length, 0);
-  assert.equal(result.reply.includes(passport.answer.trim()), true);
+  assert.equal(result.reply.includes(lead), true);
+  assert.equal(result.reply.includes('section 4'), true);
+  assert.equal(result.reply.includes('PDF page 19'), true);
   assert.equal(result.reply.includes(passport.sourceUrl), true);
-  assert.match(result.reply, /not legal advice/);
+  assert.equal((result.reply.match(/^Source:/gm) || []).length, 1);
+  assert.equal((result.reply.match(/This is not legal advice\./g) || []).length, 1);
+  assert.equal(/the handbook section/i.test(result.reply), false);
+  assert.equal(result.reply.includes('I do not have verified information on this yet'), false);
   assert.equal(result.reply.includes('if you agree'), false);
   assert.doesNotMatch(result.reply, STATUTE);
+});
+
+test('the same passport question falls back when approvals are empty', () => {
+  const os = require('os');
+  const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'gringo-legal-safety-empty-'));
+  const passport = JSON.parse(fs.readFileSync(path.join(__dirname, '../knowledge/drafts/passport.en.json'), 'utf8'));
+  const reply = guardLegalReply('Your employer can keep your passport if you agree.', {
+    question: 'is my boss allowed to keep my passport?',
+    language: 'en',
+    legalSegment: true,
+    verifiedRecords: [passport],
+    approvalsDir: empty,
+  });
+  assert.ok(reply.includes(RIGHTS_UNVERIFIED_FALLBACK.en));
+  assert.equal(reply.includes('criminal offence'), false);
+  assert.equal(reply.includes('if you agree'), false);
+  assert.doesNotMatch(reply, STATUTE);
 });
 
 test('ordinary job and money questions are not replaced by the legal fallback', async () => {

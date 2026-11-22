@@ -1,10 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const { classifyUserQuestion } = require('../src/modules/knowledge-agent/legal-topic-detector');
-const { guardLegalReply } = require('../src/modules/knowledge-agent/legal-question-guard');
+const { PARTIAL_NOT_ANSWERED, SEPARATE_SUBJECTS, guardLegalReply } = require('../src/modules/knowledge-agent/legal-question-guard');
 const { passesLegalVerification } = require('../src/modules/knowledge-agent/legal-verification');
 const { contentHash } = require('../src/modules/knowledge-agent/source-grounded-record');
 const { legalDisclaimerText } = require('../src/modules/knowledge-agent/legal-disclaimer');
@@ -153,6 +154,14 @@ function answerBody(record) {
   return String(record.answer || '').trim();
 }
 
+function answerLead(record) {
+  return answerBody(record).split(/\n{2,}/)[0].trim();
+}
+
+function sourceHeading(language) {
+  return language === 'he' ? /^מקור:/gm : /^Source:/gm;
+}
+
 const profile = {
   userId: 'usr_phase2_loader',
   fullName: 'Test Worker',
@@ -209,6 +218,7 @@ test('retrieved handbook records still carry the fields the content hash uses', 
       assert.equal(found.schema, 'source-grounded', record.id);
       assert.equal(found.language, language, record.id);
       assert.equal(found.section, record.section, record.id);
+      assert.equal(found.pdfPage, record.pdfPage, record.id);
       assert.equal(found.informationLabel, record.informationLabel, record.id);
       assert.equal(Array.isArray(found.claims), true, record.id);
       assert.equal(contentHash(found), contentHash(record), record.id);
@@ -222,22 +232,35 @@ test('each approved topic answers in Hebrew and English from the loaded record',
   for (const topic of APPROVED_TOPICS) {
     for (const language of ['he', 'en']) {
       const record = readDraft(topic, language);
-      const body = answerBody(record);
-      assert.ok(body.length > 40, record.id);
+      const lead = answerLead(record);
+      assert.ok(lead.length > 20, record.id);
+      const sectionLabel = language === 'he' ? `סעיף ${record.section}` : `section ${record.section}`;
+      const pageLabel = language === 'he' ? `עמוד PDF ${record.pdfPage}` : `PDF page ${record.pdfPage}`;
       for (const phrasing of PHRASINGS[topic][language]) {
         const classified = classifyUserQuestion(phrasing);
         assert.equal(classified.disposition, 'legal', phrasing);
         assert.equal(classified.topic, topic, phrasing);
+        assert.deepEqual(classified.topics, [topic], phrasing);
         const reply = await ask(phrasing, language);
-        assert.equal(reply.includes(body), true, phrasing);
+        assert.equal(reply.includes(lead), true, phrasing);
         assert.equal(reply.includes(record.sourceUrl), true, phrasing);
-        assert.equal(reply.includes(legalDisclaimerText(language)), true, phrasing);
+        assert.equal(reply.includes(record.sourceTitle), true, phrasing);
+        assert.equal(reply.includes(sectionLabel), true, phrasing);
+        assert.equal(reply.includes(pageLabel), true, phrasing);
+        assert.equal(reply.includes('הסעיף המתאים בזכותון'), false, phrasing);
+        assert.equal(/the handbook section/i.test(reply), false, phrasing);
+        assert.equal(reply.split(legalDisclaimerText(language)).length - 1, 1, phrasing);
+        assert.equal((reply.match(sourceHeading(language)) || []).length, 1, phrasing);
         assert.equal(reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD[language]), false, phrasing);
-        const other = readDraft(topic, language === 'he' ? 'en' : 'he');
-        const otherBody = answerBody(other);
-        if (otherBody && otherBody !== body) {
-          assert.equal(reply.includes(otherBody), false, phrasing);
+        if (topic === 'minimum_wage') {
+          const missingPage = language === 'he' ? 'עמוד PDF: לא שמור ברשומה' : 'PDF page: not stored';
+          assert.equal(reply.includes(missingPage), true, phrasing);
+        } else {
+          assert.equal(reply.includes('לא שמור ברשומה'), false, phrasing);
+          assert.equal(reply.includes('not stored'), false, phrasing);
         }
+        const other = readDraft(topic, language === 'he' ? 'en' : 'he');
+        assert.equal(reply.includes(answerLead(other)), false, phrasing);
         samples.push({ topic, language, phrasing, reply });
       }
     }
@@ -364,6 +387,89 @@ test('ordinary non-legal questions do not receive a handbook answer', { timeout:
     assert.equal(reply.includes(passport), false, phrasing);
     assert.equal(reply.includes(sick), false, phrasing);
     assert.equal(reply.includes(legalDisclaimerText('en')), false, phrasing);
+  }
+});
+
+test('an empty approvals directory blocks all eight topics in Hebrew and English', () => {
+  const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'gringo-empty-approvals-'));
+  assert.deepEqual(kb.loadApprovedDraftRecords({ approvalsDir: empty }), []);
+  for (const topic of APPROVED_TOPICS) {
+    for (const language of ['he', 'en']) {
+      const record = readDraft(topic, language);
+      const lead = answerLead(record);
+      assert.equal(passesLegalVerification(record, { approvalsDir: empty }), false, record.id);
+      const reply = guardLegalReply(`MODEL ${lead}`, {
+        question: PHRASINGS[topic][language][0],
+        language,
+        legalSegment: true,
+        verifiedRecords: [record],
+        approvalsDir: empty,
+      });
+      assert.equal(reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD[language]), true, record.id);
+      assert.equal(reply.includes(lead), false, record.id);
+      assert.equal(reply.includes('MODEL'), false, record.id);
+    }
+  }
+});
+
+test('a wrong content hash blocks all eight topics in Hebrew and English', () => {
+  for (const topic of APPROVED_TOPICS) {
+    for (const language of ['he', 'en']) {
+      const record = readDraft(topic, language);
+      const lead = answerLead(record);
+      const approvals = [{
+        recordId: record.id,
+        contentHash: 'ab'.repeat(32),
+        reviewer: 'Yehuda Cohen',
+        date: '2026-11-22',
+      }];
+      assert.equal(passesLegalVerification(record, { approvals }), false, record.id);
+      const reply = guardLegalReply(`MODEL ${lead}`, {
+        question: PHRASINGS[topic][language][0],
+        language,
+        legalSegment: true,
+        verifiedRecords: [record],
+        approvals,
+      });
+      assert.equal(reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD[language]), true, record.id);
+      assert.equal(reply.includes(lead), false, record.id);
+      assert.equal(reply.includes('MODEL'), false, record.id);
+    }
+  }
+});
+
+test('a multi-topic question does not let one answer cover the rest', { timeout: 120000 }, async () => {
+  const cases = [
+    ['he', 'המעסיק מחזיק בדרכון שלי וגם לא משלם לי שכר', ['passport', 'wages'], ['passport'], ['minimum_wage']],
+    ['en', "My employer keeps my passport and also doesn't pay my salary", ['passport', 'wages'], ['passport'], ['minimum_wage']],
+    ['he', 'אין לי ביטוח רפואי וגם המגורים לא תקינים', ['medical_insurance', 'housing'], ['medical_insurance', 'housing'], []],
+    ['en', 'I have no health insurance and my housing is bad', ['medical_insurance', 'housing'], ['medical_insurance', 'housing'], []],
+    ['he', 'המעסיק מחזיק בדרכון שלי וגם מנכה לי מהשכר', ['passport', 'deductions'], ['passport'], ['deductions']],
+    ['en', 'My employer keeps my passport and also deducts from my salary', ['passport', 'deductions'], ['passport'], ['deductions']],
+  ];
+  for (const [language, phrasing, topics, shown, hidden] of cases) {
+    const classified = classifyUserQuestion(phrasing);
+    assert.equal(classified.disposition, 'legal', phrasing);
+    assert.deepEqual(classified.topics, topics, phrasing);
+    const reply = await ask(phrasing, language);
+    const notice = shown.length === topics.length ? SEPARATE_SUBJECTS[language] : PARTIAL_NOT_ANSWERED[language];
+    assert.equal(reply.includes(notice), true, phrasing);
+    assert.equal(reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD[language]), false, phrasing);
+    assert.equal(reply.split(legalDisclaimerText(language)).length - 1, 1, phrasing);
+    assert.equal((reply.match(sourceHeading(language)) || []).length, 1, phrasing);
+    for (const topic of shown) {
+      const record = readDraft(topic, language);
+      assert.equal(reply.includes(answerLead(record)), true, `${phrasing} ${topic}`);
+      assert.equal(reply.includes(language === 'he' ? `סעיף ${record.section}` : `section ${record.section}`), true, phrasing);
+      assert.equal(reply.includes(language === 'he' ? `עמוד PDF ${record.pdfPage}` : `PDF page ${record.pdfPage}`), true, phrasing);
+    }
+    for (const topic of hidden) {
+      const record = readDraft(topic, language);
+      const lead = answerLead(record);
+      if (lead) assert.equal(reply.includes(lead), false, `${phrasing} ${topic}`);
+    }
+    assert.equal(reply.includes('הסעיף המתאים בזכותון'), false, phrasing);
+    assert.equal(/the handbook section/i.test(reply), false, phrasing);
   }
 });
 

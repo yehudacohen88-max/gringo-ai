@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const { passesLegalVerification } = require('../src/modules/knowledge-agent/legal-verification');
@@ -43,6 +44,8 @@ test('drafts load only when an exact-hash approval already exists', () => {
   const serviceSource = fs.readFileSync(path.join(__dirname, '../src/modules/knowledge-agent/knowledge-base.service.js'), 'utf8');
   assert.match(serviceSource, /knowledge\/drafts/);
   assert.match(serviceSource, /knowledge-base/);
+  const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'gringo-source-grounded-empty-'));
+  assert.deepEqual(kb.loadApprovedDraftRecords({ approvalsDir: empty }), []);
 });
 
 test('status approved without a matching approvals entry is rejected', () => {
