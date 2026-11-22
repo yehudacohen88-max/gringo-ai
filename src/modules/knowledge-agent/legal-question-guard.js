@@ -6,9 +6,9 @@
 //
 // Ordinary job search and money-transfer wording is intentionally absent.
 
-const { passesLegalVerification } = require('./legal-verification');
+const { isSourceGroundedRecord, passesLegalVerification } = require('./legal-verification');
 const { classifyUserQuestion } = require('./legal-topic-detector');
-const { withLegalDisclaimer } = require('./legal-disclaimer');
+const { disclaimerLanguage, withLegalDisclaimer } = require('./legal-disclaimer');
 const {
   createRightsUnverifiedFallback,
   formatRightsFallback,
@@ -209,13 +209,42 @@ function trustedStructuredText(output) {
   return '';
 }
 
+function recordLanguageCode(record = {}) {
+  const value = String(record.language || '').trim().toLowerCase();
+  if (!value) return '';
+  if (value === 'english' || value === 'en' || value.startsWith('en-')) return 'en';
+  if (value === 'hebrew' || value === 'he' || value === 'iw' || value.startsWith('he')) return 'he';
+  if (value.startsWith('th')) return 'th';
+  if (value.startsWith('si')) return 'si';
+  if (value.startsWith('hi')) return 'hi';
+  return value;
+}
+
+// Handbook records are copied only when the detector's topic id is the
+// record's topic id and the reply language is the record's language.
+// The older keyword families stay for records that are not source-grounded.
+function sourceGroundedRecordMayAnswer(record, question, language) {
+  const detected = classifyUserQuestion(question);
+  if (detected.disposition !== 'legal') return false;
+  if (String(record.topic || '').trim() !== detected.topic) return false;
+  const actual = recordLanguageCode(record);
+  const wanted = disclaimerLanguage(language);
+  if (!actual || actual !== wanted) return false;
+  return true;
+}
+
 function verbatimReviewedAnswers(records = [], topics = [], options = {}) {
   const approved = (Array.isArray(records) ? records : []).filter((record) => passesLegalVerification(record, options));
   const needed = topics.length ? topics : ['rights'];
+  const question = String(options.question || '');
   const lines = [];
   for (const record of approved) {
-    const covered = new Set(recordTopics(record));
-    if (!needed.some((topic) => topicCovered(topic, covered))) continue;
+    if (isSourceGroundedRecord(record)) {
+      if (!sourceGroundedRecordMayAnswer(record, question, options.language)) continue;
+    } else {
+      const covered = new Set(recordTopics(record));
+      if (!needed.some((topic) => topicCovered(topic, covered))) continue;
+    }
     const answer = String(record.answer || '').trim();
     const source = record.source && typeof record.source === 'object' ? record.source : {};
     const claim = Array.isArray(record.claims) ? record.claims.find((item) => item && item.sourceUrl) : null;

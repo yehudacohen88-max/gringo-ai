@@ -46,7 +46,78 @@ const TOPIC_MAPPINGS = Object.freeze([
     terms: Object.freeze([
       'weekly rest',
       'מנוחה שבועית',
+      'מנוחה שבועי',
+      'יום מנוחה',
+      'seven days a week',
+      'שבעה ימים בשבוע',
       'วันหยุดประจำสัปดาห์',
+    ]),
+  }),
+  Object.freeze({
+    topic: 'passport',
+    terms: Object.freeze([
+      'passport',
+      'דרכון',
+    ]),
+  }),
+  Object.freeze({
+    topic: 'construction_transfer',
+    terms: Object.freeze([
+      'manpower company',
+      'change employers',
+      'move to another',
+      'לתאגיד אחר',
+      'להחליף מעסיק',
+      'לעבור לתאגיד',
+      'לעבור לקבלן',
+    ]),
+  }),
+  Object.freeze({
+    topic: 'minimum_wage',
+    terms: Object.freeze([
+      'minimum wage',
+      'שכר מינימום',
+      'שכר המינימום',
+      'שכר מינימלי',
+      'השכר המינימלי',
+    ]),
+  }),
+  Object.freeze({
+    topic: 'housing',
+    terms: Object.freeze([
+      'workers in one room',
+      'suitable housing',
+      'share one room',
+      'עובדים בחדר',
+      'מגורים הולמים',
+    ]),
+  }),
+  Object.freeze({
+    topic: 'medical_insurance',
+    terms: Object.freeze([
+      'health insurance',
+      'medical insurance',
+      'ביטוח רפואי',
+      'ביטוח הרפואי',
+      'הביטוח הרפואי',
+      'ביטוח בריאות',
+    ]),
+  }),
+  Object.freeze({
+    topic: 'sick_leave',
+    terms: Object.freeze([
+      'sick leave',
+      'sick for',
+      'ימי מחלה',
+      'חופשת מחלה',
+      'הייתי חולה',
+    ]),
+  }),
+  Object.freeze({
+    topic: 'severance',
+    terms: Object.freeze([
+      'severance',
+      'פיצויי',
     ]),
   }),
 ]);

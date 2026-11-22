@@ -207,10 +207,13 @@ test('classifier bypass: an indirect legal question does not call the model', as
     channel: 'web',
     channelUserId: 'legal-safety',
   });
+  const passport = JSON.parse(fs.readFileSync(path.join(__dirname, '../knowledge/drafts/passport.en.json'), 'utf8'));
 
   assert.equal(calls.length, 0);
-  assert.match(result.reply, /I do not have verified information on this yet/);
+  assert.equal(result.reply.includes(passport.answer.trim()), true);
+  assert.equal(result.reply.includes(passport.sourceUrl), true);
   assert.match(result.reply, /not legal advice/);
+  assert.equal(result.reply.includes('if you agree'), false);
   assert.doesNotMatch(result.reply, STATUTE);
 });
 

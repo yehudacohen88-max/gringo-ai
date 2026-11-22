@@ -1,9 +1,15 @@
 const fs = require('fs');
 const path = require('path');
 const { isLegalCategory, isLegalKnowledgeItem, passesLegalVerification } = require('./legal-verification');
+const { classifyUserQuestion } = require('./legal-topic-detector');
 const { topicKeysForQuestion } = require('./topic-mappings');
 
 const KNOWLEDGE_BASE_DIR = path.join(__dirname, 'knowledge-base');
+// Explicit path for handbook drafts. A file here is added to the runtime
+// list only when passesLegalVerification accepts it against knowledge/approvals.
+// That check is an exact content hash plus reviewer and date. status,
+// legalClaimsVerified, and source.verified are not read as permission to load.
+const DRAFTS_DIR = path.join(__dirname, '../../../knowledge/drafts');
 
 function normalize(value) {
   return String(value || '').toLowerCase();
@@ -58,6 +64,17 @@ function knowledgeTermMatches(question, term) {
   return new RegExp(`(?<![\\p{L}\\p{M}\\p{N}])${hebrewPrefix}${escapedTerm}(?![\\p{L}\\p{M}\\p{N}])`, 'iu').test(normalizedQuestion);
 }
 
+function detectedTopicMatches(item, question) {
+  const detected = classifyUserQuestion(question);
+  if (!detected || detected.disposition !== 'legal' || !detected.topic) return false;
+  return String(item && item.topic || '') === detected.topic;
+}
+
+function questionSelectsRecordTopic(item, question) {
+  return itemTopicMatchesKeys(item, topicKeysForQuestion(question, knowledgeTermMatches))
+    || detectedTopicMatches(item, question);
+}
+
 function itemTopicMatchesKeys(item, keys) {
   const topic = normalizeText(String(item && item.topic || '').replace(/[_-]+/g, ' '));
   return keys.some((key) => {
@@ -93,7 +110,7 @@ function hasPositiveRelevanceEvidence(item = {}, question = '', category = '') {
   });
   const titleMatches = isStrongRelevanceTerm(item.title) && knowledgeTermMatches(normalizedQuestion, item.title);
   const topicMatches = isStrongRelevanceTerm(item.topic) && knowledgeTermMatches(normalizedQuestion, item.topic);
-  const mappedTopicMatches = itemTopicMatchesKeys(item, topicKeysForQuestion(question, knowledgeTermMatches));
+  const mappedTopicMatches = questionSelectsRecordTopic(item, question);
 
   return Boolean(
     (categoryMatches && (matchedStrongKeyword || titleMatches || topicMatches || mappedTopicMatches))
@@ -104,77 +121,136 @@ function hasPositiveRelevanceEvidence(item = {}, question = '', category = '') {
   );
 }
 
-function loadKnowledgeItems() {
-  const files = fs.readdirSync(KNOWLEDGE_BASE_DIR).filter((file) => file.endsWith('.json'));
+function readJsonArray(filePath) {
+  const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  return Array.isArray(parsed) ? parsed : [parsed];
+}
 
-  return files.flatMap((file) => {
-    const filePath = path.join(KNOWLEDGE_BASE_DIR, file);
-    const contents = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(contents);
-  });
+function loadStoredKnowledgeItems() {
+  const files = fs.readdirSync(KNOWLEDGE_BASE_DIR).filter((file) => file.endsWith('.json'));
+  return files.flatMap((file) => readJsonArray(path.join(KNOWLEDGE_BASE_DIR, file)));
+}
+
+function loadApprovedDraftRecords() {
+  if (!fs.existsSync(DRAFTS_DIR)) return [];
+  const files = fs.readdirSync(DRAFTS_DIR).filter((file) => file.endsWith('.json')).sort();
+  const records = [];
+  for (const file of files) {
+    let record;
+    try {
+      record = JSON.parse(fs.readFileSync(path.join(DRAFTS_DIR, file), 'utf8'));
+    } catch (error) {
+      continue;
+    }
+    if (!record || typeof record !== 'object' || Array.isArray(record)) continue;
+    // Same gate the reply path uses. A hash miss, a missing approval, a
+    // mismatched record id, or extraction_unreliable (Thai, Hindi, Sinhala)
+    // leaves the draft out. Metadata on the draft cannot admit it.
+    if (!passesLegalVerification(record)) continue;
+    records.push(record);
+  }
+  return records;
+}
+
+function loadKnowledgeItems() {
+  return loadStoredKnowledgeItems().concat(loadApprovedDraftRecords());
 }
 
 function scoreKnowledgeItem(item, question, category) {
   const normalizedQuestion = normalize(question);
   const normalizedCategory = normalize(category);
   let score = 0;
+  const keywords = Array.isArray(item && item.keywords) ? item.keywords : [];
 
-  if (normalize(item.category) === normalizedCategory) {
+  if (normalizedCategory && normalize(item && item.category) === normalizedCategory) {
     score += 3;
   }
 
-  item.keywords.forEach((keyword) => {
+  keywords.forEach((keyword) => {
     if (normalizedQuestion.includes(normalize(keyword))) {
       score += 2;
     }
   });
 
-  if (normalizedQuestion.includes(normalize(item.title))) {
+  if (normalizedQuestion.includes(normalize(item && item.title))) {
     score += 2;
   }
 
-  if (normalize(item.question).split(' ').some((word) => word.length > 3 && normalizedQuestion.includes(word))) {
+  if (normalize(item && item.question).split(' ').some((word) => word.length > 3 && normalizedQuestion.includes(word))) {
     score += 1;
   }
 
-  if (itemTopicMatchesKeys(item, topicKeysForQuestion(question, knowledgeTermMatches))) {
+  if (questionSelectsRecordTopic(item, question)) {
     score += 5;
   }
 
   return score;
 }
 
+function projectKnowledgeRecord(item, score, question, category) {
+  // Keep every field contentHash reads. Dropping schema, claims, language,
+  // section, or informationLabel makes a valid approval look like a mismatch.
+  const projected = {
+    id: item.id,
+    title: item.title,
+    category: item.category,
+    domain: item.domain || '',
+    topic: item.topic || '',
+    keywords: Array.isArray(item.keywords) ? [...item.keywords] : [],
+    question: item.question,
+    answer: item.answer,
+    source: item.source && typeof item.source === 'object' && !Array.isArray(item.source) ? { ...item.source } : null,
+    sourceUrl: item.sourceUrl || '',
+    sourceTitle: item.sourceTitle || '',
+    verifiedAt: item.verifiedAt || '',
+    contentStatus: item.contentStatus || '',
+    reviewedBy: item.reviewedBy || '',
+    legalReviewBy: item.legalReviewBy || '',
+    status: item.status || '',
+    extraction: item.extraction || '',
+    score,
+    relevanceEvidence: {
+      categoryMatched: normalizeText(item.category) === normalizeText(category),
+      matchedKeywords: getMatchedKnowledgeKeywords(item, question).filter(isStrongRelevanceTerm),
+      titleMatched: isStrongRelevanceTerm(item.title) && knowledgeTermMatches(question, item.title),
+      topicMatched: isStrongRelevanceTerm(item.topic) && knowledgeTermMatches(question, item.topic),
+    },
+  };
+  if (item.schema) projected.schema = item.schema;
+  if (Array.isArray(item.claims)) {
+    projected.claims = item.claims.map((claim) => (
+      claim && typeof claim === 'object' ? { ...claim } : claim
+    ));
+  }
+  if (item.language) projected.language = item.language;
+  if (item.section !== undefined && item.section !== null) projected.section = item.section;
+  if (Object.prototype.hasOwnProperty.call(item, 'informationLabel')) {
+    projected.informationLabel = item.informationLabel;
+  }
+  return projected;
+}
+
 function findRelevantKnowledge(question, category, limit = 5) {
-  return loadKnowledgeItems()
+  const ranked = loadKnowledgeItems()
     .map((item) => ({
       item,
       score: scoreKnowledgeItem(item, question, category),
     }))
     .filter((match) => match.score > 0 || normalize(match.item.category) === normalize(category))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit)
-    .map((match) => ({
-      id: match.item.id,
-      title: match.item.title,
-      category: match.item.category,
-      domain: match.item.domain || '',
-      topic: match.item.topic || '',
-      keywords: Array.isArray(match.item.keywords) ? [...match.item.keywords] : [],
-      question: match.item.question,
-      answer: match.item.answer,
-      source: match.item.source && typeof match.item.source === 'object' ? { ...match.item.source } : null,
-      verifiedAt: match.item.verifiedAt || '',
-      contentStatus: match.item.contentStatus || '',
-      reviewedBy: match.item.reviewedBy || '',
-      legalReviewBy: match.item.legalReviewBy || '',
-      score: match.score,
-      relevanceEvidence: {
-        categoryMatched: normalizeText(match.item.category) === normalizeText(category),
-        matchedKeywords: getMatchedKnowledgeKeywords(match.item, question).filter(isStrongRelevanceTerm),
-        titleMatched: isStrongRelevanceTerm(match.item.title) && knowledgeTermMatches(question, match.item.title),
-        topicMatched: isStrongRelevanceTerm(match.item.topic) && knowledgeTermMatches(question, match.item.topic),
-      },
-    }));
+    .sort((a, b) => b.score - a.score);
+  const top = ranked.slice(0, limit);
+  const kept = new Set(top.map((match) => match.item && match.item.id));
+  // Category matches can fill the limit before a handbook draft. A draft whose
+  // topic the question selected is still returned so the approval gate can
+  // accept or reject it. It is not ranked ahead of the existing top matches.
+  const drafts = ranked.filter((match) => (
+    match.item
+    && !kept.has(match.item.id)
+    && match.score > 0
+    && (match.item.schema === 'source-grounded' || Array.isArray(match.item.claims))
+    && questionSelectsRecordTopic(match.item, question)
+  ));
+  return top.concat(drafts).map((match) => projectKnowledgeRecord(match.item, match.score, question, category));
 }
 
 function matchesSalaryPaymentTimingScope(item = {}) {
@@ -853,6 +929,7 @@ module.exports = {
   findWeeklyRestOvertimeInteractionRule,
   findWeeklyRestWorkFoundationRule,
   findRelevantKnowledge,
+  loadApprovedDraftRecords,
   loadKnowledgeItems,
   matchesBasicHourlySalaryCalculationScope,
   matchesFiveDayDailyOvertimeClassificationScope,

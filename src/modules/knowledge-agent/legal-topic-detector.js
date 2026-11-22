@@ -50,7 +50,7 @@ function detectLegalTopic(text, flags) {
   const value = String(text || '');
   const passportWord = /passport|דרכון|หนังสือเดินทาง|पासपोर्ट|විදේශ ගමන්/i.test(value);
   const employerWord = /employer|boss|מעסיק|נายจ้าง|นายจ้าง|मालिक|नियोक्ता|යෝජක/i.test(value);
-  const withholdWord = /keep|keeps|withhold|take|takes|took|hold|holds|confiscat|לקח|לקחת|ייקח|החזיק|ยึด|เอา.*หนังสือ|रख|තබා/i.test(value);
+  const withholdWord = /keep|keeps|withhold|take|takes|took|hold|holds|holding|confiscat|לקח|לקחת|ייקח|החזיק|מחזיק|מחזיר|לא החזיר|ยึด|เอา.*หนังสือ|रख|තබා/i.test(value);
 
   if (/traffick|slavery|סחר בבני|עבדות|ค้ามนุษย์|לא נותנים לי לצאת|לא נותנים לצאת|ไม่ให้ฉันออกจากที่พัก|cannot leave the housing|do not let me leave/i.test(value)
     || (/passport|דרכון|หนังสือเดินทาง/i.test(value) && /לא נותנים לי לצאת|ไม่ให้ฉันออก|do not let me leave|cannot leave/i.test(value))) {
@@ -69,8 +69,8 @@ function detectLegalTopic(text, flags) {
     return topicResult('deposit', '12', 'piba');
   }
 
-  if (/manpower company|לתאגיד אחר|להחליף מעסיק|לעבור לתאגיד|บริษัทจัดหางาน|मैनपावर|change employers|move to another/i.test(value)
-    || (/construction|בניין|בניה|ก่อสร้าง|निर्माण/i.test(value) && /when can i move|מותר לי לעבור|להחליף/i.test(value))) {
+  if (/manpower company|לתאגיד אחר|להחליף מעסיק|לעבור לתאגיד|לעבור לקבלן|חברת ביצוע|קבלן כוח אדם|บริษัทจัดหางาน|मैनपावर|change employers|move to another/i.test(value)
+    || (/construction|בניין|בניה|בנייה|ก่อสร้าง|निर्माण/i.test(value) && /when can i move|when am i allowed to move|מותר לי לעבור|להחליף/i.test(value))) {
     return topicResult('construction_transfer', '1C', 'piba');
   }
 
@@ -99,15 +99,15 @@ function detectLegalTopic(text, flags) {
     return topicResult('deductions', '10', 'piba');
   }
 
-  if (/health insurance|medical insurance|ביטוח רפואי|ביטוח בריאות|ประกันสุขภาพ|स्वास्थ्य बीमा|සෞඛ්‍ය රක්ෂණ|insurance company refuses|מסרבת לשלם|บริษัทประกัน/i.test(value)) {
+  if (/health insurance|medical insurance|ביטוח רפואי|ביטוח הרפואי|הביטוח הרפואי|ביטוח בריאות|ประกันสุขภาพ|स्वास्थ्य बीमा|සෞඛ්‍ය රක්ෂණ|insurance company refuses|מסרבת לשלם|บริษัทประกัน/i.test(value)) {
     return topicResult('medical_insurance', '5', 'piba');
   }
 
-  if (/workers in one room|עובדים בחדר אחד|עובדים בחדר|10 workers|אנחנו 10|อยู่ห้องเดียวกัน|10 คนอยู่/i.test(value)) {
+  if (/workers in one room|suitable housing|provide suitable housing|share one room|workers per room|עובדים בחדר אחד|עובדים בחדר|עובדים.{0,40}חדר|מגורים הולמים|10 workers|אנחנו 10|อยู่ห้องเดียวกัน|10 คนอยู่/i.test(value)) {
     return topicResult('housing', '7', 'piba');
   }
 
-  if (/weekly rest|מנוחה שבועית|שבעה ימים בשבוע|seven days a week|7 days a week/i.test(value) && !flags.shopping) {
+  if (/weekly rest|מנוחה שבועית|מנוחה שבועי|יום מנוחה|שבעה ימים בשבוע|seven days a week|7 days a week/i.test(value) && !flags.shopping) {
     return topicResult('weekly_rest', '11', 'piba');
   }
 
@@ -127,7 +127,7 @@ function detectLegalTopic(text, flags) {
     if (annualLeave) return topicResult('annual_leave', '11', 'piba');
   }
 
-  if (/minimum wage|שכר מינימום|שכר המינימום|ค่าแรงขั้นต่ำ|न्यूनतम वेतन/i.test(value) && !flags.transport) {
+  if (/minimum wage|minimum hourly wage|\bminimum(?:\s+[a-z]+){0,3}\s+wage\b|שכר מינימום|שכר המינימום|שכר מינימלי|השכר המינימלי|ค่าแรงขั้นต่ำ|न्यूनतम वेतन/i.test(value) && !flags.transport) {
     return topicResult('minimum_wage', '9', 'piba');
   }
 

@@ -21,17 +21,27 @@ function draftRecord() {
   };
 }
 
-test('drafts are never loaded by the runtime knowledge base', () => {
-  const loaded = new Set(kb.loadKnowledgeItems().map((item) => item.id));
+test('drafts load only when an exact-hash approval already exists', () => {
+  const loaded = kb.loadKnowledgeItems();
+  const loadedIds = new Set(loaded.map((item) => item.id));
   const draftFiles = fs.readdirSync(DRAFTS).filter((file) => file.endsWith('.json'));
+  const approvedTopics = new Set([
+    'passport', 'construction_transfer', 'minimum_wage', 'housing',
+    'medical_insurance', 'weekly_rest', 'sick_leave', 'severance',
+  ]);
   assert.ok(draftFiles.length >= 50);
   for (const file of draftFiles) {
     const record = JSON.parse(fs.readFileSync(path.join(DRAFTS, file), 'utf8'));
-    assert.equal(loaded.has(record.id), false, record.id);
     assert.notEqual(record.status, 'approved', record.id);
+    const shouldLoad = approvedTopics.has(record.topic) && (record.language === 'he' || record.language === 'en');
+    assert.equal(loadedIds.has(record.id), shouldLoad, record.id);
+    if (shouldLoad) {
+      const found = loaded.find((item) => item.id === record.id);
+      assert.equal(passesLegalVerification(found), true, record.id);
+    }
   }
   const serviceSource = fs.readFileSync(path.join(__dirname, '../src/modules/knowledge-agent/knowledge-base.service.js'), 'utf8');
-  assert.equal(serviceSource.includes('knowledge/drafts'), false);
+  assert.match(serviceSource, /knowledge\/drafts/);
   assert.match(serviceSource, /knowledge-base/);
 });
 
