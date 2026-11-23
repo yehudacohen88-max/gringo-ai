@@ -5,22 +5,80 @@
   "topic": "complaints",
   "section": "13",
   "authorityId": "ministry_of_labour_ombudsperson",
+  "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
   "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
   "sourceRetrievedAt": "2026-11-11",
+  "checkedAt": "2026-11-22",
+  "pdfPage": 23,
   "handbookEdition": "2026",
+  "reviewGroup": "blocked",
   "nativeReviewRequired": false,
   "status": "draft",
   "extraction": "ok",
-  "answer": "בזכותון נכתב שאפשר להגיש תלונה לממונה על זכויות עובדים זרים בעבודה במשרד העבודה.",
+  "answer": "תשובה: עובד שמעסיקו לא מילא חובות לפי חוקי העבודה יכול להגיש תלונה לממונה על זכויות עובדים זרים בעבודה במשרד העבודה. אפשר גם לפנות למרכז הפניות של רשות האוכלוסין למידע או לתלונה על מעסיק או על לשכה. שתי המהדורות אינן מדפיסות אותו אתר לטופס המקוון, והרשומה הזאת אינה מכריעה איזה אתר הוא הערוץ העדכני.\n\nתנאים וחריגים: החוק, כפי שהזכותון מביא אותו, אוסר לפטר עובד, להפחית שכר או להרע תנאים בגלל תלונה או תביעה שהוגשה בתום לב, או בגלל סיוע לעובד אחר להגיש תלונה. המהדורה האנגלית מדפיסה את האתר www.molsa.gov.il. בטקסט העברי הקישור נקטע; קישור שמוטמע בקובץ ה-PDF מוביל אל https://www.gov.il/he/departments/Units/foreign-workers-rights-at-work.\n\nמה אפשר לעשות: להגיש את התלונה לממונה או למרכז הפניות של הרשות, דרך העמוד הרשמי, בלי להסתמך כאן על מספר טלפון. מספרי הטלפון והדוא\"ל המודפסים בזכותון אינם מפורסמים כאן.\n\nמקור: זכותון 2026, הסעיף המתאים בזכותון. https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf\n\nאין לראות באמור ייעוץ משפטי. המידע הוא כללי בלבד ואינו מחליף ייעוץ מקצועי המתייחס לנסיבות המקרה.",
   "informationLabel": "תקציר זה נועד לידיעה כללית בלבד ואינו מהווה תחליף לנוסח החוק‪ ,‬התקנות‪ ,‬הנהלים וצווי‬ ‫ההרחבה הרלוונטיים המחייבים",
   "claims": [
     {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
       "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+      "pdfPage": 23,
       "section": "13",
       "quote": "יכול להגיש תלונה לממונה על זכויות עובדים זרים בעבודה במשרד‬ ‫העבודה",
       "language": "he",
       "sourceRetrievedAt": "2026-11-11",
       "sourceFileSha256": "023c4d36d17262c2b3c66c95afe06faeed03688e9720d52ef29e78d8f9cdc9bc"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+      "pdfPage": 23,
+      "section": "13",
+      "quote": "את התלונה לממונה על זכויות עובדים ניתן להגיש גם באמצעות מילוי טופס מקוון באתר האינטרנט‬ ‫של משרד העבודה‪",
+      "language": "he",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "023c4d36d17262c2b3c66c95afe06faeed03688e9720d52ef29e78d8f9cdc9bc"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+      "pdfPage": 23,
+      "section": "13",
+      "quote": "עובדים זרים בישראל רשאים לפנות למרכז הפניות של רשות האוכלוסין וההגירה לקבלת‬ ‫מידע או להגשת תלונות בנוגע למעסיקים או ללשכות פרטית‪ .‬מספר הטלפון במוקד הוא‪",
+      "language": "he",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "023c4d36d17262c2b3c66c95afe06faeed03688e9720d52ef29e78d8f9cdc9bc"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+      "pdfPage": 23,
+      "section": "13",
+      "quote": "החוק אוסר על מעסיק לפטר עובד‪ ,‬להפחית את שכרו או להרע את תנאי עבודתו כתוצאה מתלונה או‬ ‫תביעה אשר הגיש העובד בתום לב‪ ,‬או משום שסייע לעובד אחר בתום לב להגיש תלונה או תביעה‪.‬‬ ‫מעסיק אשר מתנהג כאמור לעיל כלפי עובד זר שהוא מעסיק‪ ,‬עובר עבירה פלילית‪ ,‬בגינה אפשר להגיש‬ ‫תלונה כאמור לעיל‪.‬‬ ‫",
+      "language": "he",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "023c4d36d17262c2b3c66c95afe06faeed03688e9720d52ef29e78d8f9cdc9bc"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+      "pdfPage": 23,
+      "section": "13",
+      "quote": "‫זכותון לעובדים זרים‬ ‫‪2026",
+      "language": "he",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "023c4d36d17262c2b3c66c95afe06faeed03688e9720d52ef29e78d8f9cdc9bc"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026 link annotation",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+      "pdfPage": 23,
+      "section": "13",
+      "quote": "https://www.gov.il/he/departments/Units/foreign-workers-rights-at-work",
+      "language": "he",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "b75788fa18cf40983d6d8ddb8d863bb3494265f5f1e4a629c7e98a616f2cb3ee",
+      "sourceText": "knowledge/sources/piba_handbook_2026/link-annotations.txt"
     }
-  ]
+  ],
+  "reviewNote": "המהדורה העברית והאנגלית אינן נותנות אותו קישור לטופס המקוון."
 }

@@ -1,0 +1,42 @@
+{
+  "schema": "source-grounded",
+  "id": "draft-piba2026-sick_leave-he",
+  "language": "he",
+  "topic": "sick_leave",
+  "section": "11",
+  "authorityId": "piba",
+  "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+  "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+  "sourceRetrievedAt": "2026-11-11",
+  "checkedAt": "2026-11-22",
+  "pdfPage": 20,
+  "handbookEdition": "2026",
+  "reviewGroup": "ready",
+  "nativeReviewRequired": false,
+  "status": "draft",
+  "extraction": "ok",
+  "answer": "תשובה: עובד זכאי לימי מחלה בתשלום לפי תקופת העבודה אצל המעסיק הנוכחי: יום וחצי לכל חודש עבודה, עד 90 יום, בכפוף לאישור רפואי על הצורך להיעדר.\n\nתנאים וחריגים: אין תשלום ליום המחלה הראשון. ביום השני והשלישי המעסיק משלם 50% מהשכר הרגיל. מהיום הרביעי הוא משלם את השכר הרגיל, עד התקופה המרבית.\n\nמה אפשר לעשות: להציג אישור רפואי שמציין את הצורך להיעדר מהעבודה, כפי שהזכותון דורש.\n\nמקור: זכותון 2026, הסעיף המתאים בזכותון. https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf\n\nאין לראות באמור ייעוץ משפטי. המידע הוא כללי בלבד ואינו מחליף ייעוץ מקצועי המתייחס לנסיבות המקרה.",
+  "informationLabel": "תקציר זה נועד לידיעה כללית בלבד ואינו מהווה תחליף לנוסח החוק‪ ,‬התקנות‪ ,‬הנהלים וצווי‬ ‫ההרחבה הרלוונטיים המחייבים",
+  "claims": [
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+      "pdfPage": 20,
+      "section": "11",
+      "quote": "ימי מחלה בתשלום – עובדים זכאים לימי מחלה בתשלום בהתאם לאורך תקופת ההעסקה שלהם‬ ‫אצל המעסיק הנוכחי )יום וחצי עבור כל חודש עבודה)‪ ,‬עד ‪ 90‬יום בסך הכול‪ ,‬בכפוף להצגת אישור‬ ‫רפואי בו מצוין הצורך להיעדר מהעבודה‪.‬‬ ‫העובדים אינם זכאים לתשלום עבור יום המחלה הראשון‪ .‬עבור יום המחלה השני והשלישי‬ ‫המעסיק חייב לשלם לעובד ‪ 50%‬משכרו הרגיל‪ ,‬ומהיום הרביעי – עליו לשלם את שכרו הרגיל של‬ ‫העובד עד לתקופה המרבית‪.‬‬ ‫",
+      "language": "he",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "023c4d36d17262c2b3c66c95afe06faeed03688e9720d52ef29e78d8f9cdc9bc"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_he2026.pdf",
+      "pdfPage": 20,
+      "section": "11",
+      "quote": "‫זכותון לעובדים זרים‬ ‫‪2026",
+      "language": "he",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "023c4d36d17262c2b3c66c95afe06faeed03688e9720d52ef29e78d8f9cdc9bc"
+    }
+  ]
+}

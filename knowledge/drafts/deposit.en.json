@@ -1,0 +1,74 @@
+{
+  "schema": "source-grounded",
+  "id": "draft-piba2026-deposit-en",
+  "language": "en",
+  "topic": "deposit",
+  "section": "12",
+  "authorityId": "piba",
+  "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+  "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+  "sourceRetrievedAt": "2026-11-11",
+  "checkedAt": "2026-11-22",
+  "pdfPage": 29,
+  "handbookEdition": "2026",
+  "reviewGroup": "blocked",
+  "nativeReviewRequired": false,
+  "status": "draft",
+  "extraction": "ok",
+  "answer": "Answer: The handbook describes how the deposit is received on a legal and permanent exit. The two editions do not say the same thing about the base for an illegal-overstay deduction, and this record does not decide.\n\nConditions and exceptions: The deposit applies to the sectors the handbook lists, including construction, hotels, restaurants other than expert ethnic chefs, industry, commerce and services, long-term care facilities, and special-technology projects, and also to caregiving companies. The handbook minimum is no less than 12.5% of the regular monthly salary for full-time work, with a proportional sum allowed in the first and last month only. The deposit is on top of salary and is not deducted from it. On a legal and permanent exit the worker receives the balance including interest, less bank fees and less tax of 15%. After receiving the money the worker may not return to Israel. On illegal overstay the Hebrew edition says the deduction is from the remaining 25% and that after 12 months the remaining 75% is lost. The English edition says the deduction is from the remaining 75% and that after 12 months 75% is forfeited. This record does not decide.\n\nWhat you can do: Receive US dollars or euros at the airport bank after border control, if the worker or the employer applied to PIBA at least 10 working days before departure, or receive a transfer to a bank account abroad within 30 working days of the application. A request to waive a deduction, where the overstay was a good-faith mistake or another justified reason, is a written application to PIBA. The email address printed in the handbook is not repeated here. The English edition links to the procedure: https://www.gov.il/en/departments/policies/deposit_monies_foreign_workers_constructions_technology_procedure\n\nSource: PIBA Foreign Workers' Rights Handbook 2026, the handbook section. https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf\n\nThis summary is provided for general informational purposes only, and is not a substitute for the wording of the relevant laws, regulations, procedures and extension orders, which are binding.\n\nThis is not legal advice. The information is general only and does not replace professional advice concerning the circumstances of your case.",
+  "informationLabel": "This summary is provided for general informational purposes only, and is not a substitute for the wording of the relevant laws, regulations, procedures and extension orders, which are binding.",
+  "claims": [
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 29,
+      "section": "12",
+      "quote": "Employer payments on account of severance pay, pension and continuing education etc., (hereinafter: employer work condition payments) for foreign construction workers, hotel workers, restaurant workers (excluding expert ethnic chefs), foreign workers employed in the industrial or commerce and services sectors, in long term care facilities, or in projects requiring special technology, must be deposited by those employers into a deposit account held by PIBA in the name of each worker. Caregiving Companies must also deposit the above monthly payments into the deposit account for each foreign caregiver they employ.",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 29,
+      "section": "12",
+      "quote": "The current minimum deposit to the deposit account by employers of foreign workers is no less than 12.5% of the worker's regular monthly salary for full time work. Nonetheless, for the first and last months of a worker's employment only, the employer may deposit a proportional sum figured as per the number of days worked by the foreign worker in that first or last employment month.",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 29,
+      "section": "12",
+      "quote": "The foreign employee shall receive the accumulated amount in the deposit fund, including interest accrued, less bank fees and less tax of 15%, upon legally and permanently exiting Israel. The money may be received by the employee in US dollars or in Euros at the bank in the airport in Israel after passing through border control (if the employee or his employer filed an application for such with PIBA at least 10 working days in advance of departure) or via bank transfer to the employee's bank account abroad, within 30 working days of the filing of the application. After receiving the deposit monies as above, the foreign worker may not return to Israel. If the employee does not exit Israel at the end of his legal period of stay in the country, he will be entitled to receive only 25% of the accumulated deposit amount (less bank fees and taxes as above) and an increasing percentage of the remaining 75% will be deducted from the deposit by PIBA for each month of illegal overstay in Israel by the employee, as stipulated below. After 12 months of illegal overstay, the employee will forfeit 75% of the accumulated amount.",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 29,
+      "section": "12",
+      "quote": "ORKERS' RIGHTS HANDBOOK 2026",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026 link annotation",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 29,
+      "section": "12",
+      "quote": "https://www.gov.il/en/departments/policies/deposit_monies_foreign_workers_constructions_technology_procedure",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "b75788fa18cf40983d6d8ddb8d863bb3494265f5f1e4a629c7e98a616f2cb3ee",
+      "sourceText": "knowledge/sources/piba_handbook_2026/link-annotations.txt"
+    }
+  ],
+  "reviewNote": "העברית אומרת שהניכוי על שהייה לא חוקית הוא מיתרת 25%, והאנגלית מיתרת 75%. אין הכרעה."
+}

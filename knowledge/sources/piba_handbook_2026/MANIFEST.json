@@ -63,5 +63,7 @@
       "extraction": "unreliable",
       "notes": "pdftotext -layout is partly garbled (Israel is usually spelled ඊශ්‍රොයල rather than ඊශ්‍රායල). Not reliable for quotes."
     }
-  ]
+  ],
+  "hashComparedAt": "2026-11-22",
+  "hashComparedResult": "he-and-en-pdf-sha256-matched-gov-il-download"
 }

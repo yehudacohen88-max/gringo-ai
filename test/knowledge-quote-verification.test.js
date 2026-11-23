@@ -60,7 +60,7 @@ function writeCorpus(mutate) {
 test('the committed handbook quotes pass verification', () => {
   const result = verifyKnowledgeQuotes();
   assert.equal(result.ok, true, result.errors.join('\n'));
-  assert.equal(result.draftCount, 50);
+  assert.equal(result.draftCount, 60);
 });
 
 test('a tampered quote fails the quote check', () => {

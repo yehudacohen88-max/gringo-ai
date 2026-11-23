@@ -1,0 +1,54 @@
+{
+  "schema": "source-grounded",
+  "id": "draft-piba2026-minimum_wage-en",
+  "language": "en",
+  "topic": "minimum_wage",
+  "section": "9",
+  "authorityId": "piba",
+  "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+  "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+  "sourceRetrievedAt": "2026-11-11",
+  "checkedAt": "2026-11-22",
+  "pdfPage": 22,
+  "handbookEdition": "2026",
+  "reviewGroup": "ready",
+  "nativeReviewRequired": false,
+  "status": "draft",
+  "extraction": "ok",
+  "answer": "Answer: On the National Insurance Institute minimum-wage page, for a worker aged 18 and over, from 01.04.2026, the monthly wage is 6,443.85 NIS. The hourly wage on a 182-hour month is 35.4 NIS, and the hourly wage on a 186-hour month is 34.64 NIS.\n\nConditions and exceptions: The Institute publishes both hourly bases. The 2026 handbook prints 6,443.85 and 35.4 for a full-time job of at most 182 hours. That handbook figure is the same amount the Institute lists as in effect from 01.04.2026. It is not an older amount presented as current. Where a collective agreement or extension order sets a higher wage, such as in construction, the higher wage applies.\n\nWhat you can do: The handbook advises keeping a written record of daily working hours and of rest hours and rest days.\n\nSource: National Insurance Institute, minimum wage. https://www.btl.gov.il/Mediniyut/GeneralData/Pages/%D7%A9%D7%9B%D7%A8%20%D7%9E%D7%99%D7%A0%D7%99%D7%9E%D7%95%D7%9D.aspx Also PIBA Foreign Workers' Rights Handbook 2026, the handbook section. https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf\n\nThis summary is provided for general informational purposes only, and is not a substitute for the wording of the relevant laws, regulations, procedures and extension orders, which are binding.\n\nThis is not legal advice. The information is general only and does not replace professional advice concerning the circumstances of your case.",
+  "informationLabel": "This summary is provided for general informational purposes only, and is not a substitute for the wording of the relevant laws, regulations, procedures and extension orders, which are binding.",
+  "claims": [
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 22,
+      "section": "9",
+      "quote": "the monthly minimum wage of an employee working in a full-time job (a maximum of 182 hours per month) is 6,443.85 NIS. The minimum wage per hour of work is NIS 35.4 . It is emphasized that for foreign workers in sectors or workplaces where wages that exceed the minimum wage apply as stipulated in a Collective Agreement or Extension Order, such as the construction sector, the higher wages and better work conditions will apply. All workers are advised to keep a written record of their daily working hours and their hours and days of rest.",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 22,
+      "section": "9",
+      "quote": "ORKERS' RIGHTS HANDBOOK 2026",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    },
+    {
+      "sourceTitle": "שכר מינימום - נתונים כלליים | ביטוח לאומי",
+      "sourceUrl": "https://www.btl.gov.il/Mediniyut/GeneralData/Pages/%D7%A9%D7%9B%D7%A8%20%D7%9E%D7%99%D7%A0%D7%99%D7%9E%D7%95%D7%9D.aspx",
+      "pdfPage": null,
+      "section": "btl-minimum-wage",
+      "quote": "מגיל 18 ומעלה: שכר יומי למועסק 6 ימים בשבוע: 257.75 ש\"ח (החל ב- 01.04.2026) שכר יומי למועסק 5 ימים בשבוע: 297.4 ש\"ח (החל ב- 01.04.2026) שכר לשעה בהיקף של 186 שעות בחודש: 34.64 ש\"ח (החל ב- 01.04.2026) שכר לשעה בהיקף של 182 שעות בחודש: 35.4 ש\"ח (החל ב- 01.04.2026) שכר חודשי: 6,443.85 ש\"ח (החל ב- 01.04.2026)",
+      "language": "he",
+      "sourceRetrievedAt": "2026-11-22",
+      "sourceFileSha256": "40a8c3e26d40a6e0290619d7509a0d1bf96c176e045c52544b509d4d9400f4c9",
+      "sourceText": "knowledge/sources/btl_minimum_wage/page.txt"
+    }
+  ],
+  "effectiveFrom": "2026-04-01"
+}

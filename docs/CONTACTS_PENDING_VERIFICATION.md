@@ -50,4 +50,15 @@ Hebrew §13 prints the same Ombudsperson phone `074-7696161`, SMS `0506-290758`,
 | PIBA Deposits Unit | 074-7085060 | phone | not stated | EN §16. Quote: "Deposits Unit of PIBA – Pikdonot@sa.piba.gov.il - -- Tel: 074-7085060" |
 | PIBA Deposits Unit | Pikdonot@sa.piba.gov.il | email | not stated | EN §12 and §16 |
 
-Online form URLs printed next to these offices are also unverified for chat use and are not linked from replies. Rights replies link only to the handbook PDF for the user's language.
+Online form URLs printed next to these offices are also unverified for chat use and are not linked from runtime replies. Rights replies link only to the handbook PDF for the user's language until a record is approved.
+
+## Phase 2 differences, still pending
+
+Checked on 2026-11-22 against the PDF pages. None of these are shown by the bot. None are marked verified.
+
+| Body | Value as printed | Channel | Hours | Source |
+| --- | --- | --- | --- | --- |
+| Kav La'Oved, Tel Aviv | 03-6883766 | phone | not stated | HE §16, PDF page 24, OCR on 2026-11-22. The English edition prints 03-6883537 for the same office. The two editions disagree. Both numbers stay pending. |
+| Legal Aid Department address | Henrietta Szold 16, Tel Aviv, as read from the Hebrew text layer of §15 | address | not stated | HE §15 text layer. Not OCR-confirmed in this pass and not published. The English §15 does not name this office. |
+
+The Hebrew and English complaints sections also name different web addresses for the online form. That conflict is recorded in `docs/KB_PHASE2_REVIEW_HE.md`. The draft answer names both addresses and does not choose one. It does not repeat a phone number or an email.

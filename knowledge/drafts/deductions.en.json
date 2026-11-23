@@ -5,22 +5,49 @@
   "topic": "deductions",
   "section": "10",
   "authorityId": "piba",
+  "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
   "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
   "sourceRetrievedAt": "2026-11-11",
+  "checkedAt": "2026-11-22",
+  "pdfPage": 23,
   "handbookEdition": "2026",
+  "reviewGroup": "needs_info",
   "nativeReviewRequired": false,
   "status": "draft",
   "extraction": "ok",
-  "answer": "The handbook states that the maximum permitted monthly deduction for health insurance, suitable housing and related expenses, and debts owed to the employer, is 25% of the employee’s salary.",
+  "answer": "Answer: An employer may deduct only these kinds of amounts: payments required by law (income tax and national insurance); housing and related expenses up to the regulatory ceiling; part of the private health-insurance cost up to the regulatory ceiling; and set amounts for a debt to the employer if the employee agreed in writing. Fees and taxes imposed on the employer may not be deducted.\n\nConditions and exceptions: The monthly ceiling for health insurance, suitable housing and related expenses, and debts to the employer is 25% of the salary. The 25% cap is not a blanket permission to deduct 25%. It is not an automatic deduction, and the employer may deduct only actual expenses. If the permitted deductions are less than 25%, the employer may not deduct the entire 25%. If they are more than 25%, the employer may not deduct more than 25% in a month. In the final month of employment, all permitted expenses may be deducted. Shekel ceilings printed in the handbook are not stated here as the current amounts, because a later official page about updating those ceilings was not retrieved in this check.\n\nWhat you can do: The handbook says an employer who employs a foreign worker in a business must give an itemized pay slip every month. A person receiving care who employs a caregiver at home does not have to issue a pay slip.\n\nSource: PIBA Foreign Workers' Rights Handbook 2026, the handbook section. https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf\n\nThis summary is provided for general informational purposes only, and is not a substitute for the wording of the relevant laws, regulations, procedures and extension orders, which are binding.\n\nThis is not legal advice. The information is general only and does not replace professional advice concerning the circumstances of your case.",
   "informationLabel": "This summary is provided for general informational purposes only, and is not a substitute for the wording of the relevant laws, regulations, procedures and extension orders, which are binding.",
   "claims": [
     {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
       "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 23,
       "section": "10",
-      "quote": "The maximum permitted monthly deduction for health insurance, suitable housing and related expenses, and debts owed to the employer, is 25% of the employee’s salary.",
+      "quote": "An employer may deduct the following amounts from the salary of a foreign worker: a. Payments required by law (income tax and national insurance). b. Deductions for housing and related expenses, but no more than the limit stipulated in the regulations (see details below). c. Deductions to cover a portion of the cost of the private medical insurance arranged by the employer for the worker (up to the limit stipulated in the regulations) d. Set amounts on account of debts owed by the employee to the employer, if the employee has agreed in writing to such deductions. Fees and taxes imposed by law on employers of foreign workers may not be deducted from the worker’s salary under any circumstances. No other amounts may be deducted from the worker’s salary (for information concerning agreement for partial payment of salary as the market value of food and non-alcoholic drinks provided by employer in the workplace, see above).",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 23,
+      "section": "10",
+      "quote": "The maximum permitted monthly deduction for health insurance, suitable housing and related expenses, and debts owed to the employer, is 25% of the employee’s salary. It must be emphasized that this is not an automatic deduction and the employer may only deduct actual expenses. Thus, when the permitted deductions add up to less than 25% of the salary, the employer may not deduct the entire 25%. In addition, in cases where the actual permitted deductions exceed 25%, an employer is not entitled to deduct more than 25% monthly. An exception is made for the final month of employment in which all permitted expenses may be deducted.",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 23,
+      "section": "10",
+      "quote": "ORKERS' RIGHTS HANDBOOK 2026",
       "language": "en",
       "sourceRetrievedAt": "2026-11-11",
       "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
     }
-  ]
+  ],
+  "reviewNote": "הקובץ של חוזר האגרות לשנת 2026 לא נפתח, ולכן תקרות השקלים לא נכתבות כסכום עדכני."
 }

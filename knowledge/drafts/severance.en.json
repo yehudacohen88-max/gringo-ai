@@ -1,0 +1,42 @@
+{
+  "schema": "source-grounded",
+  "id": "draft-piba2026-severance-en",
+  "language": "en",
+  "topic": "severance",
+  "section": "12",
+  "authorityId": "piba",
+  "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+  "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+  "sourceRetrievedAt": "2026-11-11",
+  "checkedAt": "2026-11-22",
+  "pdfPage": 28,
+  "handbookEdition": "2026",
+  "reviewGroup": "ready",
+  "nativeReviewRequired": false,
+  "status": "draft",
+  "extraction": "ok",
+  "answer": "Answer: An employee who is dismissed after one year or more with one employer, or in one place of employment, is entitled to severance pay. The rate is one month’s wage for each year with that employer or in that workplace.\n\nConditions and exceptions: A worker whose employment stops after one year because the employer died or went bankrupt, or because a company was liquidated, is entitled to severance pay as if dismissed. This section does not say that resignation by itself creates the same right. A general pension extension order binds all employers, and the handbook points to the Ministry of Labour website for that information.\n\nWhat you can do: The handbook points to the Ministry of Labour website for the pension information. This section does not set out a separate form for receiving the severance pay itself.\n\nSource: PIBA Foreign Workers' Rights Handbook 2026, the handbook section. https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf\n\nThis summary is provided for general informational purposes only, and is not a substitute for the wording of the relevant laws, regulations, procedures and extension orders, which are binding.\n\nThis is not legal advice. The information is general only and does not replace professional advice concerning the circumstances of your case.",
+  "informationLabel": "This summary is provided for general informational purposes only, and is not a substitute for the wording of the relevant laws, regulations, procedures and extension orders, which are binding.",
+  "claims": [
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 28,
+      "section": "12",
+      "quote": "An employee who is dismissed after working for one employer, or in one place of employment, for a period of one year or more, is entitled to severance pay (pitzuyei piturim). The rate of severance pay is one month’s wage for each year of employment with the employer or in one work place. A worker whose employment is stopped after one year of employment as a result of the death or bankruptcy of the employer – or, in the case of a corporation, on account of its liquidation – is entitled to severance pay as if the worker had been dismissed.",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 28,
+      "section": "12",
+      "quote": "ORKERS' RIGHTS HANDBOOK 2026",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    }
+  ]
+}

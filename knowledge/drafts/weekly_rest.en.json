@@ -1,0 +1,42 @@
+{
+  "schema": "source-grounded",
+  "id": "draft-piba2026-weekly_rest-en",
+  "language": "en",
+  "topic": "weekly_rest",
+  "section": "11",
+  "authorityId": "piba",
+  "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+  "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+  "sourceRetrievedAt": "2026-11-11",
+  "checkedAt": "2026-11-22",
+  "pdfPage": 26,
+  "handbookEdition": "2026",
+  "reviewGroup": "ready",
+  "nativeReviewRequired": false,
+  "status": "draft",
+  "extraction": "ok",
+  "answer": "Answer: Under the Hours of Work and Rest Law, 1951, as the handbook quotes it, a worker is entitled to a weekly rest of at least 36 hours, which must include Friday or Saturday or Sunday.\n\nConditions and exceptions: As the handbook reports the case law, the 36-hour rule does not apply to a live-in caregiver. That worker must still receive at least 25 consecutive hours.\n\nWhat you can do: The handbook advises keeping a written record of working hours and of rest hours and rest days.\n\nSource: PIBA Foreign Workers' Rights Handbook 2026, the handbook section. https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf\n\nThis summary is provided for general informational purposes only, and is not a substitute for the wording of the relevant laws, regulations, procedures and extension orders, which are binding.\n\nThis is not legal advice. The information is general only and does not replace professional advice concerning the circumstances of your case.",
+  "informationLabel": "This summary is provided for general informational purposes only, and is not a substitute for the wording of the relevant laws, regulations, procedures and extension orders, which are binding.",
+  "claims": [
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 26,
+      "section": "11",
+      "quote": "Weekly Rest Period: Under the Hours of Work and Rest Law, 1951, workers are entitled to a weekly rest period of at least 36 hours, which must include Friday or Saturday or Sunday. As set out in case law, the above 36-hour rule does not apply to live-in caregivers, who must nonetheless receive a weekly day of rest of at least 25 consecutive hours.",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    },
+    {
+      "sourceTitle": "PIBA Foreign Workers' Rights Handbook 2026",
+      "sourceUrl": "https://www.gov.il/BlobFolder/policy/bileteral-forms-foreign-workers/he/foreign_workers_rights_booklets_en2026.pdf",
+      "pdfPage": 26,
+      "section": "11",
+      "quote": "ORKERS' RIGHTS HANDBOOK 2026",
+      "language": "en",
+      "sourceRetrievedAt": "2026-11-11",
+      "sourceFileSha256": "1a7d18b7a85d109fb56a1163de6495f96e6cca196a511811d93c8a82af14822f"
+    }
+  ]
+}
