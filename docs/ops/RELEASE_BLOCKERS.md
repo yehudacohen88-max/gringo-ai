@@ -1,8 +1,12 @@
 # Release blockers
 
-## Source-grounded handbook drafts are not approved
+## Handbook drafts: eight Hebrew and English topics can be shown after merge
 
-The PIBA Foreign Workers' Rights Handbook 2026 PDFs and text extracts are in `knowledge/sources/piba_handbook_2026/`. Draft paraphrases for ten topics, in English and Hebrew only, are in `knowledge/drafts/`. Thai, Hindi, and Sinhala extracts are garbled, so those drafts are `extraction_unreliable` and have no quote and no answer. Nothing in `knowledge/approvals/` approves a record. The bot still does not state a legal figure. See `docs/KNOWLEDGE_APPROVAL.md`.
+The PIBA Foreign Workers' Rights Handbook 2026 PDFs and text extracts are in `knowledge/sources/piba_handbook_2026/`. Drafts for twelve topics, five languages each, are in `knowledge/drafts/`. Thai, Hindi, and Sinhala extracts are garbled, so those drafts are `extraction_unreliable` and have no quote and no answer.
+
+PR #28 adds sixteen approval files under `knowledge/approvals/` for passport, construction_transfer, minimum_wage, housing, medical_insurance, weekly_rest, sick_leave, and severance, Hebrew and English only. Each file records the owner's content decision t103u (Yehuda Cohen, 2026-11-22). That is not an independent legal review. The draft files stay `status: "draft"`.
+
+The loader reads a draft only when one of those approval files matches its content hash. After PR #27, then PR #28, then the loader pull request are merged, a Hebrew or English question on one of those eight topics can show that record's answer, its official source link, and the legal disclaimer. deductions, annual_leave, deposit, and complaints stay blocked. Thai, Hindi, and Sinhala stay blocked. An uncertain or different legal question stays on the fallback. See `docs/KNOWLEDGE_APPROVAL.md`.
 
 A rights reply links the official handbook PDF for the user's language, gives the retrieval date 2026-11-11, and appends the disclaimer in `src/modules/knowledge-agent/legal-disclaimer.js`. Phone numbers and emails from the handbook are listed only in `docs/CONTACTS_PENDING_VERIFICATION.md`.
 
@@ -75,7 +79,7 @@ Patterns for 125%, the ninth day, and named statutes remain only as a backup for
 
 ## What this does not unblock
 
-- No construction-sector legal answer
+- No construction collective agreement, pension, site-safety, or permit answer. The handbook `construction_transfer` record does not close that gap.
 - No reviewed translation of a rights answer
 - No phone number or email for any office
 - No claim that a specific gov.il, Knesset, or Kav LaOved page was opened and checked in this change

@@ -23,7 +23,7 @@ Checked on branch `cursor/source-grounded-rights-c633`. No file was added under 
 | Overtime classification resolver | Uses knowledge records only as structured prerequisites. Statutory percentages are not copied into the user reply unless a record passes the gate | Yes |
 | Telegram `/start` and `/help` | Static orientation. No handbook claim, no phone number from the pending contacts list | Not a legal answer |
 | Language switch and privacy consent | Unchanged. They do not present rights rules | Not a legal answer |
-| Drafts in `knowledge/drafts/` | Not read by `loadKnowledgeItems` | Cannot be shown |
+| Drafts in `knowledge/drafts/` | Read only by `loadApprovedDraftRecords`, and only when `passesLegalVerification` matches `knowledge/approvals` | Shown only for the matching topic and language |
 | `docs/CONTACTS_PENDING_VERIFICATION.md` | Human checklist only | Not loaded at runtime |
 
 ## Tests

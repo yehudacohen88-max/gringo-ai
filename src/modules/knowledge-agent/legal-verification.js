@@ -25,6 +25,9 @@ function isLegalCategory(category) {
 
 function isLegalKnowledgeItem(item = {}) {
   if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
+  // Handbook drafts have no category and no domain. They still have to pass
+  // the approval gate. Metadata on the record is not a legal category.
+  if (isSourceGroundedRecord(item)) return true;
   if (isLegalCategory(item.category)) return true;
   return clean(item.domain).toLowerCase() === 'employment';
 }

@@ -17,7 +17,7 @@ const moneyService = require('../money/money.service');
 const serviceService = require('../services/service.service');
 const taskService = require('../tasks/task.service');
 const { knowledgeAgentService } = require('../knowledge-agent');
-const { isLegalCategory, knowledgeSafeForAi } = require('../knowledge-agent/legal-verification');
+const { isLegalCategory, isLegalKnowledgeItem, knowledgeSafeForAi } = require('../knowledge-agent/legal-verification');
 const {
   CLARIFICATION,
   SECTION_LINE,
@@ -1628,6 +1628,7 @@ async function processWebMessage(messageContext = {}) {
       const guarded = guardLegalReply(response.reply, {
         question: asked,
         language: userLanguage,
+        verifiedRecords: response.verifiedRecords,
         output: response.structuredOutput || (
           response.category === 'Jobs' && Array.isArray(response.jobs)
             ? { capability: 'jobs.search', jobs: response.jobs }
@@ -1656,6 +1657,7 @@ async function processWebMessage(messageContext = {}) {
     }
     const finalized = { ...response };
     delete finalized.replyLanguage;
+    delete finalized.verifiedRecords;
     if (response.skipOutgoingTranslation || responseAlreadyMatchesUserLanguage(response, userLanguage)) {
       delete finalized.skipOutgoingTranslation;
       if (response.skipOutgoingTranslation && isIncomingLanguageFailureReply(finalized.reply)) {
@@ -2496,7 +2498,7 @@ async function processWebMessage(messageContext = {}) {
         budgetKey: getConversationKey(userContext),
         userLanguage,
         userProfile,
-        relevantKnowledge: knowledgeSafeForAi(knowledgeResult.relevantKnowledge || []).filter((item) => !isLegalCategory(item && item.category) && item.domain !== 'employment'),
+        relevantKnowledge: knowledgeSafeForAi(knowledgeResult.relevantKnowledge || []).filter((item) => !isLegalKnowledgeItem(item)),
         recentConversation: getRecentConversation(userContext),
         conversationContext,
         memorySnapshot,
@@ -2555,6 +2557,7 @@ async function processWebMessage(messageContext = {}) {
     ...(withholdLegalTranslation ? { skipOutgoingTranslation: true, replyLanguage: userLanguage } : {}),
     category: knowledgeResult.category,
     status: finalStatus,
+    verifiedRecords,
     ai,
     crm,
   });
