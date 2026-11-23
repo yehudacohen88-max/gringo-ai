@@ -179,6 +179,15 @@ const ENTITLEMENT_PHRASE = new RegExp([
   String.raw`\bit\s+is\s+(?:not\s+)?(?:il)?legal\b`,
   String.raw`\blegal\s+to\b`,
   String.raw`\billegal\b`,
+  // "a right to" / "the right to", not "the right bus".
+  String.raw`\bright\s+to\b`,
+  'זכות ל',
+  'זכאי',
+  'זכאית',
+  'יש לך זכות',
+  'มีสิทธิ',
+  'का अधिकार',
+  'अधिकार है',
   'מגיע לך',
   'מגיעים לך',
   'על פי חוק',
@@ -197,6 +206,9 @@ const ENTITLEMENT_PHRASE = new RegExp([
   'නීතියට අනුව',
   'හිමි වේ',
   'ඔබට හිමි',
+  'අයිතිය තිබේ',
+  'අයිතියක් තිබේ',
+  'හිමිකම තිබේ',
 ].join('|'), 'iu');
 // Obligation or permission. "legal advice" and "can ask" are not in this list.
 // Hebrew, Thai, and Hindi lines are the equivalents used only to block a reply.
@@ -318,18 +330,68 @@ const LAW_CUE = new RegExp([
 // A named wage rule plus a sum, without requiring the word "must". The hourly
 // calculator's "does not include overtime" sentence is not in this list.
 const AMOUNT_TIED_TO_RIGHTS = /minimum\s+wage|severance|statutory|compensation\s+pay|שכר\s+ה?מינימום|פיצויי|ค่าแรงขั้นต่ำ|ค่าชดเชย|न्यूनतम\s+वेतन|අවම\s+වැටුප|අවම\s+වේතන/iu;
+const DAY_OFF = /\bday\s+off\b|\bdays\s+off\b/iu;
+// Cannot / may not / not allowed, next to firing, dismissal, a deduction, or
+// holding a passport. "cannot find the bus" is not in this list.
+const EMPLOYER_PROHIBITION = new RegExp([
+  String.raw`\b(?:cannot|can't|can\s+not|may\s+not|must\s+not|not\s+allowed(?:\s+to)?)\b[\s\S]{0,48}\b(?:fire|fires|dismiss|deduct|withhold)\b`,
+  String.raw`\b(?:cannot|can't|can\s+not|may\s+not|must\s+not|not\s+allowed(?:\s+to)?)\b[\s\S]{0,48}\b(?:keep|hold|take)\b[\s\S]{0,24}\bpassport\b`,
+  'אסור למעסיק',
+  'לא יכול לפטר',
+  'אי אפשר לפטר',
+  'ไม่สามารถไล่',
+  'ห้ามนายจ้าง',
+  'नहीं निकाल सकता',
+  'नहीं निकाल सकती',
+  'नहीं रख सकता',
+  // Unverified machine-derived Sinhala hints. Block only. Never displayed.
+  'පහ කළ නොහැක',
+  'නෙරපන්න බැහැ',
+].join('|'), 'iu');
+const PASSPORT_WORD = /passport|דרכון|พาสปอร์ต|หนังสือเดินทาง|पासपोर्ट|පාස්පෝට්|ගමන් බලපත්/iu;
+const PASSPORT_HOLDER = /\b(?:employer|boss|agency|manpower)\b|מעסיק|קבלן|นายจ้าง|บริษัทจัดหา|मालिक|नियोक्ता|एजेंसी|යෝජක|නියෝජිත/iu;
+const PASSPORT_CONTROL = /\b(?:keep|keeps|kept|withhold|withheld|confiscat\w*|took|taken|holding|holds)\b|\b(?:will not|won't|refus(?:e|es|ing) to)\s+return\b|לקח|מחזיק|ייקח|החזיק|לא מחזיר|לא החזיר|ยึด|ไม่คืน|रख लिया|रोक लिया|वापस नहीं|තබා|අරගෙන|නොදෙ/iu;
+
+function employerPassportControl(value) {
+  return PASSPORT_WORD.test(value) && PASSPORT_HOLDER.test(value) && PASSPORT_CONTROL.test(value);
+}
+
+// Bringing a passport to a bank, post office, or SIM shop is an errand.
+// An employer or agency holding that passport is not.
+function passportErrand(value) {
+  if (employerPassportControl(value)) return false;
+  const place = /\b(?:bank|post office)\b|\bsim\b|בנק|דואר|ธนาคาร|ไปรษณีย์|बैंक|डाक|सिम|බැංකු|තැපැල්|සිම්/iu;
+  const bring = /\b(?:bring|take|show|present|need|open)\b|להביא|นำ|เอา|ले जा|लेकर|ගෙන|අරින්න/iu;
+  return PASSPORT_WORD.test(value) && place.test(value) && bring.test(value);
+}
+
+function labourSubject(value, ignorePassport) {
+  const source = ignorePassport ? value.replace(PASSPORT_WORD, ' ') : value;
+  return LABOUR_SUBJECT.test(source) || DAY_OFF.test(source);
+}
+
+function lawMandate(value) {
+  if (/กำหนดให้/.test(value) && (/กฎหมาย|นายจ้าง|กระทรวง/.test(value) || /\blaw\b/i.test(value))) return true;
+  if (/के तहत/.test(value) && /होगा|करना होगा|होना होगा/.test(value)) return true;
+  if (/\blaw\s+requires\b/i.test(value)) return true;
+  return false;
+}
 
 function containsUnapprovedLegalClaim(text = '') {
   const value = String(text || '').normalize('NFC');
   if (!value.trim()) return false;
+  if (employerPassportControl(value) || EMPLOYER_PROHIBITION.test(value)) return true;
+  const errand = passportErrand(value);
   const entitlement = ENTITLEMENT_PHRASE.test(value);
   const obligation = OBLIGATION.test(value);
-  const subject = LABOUR_SUBJECT.test(value);
+  const subject = labourSubject(value, errand);
   const lawCue = LAW_CUE.test(value);
+  const mandate = lawMandate(value);
   const section = SECTION_CITATION.test(value);
   const money = MONEY_AMOUNT.test(value);
   const tiedAmount = AMOUNT_TIED_TO_RIGHTS.test(value);
   if (entitlement) return true;
+  if (mandate && (lawCue || subject)) return true;
   if (obligation && (subject || lawCue)) return true;
   if (section && (lawCue || entitlement || subject || money || tiedAmount)) return true;
   return money && (tiedAmount || entitlement);

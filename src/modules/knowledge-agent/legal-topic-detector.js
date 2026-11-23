@@ -32,12 +32,17 @@ function practicalFlags(text) {
     && !/deduct|ניכוי|לנכות|מוריד|หัก|workers in one room|עובדים בחדר/i.test(value);
   const money = /exchange rate|rate to send|send money|money transfer|transfer cost|cheapest way to send|send money home|להעביר|שולח את המשכורת|לשלוח את המשכורת|לשלוח כסף|כסף הביתה|ส่งเงิน|ส่งค่าจ้างกลับ|पैसे कैसे निकाल|कैसे निकाल|पैसे भेज|මුදල් යව|මුදල් යැව|විනිමය|හුවමාරු අනුපාත|අනුපාතය/i.test(value);
   const healthLocation = /where is the (nearest )?(hospital|clinic)|בית החולים|בית חולים|โรงพยาบาลอยู่ที่ไหน|अस्पताल कहाँ|nearest clinic|where is the hospital|රෝහල/i.test(value);
-  // Sinhala renewal phrases are unverified routing hints. They only keep a
-  // logistics question on the practical path. They are never displayed.
-  const documentsLogistics = /embassy|שגרירות|สถานทูต|दूतावास|තානාපති|איפה מחדשים דרכון|מחדשים דרכון|renew my passport|passport renewal|lost my passport|איבדתי את הדרכון|පාස්පෝට්[^\n]{0,40}අලුත්|ගමන් බලපත්[^\n]{0,40}අලුත්/i.test(value);
-  // Thai, Hindi, and Sinhala bus/SIM/shop phrases below are unverified
-  // machine-derived routing hints. They only classify a question as practical.
-  const transport = /אוטובוס|\b(bus|train)\b|רכבת|תחבורה|รถเมล์|รถบัส|รถโดยสาร|รถประจำทาง|බස්|බසය|बस से|कौन सी बस|बस कहाँ|बस नंबर/i.test(value);
+  // Sinhala renewal phrases, and bank / post office / SIM-shop errands, are
+  // unverified routing hints where noted. They only keep a logistics question
+  // on the practical path. They are never displayed. An employer or agency
+  // holding a passport is not one of these errands.
+  const bankErrand = /(?:bring|take|show|need|which|what|open|เอา|นำ|ගෙන).{0,48}(?:document|passport|מסמך|דרכון|พาสปอร์ต|เอกสาร|पासपोर्ट|दस्तावे|පාස්පෝට්|ලේඛන).{0,48}(?:bank|post office|sim shop|בנק|דואר|ธนาคาร|ไปรษณีย์|बैंक|डाक|බැංකු|තැපැල්)|(?:bank|post office|sim shop|בנק|דואר|ธนาคาร|ไปรษณีย์|बैंक|डाकघर|බැංකු|තැපැල්).{0,60}(?:document|passport|מסמך|דרכון|พาสปอร์ต|เอกสาร|पासपोर्ट|दस्तावे|පාස්පෝට්|ලේඛන)/i.test(value);
+  const documentsLogistics = /embassy|שגרירות|สถานทูต|दूतावास|තානාපති|איפה מחדשים דרכון|מחדשים דרכון|renew my passport|passport renewal|lost my passport|איבדתי את הדרכון|පාස්පෝට්[^\n]{0,40}අලුත්|ගමන් බලපත්[^\n]{0,40}අලුත්/i.test(value)
+    || bankErrand;
+  // Thai, Hindi, and Sinhala bus, train, SIM, and shop phrases below are
+  // unverified machine-derived routing hints. They only classify a question
+  // as practical.
+  const transport = /אוטובוס|\b(bus|train)\b|רכבת|תחבורה|รถเมล์|รถบัส|รถโดยสาร|รถประจำทาง|รถไฟ|สถานีรถไฟ|ตั๋วรถไฟ|බස්|බසය|बस से|कौन सी बस|बस कहाँ|बस नंबर/i.test(value);
   const phone = /ซิม|โทรศัพท์|มือถือ|\bsim\b|सिम|मोबाइल|फ़ोन|फोन|සිම්|දුරකථන|මොබයිල්/i.test(value);
   const shopping = (/שוק|बाज़ार|market\b|חנות\b/i.test(value) && /פתוח|खुला|open\b/i.test(value))
     || /ซื้อของ|ร้านค้า|ช้อปปิ้ง|කඩේ|මිලදී|සාප්පු|दुकान|खरीद/i.test(value);
@@ -82,7 +87,7 @@ function unverifiedBlockHint(text) {
   if (UNVERIFIED_BLOCK_HINTS.test(value)) return true;
   // Passport logistics stay practical. Passport plus an employer or a
   // withholding word does not.
-  const passportish = /ගමන් බලපත්|පාස්පෝට්|पासपोर्ट|หนังสือเดินทาง/.test(value);
+  const passportish = /ගමන් බලපත්|පාස්පෝට්|पासपोर्ट|พาสปอร์ต|หนังสือเดินทาง/.test(value);
   const control = /යෝජක|තබා|අරගෙන|රදව|नियोक्ता|रख|นายจ้าง|ยึด/.test(value);
   return passportish && control;
 }
@@ -98,8 +103,8 @@ function collectLegalTopics(text, flags) {
     if (!result || found.some((item) => item.topic === result.topic)) return;
     found.push(result);
   };
-  const passportWord = /passport|דרכון|หนังสือเดินทาง|पासपोर्ट|විදේශ ගමන්/i.test(value);
-  const employerWord = /employer|boss|מעסיק|נายจ้าง|นายจ้าง|मालिक|नियोक्ता|යෝජක/i.test(value);
+  const passportWord = /passport|דרכון|หนังสือเดินทาง|พาสปอร์ต|पासपोर्ट|විදේශ ගමන්/i.test(value);
+  const employerWord = /employer|boss|agency|manpower|מעסיק|נายจ้าง|นายจ้าง|मालिक|नियोक्ता|යෝජක|නියෝජිත/i.test(value);
   const withholdWord = /keep|keeps|withhold|take|takes|took|hold|holds|holding|confiscat|לקח|לקחת|ייקח|החזיק|מחזיק|מחזיר|לא החזיר|ยึด|เอา.*หนังสือ|रख|තබා/i.test(value);
 
   if (/traffick|slavery|סחר בבני|עבדות|ค้ามนุษย์|לא נותנים לי לצאת|לא נותנים לצאת|ไม่ให้ฉันออกจากที่พัก|cannot leave the housing|do not let me leave/i.test(value)
@@ -107,7 +112,7 @@ function collectLegalTopics(text, flags) {
     add(topicResult('trafficking', '15', 'ministry_of_justice', true));
   }
 
-  if (passportWord && (employerWord || withholdWord) && !(flags.documentsLogistics && !employerWord && !withholdWord)) {
+  if (passportWord && (employerWord || withholdWord) && !(flags.documentsLogistics && !employerWord)) {
     add(topicResult('passport', '4', 'israel_police'));
   }
 

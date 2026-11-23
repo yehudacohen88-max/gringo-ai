@@ -335,8 +335,169 @@ test('the claim filter ignores ordinary amounts and the existing fallback text',
   assert.equal(containsUnapprovedLegalClaim('For 10 regular hours at 40 ILS per hour, basic gross pay is 400 ILS.'), false);
   assert.equal(containsUnapprovedLegalClaim('For 100 regular hours at 40 ILS per hour, your basic gross pay for those regular hours is 4,000 ILS. This is not your final salary, net salary, or complete payslip amount, and it does not include overtime, rest-day or holiday work, allowances, deductions, tax, pension, insurance, accommodation, or foreign-worker-specific deductions.'), false);
   assert.equal(containsUnapprovedLegalClaim('You can ask your employer for payment and keep records.'), false);
+  assert.equal(containsUnapprovedLegalClaim('Section 3 of this guide explains how to open a bank account'), false);
+  assert.equal(containsUnapprovedLegalClaim('You have the right bus if it says 480'), false);
+  assert.equal(containsUnapprovedLegalClaim('You must bring your passport to the bank to open an account.'), false);
+  assert.equal(containsUnapprovedLegalClaim('You cannot find the train at this hour.'), false);
   for (const language of ['en', 'he', 'th', 'hi', 'si']) {
     assert.equal(containsUnapprovedLegalClaim(createRightsUnverifiedFallback(language)), false, language);
     assert.equal(containsUnapprovedLegalClaim(CLARIFICATION[language]), false, language);
+  }
+});
+
+const EXACT_OUTPUT_CLAIMS = [
+  ['en', 'You have a right to a paid day off every week.'],
+  ['en', 'Your boss cannot fire you while you are on sick leave.'],
+  ['he', 'יש לך זכות לחופשה בתשלום.'],
+  ['th', 'กฎหมายกำหนดให้นายจ้างจ่ายค่าล่วงเวลา'],
+  ['th', 'คุณมีสิทธิ์ลาป่วยโดยได้รับค่าจ้าง'],
+  ['hi', 'कानून के तहत नियोक्ता को आपका पासपोर्ट लौटाना होगा।'],
+  ['hi', 'आपको हर हफ्ते एक दिन की छुट्टी का अधिकार है।'],
+  ['si', 'ඔබට සතියකට එක් නිවාඩු දිනයක් ලබා ගැනීමේ අයිතිය තිබේ.'],
+];
+
+const NEW_OUTPUT_CLAIMS = {
+  en: 'Workers have a right to overtime pay after a long shift.',
+  he: 'יש לך זכות למנוחה שבועית.',
+  th: 'นายจ้างไม่สามารถไล่คุณออกระหว่างลาป่วย',
+  hi: 'आपको वेतन का अधिकार है।',
+  si: 'ඔබට අතිකාල වැටුපක් ලබා ගැනීමේ අයිතිය තිබේ.',
+};
+
+const EMPLOYER_PASSPORT = {
+  en: 'My employer keeps my passport, is that legal?',
+  he: 'המעסיק לקח לי את הדרכון',
+  th: 'นายจ้างยึดพาสปอร์ต',
+  hi: 'मालिक ने मेरा पासपोर्ट रख लिया',
+  si: 'යෝජකයා මගේ පාස්පෝට් එක තබාගෙන ඉන්නවා',
+};
+
+test('right-to, cannot-fire, and law-mandate replies are replaced by the fallback', async () => {
+  for (const [language, claim] of EXACT_OUTPUT_CLAIMS) {
+    assert.equal(containsUnapprovedLegalClaim(claim), true, claim);
+    aiReply = `FAKE_CLAIM ${claim}`;
+    const result = await askTelegram(GREETINGS[language], language, `exact-${language}-${EXACT_OUTPUT_CLAIMS.indexOf([language, claim])}`);
+    assert.equal(result.calledModel, true, claim);
+    assert.equal(result.reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD[language]), true, claim);
+    assert.equal(result.reply.includes('FAKE_CLAIM'), false, claim);
+    assert.equal(result.reply.includes(claim), false, claim);
+  }
+  for (const language of ['he', 'th', 'hi', 'si']) {
+    for (const claim of EXACT_OUTPUT_CLAIMS.filter(([code]) => code === 'en').map(([, text]) => text)) {
+      aiReply = `FAKE_CLAIM ${claim}`;
+      const result = await askTelegram(GREETINGS[language], language, `exact-en-${language}-${claim.slice(0, 12)}`);
+      assert.equal(result.reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD[language]), true, `${language} ${claim}`);
+      assert.equal(result.reply.includes(claim), false, `${language} ${claim}`);
+    }
+  }
+  for (const [language, claim] of Object.entries(NEW_OUTPUT_CLAIMS)) {
+    assert.equal(containsUnapprovedLegalClaim(claim), true, claim);
+    aiReply = `FAKE_CLAIM ${claim}`;
+    const result = await askTelegram(GREETINGS[language], language, `new-claim-${language}`);
+    assert.equal(result.calledModel, true, claim);
+    assert.equal(result.reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD[language]), true, claim);
+    assert.equal(result.reply.includes('FAKE_CLAIM'), false, claim);
+    assert.equal(result.reply.includes(claim), false, claim);
+  }
+});
+
+test('a practical sentence mixed with a rights claim is blocked in every language', async () => {
+  const mixed = 'Take bus 480 to Jerusalem; also, you are entitled to overtime pay.';
+  for (const language of ['en', 'he', 'th', 'hi', 'si']) {
+    aiReply = `FAKE_CLAIM ${mixed}`;
+    const result = await askTelegram(GREETINGS[language], language, `mixed-out-${language}`);
+    assert.equal(result.calledModel, true, language);
+    assert.equal(result.reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD[language]), true, language);
+    assert.equal(result.reply.includes('FAKE_CLAIM'), false, language);
+    assert.equal(result.reply.includes('entitled to overtime'), false, language);
+  }
+  aiReply = 'FAKE_CLAIM should not be used';
+  const asked = await askTelegram(mixed, 'en', 'mixed-in-en');
+  assert.equal(asked.calledModel, false);
+  assert.equal(asked.reply.includes('FAKE_CLAIM'), false);
+  assert.equal(asked.reply.includes('entitled to overtime'), false);
+});
+
+test('Thai train questions and passport errands stay practical', async () => {
+  aiReply = 'ORDINARY_REPLY The amount you asked about is 1000 shekels.';
+  const trains = ['รถไฟไปไฮฟาออกกี่โมง', 'สถานีรถไฟอยู่ที่ไหน', 'ตั๋วรถไฟไปเทลอาวีฟราคาเท่าไร'];
+  for (const message of trains) {
+    assert.equal(classifyUserQuestion(message).disposition, 'practical', message);
+    assert.equal(classifyUserQuestion(message).practical.transport, true, message);
+    const result = await askTelegram(message, 'th', `train-${trains.indexOf(message)}`);
+    assert.equal(result.calledModel, true, message);
+    assert.equal(result.reply.includes('ORDINARY_REPLY'), true, message);
+    assert.equal(result.reply.includes(CLARIFICATION.th), false, message);
+    assert.equal(result.reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD.th), false, message);
+  }
+  const errands = [
+    ['en', 'Which documents do I bring to the bank?'],
+    ['en', 'What should I take to the post office to show my passport?'],
+    ['th', 'เอาพาสปอร์ตไปธนาคารเปิดบัญชีต้องใช้อะไร'],
+    ['hi', 'बैंक में खाता खोलने के लिए कौन से दस्तावेज़ ले जाऊँ?'],
+    ['si', 'බැංකුවට ගිණුමක් අරින්න මොන ලේඛන ගෙනියන්න ඕනද?'],
+  ];
+  for (const [language, message] of errands) {
+    const classified = classifyUserQuestion(message);
+    assert.equal(classified.disposition, 'practical', message);
+    const result = await askTelegram(message, language, `errand-${language}-${message.length}`);
+    assert.equal(result.reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD[language]), false, message);
+    assert.equal(result.reply.includes(CLARIFICATION[language]), false, message);
+    if (language !== 'en') {
+      assert.equal(result.calledModel, true, message);
+      assert.equal(result.reply.includes('ORDINARY_REPLY'), true, message);
+    }
+  }
+  const allowedReplies = [
+    'You have the right bus if it says 480',
+    'You must bring your passport to the bank to open an account.',
+    'Section 3 of this guide explains how to open a bank account',
+  ];
+  for (const replyText of allowedReplies) {
+    assert.equal(containsUnapprovedLegalClaim(replyText), false, replyText);
+    aiReply = replyText;
+    const result = await askTelegram('hello', 'en', `allow-${allowedReplies.indexOf(replyText)}`);
+    assert.equal(result.reply.includes(replyText), true, replyText);
+    assert.equal(result.reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD.en), false, replyText);
+  }
+});
+
+test('an employer or agency holding a passport stays blocked in every language', async () => {
+  aiReply = 'FAKE_CLAIM Your employer may keep the passport if you agree.';
+  for (const [language, message] of Object.entries(EMPLOYER_PASSPORT)) {
+    const classified = classifyUserQuestion(message);
+    assert.notEqual(classified.disposition, 'practical', message);
+    assert.notEqual(classified.disposition, 'none', message);
+    const result = await askTelegram(message, language, `hold-${language}`);
+    assert.equal(result.calledModel, false, message);
+    assert.equal(result.reply.includes('FAKE_CLAIM'), false, message);
+    assert.equal(result.reply.includes('if you agree'), false, message);
+    if (language === 'en' || language === 'he') {
+      assert.equal(classified.topic, 'passport', message);
+      assert.equal(result.reply.includes(answerLead(readDraft('passport', language))), true, message);
+    } else if (language === 'th' || language === 'hi') {
+      assert.equal(classified.topic, 'passport', message);
+      assert.equal(result.reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD[language]), true, message);
+      assert.equal(result.reply.includes(answerLead(readDraft('passport', 'en')).slice(0, 40)), false, message);
+    } else {
+      assert.equal(classified.topic || 'unspecified', 'unspecified', message);
+      assert.equal(result.reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD.si), true, message);
+      assert.equal(result.reply.includes(answerLead(readDraft('passport', 'en')).slice(0, 40)), false, message);
+    }
+  }
+  const heldReplies = {
+    en: 'The agency keeps your passport until the contract ends.',
+    he: 'הקבלן מחזיק לך את הדרכון ולא מחזיר.',
+    th: 'บริษัทจัดหายึดพาสปอร์ตไว้',
+    hi: 'एजेंसी ने पासपोर्ट रख लिया है।',
+    si: 'නියෝජිතයා පාස්පෝට් එක තබාගෙන නොදෙයි.',
+  };
+  for (const [language, claim] of Object.entries(heldReplies)) {
+    assert.equal(containsUnapprovedLegalClaim(claim), true, claim);
+    aiReply = `FAKE_CLAIM ${claim}`;
+    const result = await askTelegram(GREETINGS[language], language, `held-out-${language}`);
+    assert.equal(result.calledModel, true, claim);
+    assert.equal(result.reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD[language]), true, claim);
+    assert.equal(result.reply.includes('FAKE_CLAIM'), false, claim);
   }
 });
