@@ -21,9 +21,13 @@ function readDrafts() {
   ));
 }
 
-test('phase 2 keeps twelve Hebrew and English drafts behind an empty approvals directory', () => {
-  const names = fs.readdirSync(APPROVALS).filter((name) => name !== '.' && name !== '..');
-  assert.deepEqual(names, ['README.md']);
+test('phase 2 keeps every draft unpublished and approves only eight Hebrew and English records', () => {
+  const names = fs.readdirSync(APPROVALS).filter((name) => name !== '.' && name !== '..').sort();
+  const approvedFiles = [
+    'passport', 'construction_transfer', 'minimum_wage', 'housing',
+    'medical_insurance', 'weekly_rest', 'sick_leave', 'severance',
+  ].flatMap((topic) => ['en', 'he'].map((language) => `draft-piba2026-${topic}-${language}.json`));
+  assert.deepEqual(names, ['README.md', ...approvedFiles].sort());
   const drafts = readDrafts();
   assert.equal(drafts.length, 60);
   const topics = [...new Set(drafts.map((record) => record.topic))].sort();
