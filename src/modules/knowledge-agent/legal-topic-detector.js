@@ -6,22 +6,35 @@
 // rates, hospital location, passport-renewal logistics, transport, shopping)
 // is classified first so those words do not become a rights answer.
 // Employment wording that is still not a clear topic does not go to free AI.
+//
+// Scripts other than Hebrew and Latin have no verified legal wording. A
+// message in one of those scripts that is not confidently practical, or that
+// carries any rights signal, is disposition "uncertain" so the caller uses
+// the existing unverified-rights fallback instead of a free model answer.
+// Sinhala strings added below are unverified machine-derived detection hints.
+// They are used only to BLOCK. They are never shown and never select a record.
 
 const PENDING_NATIVE_SPEAKER_REVIEW = Object.freeze(['th', 'si', 'hi']);
 
 const MENU_LABEL = /^(employment\s*(&|and)\s*salary|jobs?|housing|money|documents?)$/i;
 
+function normalized(text) {
+  return String(text || '').normalize('NFC');
+}
+
 function practicalFlags(text) {
-  const value = String(text || '');
-  const job = /find me (a )?job|looking for (a )?(job|work)|job in |construction job|new construction job|מחפש עבודה|יש משרה|משרה חדשה|หางาน|งานก่อสร้างใหม่|नौकरी खोज|රැකියාවක් සොය/i.test(value);
+  const value = normalized(text);
+  const job = /find me (a )?job|looking for (a )?(job|work)|job in |construction job|new construction job|מחפש עבודה|יש משרה|משרה חדשה|หางาน|งานก่อสร้างใหม่|नौकरी खोज|රැකියාවක් සොය|රැකියා සොය|වැඩක් සොය|වැඩ හොය/i.test(value);
   const housingSearch = /looking for (a )?(room|apartment|housing)|place to live|מחפש (דירה|חדר)|หาห้อง|หาที่พัก/i.test(value)
     && !/deduct|ניכוי|לנכות|מוריד|หัก|workers in one room|עובדים בחדר/i.test(value);
-  const money = /exchange rate|rate to send|send money|money transfer|transfer cost|cheapest way to send|send money home|להעביר|שולח את המשכורת|לשלוח את המשכורת|לשלוח כסף|כסף הביתה|ส่งเงิน|ส่งค่าจ้างกลับ|पैसे कैसे निकाल|कैसे निकाल|पैसे भेज|මුදල් යව/i.test(value);
+  const money = /exchange rate|rate to send|send money|money transfer|transfer cost|cheapest way to send|send money home|להעביר|שולח את המשכורת|לשלוח את המשכורת|לשלוח כסף|כסף הביתה|ส่งเงิน|ส่งค่าจ้างกลับ|पैसे कैसे निकाल|कैसे निकाल|पैसे भेज|මුදල් යව|මුදල් යැව|විනිමය|හුවමාරු අනුපාත|අනුපාතය/i.test(value);
   const healthLocation = /where is the (nearest )?(hospital|clinic)|בית החולים|בית חולים|โรงพยาบาลอยู่ที่ไหน|अस्पताल कहाँ|nearest clinic|where is the hospital|රෝහල/i.test(value);
-  const documentsLogistics = /embassy|שגרירות|สถานทูต|दूतावास|තානාපති|איפה מחדשים דרכון|מחדשים דרכון|renew my passport|passport renewal|lost my passport|איבדתי את הדרכון/i.test(value);
+  // Sinhala renewal phrases are unverified routing hints. They only keep a
+  // logistics question on the practical path. They are never displayed.
+  const documentsLogistics = /embassy|שגרירות|สถานทูต|दूतावास|තානාපති|איפה מחדשים דרכון|מחדשים דרכון|renew my passport|passport renewal|lost my passport|איבדתי את הדרכון|පාස්පෝට්[^\n]{0,40}අලුත්|ගමන් බලපත්[^\n]{0,40}අලුත්/i.test(value);
   const transport = /אוטובוס|\b(bus|train)\b|רכבת|תחבורה/i.test(value);
   const shopping = /שוק|बाज़ार|market\b|חנות\b/i.test(value) && /פתוח|खुला|open\b/i.test(value);
-  const greeting = /^(hi|hello|hey|shalom|שלום|היי|สวัสดี|नमस्ते|ආයුබෝවන්)\b/i.test(value.trim());
+  const greeting = /^(?:hi|hello|hey|shalom|שלום|היי|สวัสดี(?:ครับ|ค่ะ|คะ)?|नमस्ते|ආයුබෝවන්|හලෝ|හායි|مرحبا|привет)(?![\p{L}\p{M}\p{N}])/iu.test(value.trim());
   return {
     job,
     housing: housingSearch,
@@ -39,7 +52,31 @@ function anyPractical(flags) {
 }
 
 function scriptNeedsNativeReview(text) {
-  return /[\u0E00-\u0E7F\u0D80-\u0DFF\u0900-\u097F]/.test(String(text || ''));
+  return /[\u0E00-\u0E7F\u0D80-\u0DFF\u0900-\u097F]/.test(normalized(text));
+}
+
+// Hebrew and Latin are the scripts with reviewed legal wording. Any other
+// letter (Thai, Sinhala, Devanagari, Arabic, Cyrillic, and the rest) is an
+// unverified legal script.
+function hasUnverifiedLegalScript(text) {
+  const rest = normalized(text).replace(/[\u0000-\u024F\u0590-\u05FF]/g, '');
+  return /[\p{L}]/u.test(rest);
+}
+
+// Unverified machine-derived hints. Used only to BLOCK a free model answer.
+// Never displayed. Never used to choose or quote a handbook record.
+// Sinhala covers minimum wage, medical insurance, severance, dismissal,
+// worker rights, workers sharing a room, and "the law".
+const UNVERIFIED_BLOCK_HINTS = /අවම වැටුප|අවම වේතන|වෛද්‍ය රක්ෂණ|සෞඛ්‍ය රක්ෂණ|වන්දි|පන්සන්|රැකියාවෙන් ඉවත්|වැඩෙන් ඉවත්|පහ කළ|පහකළ|අයිතිවාසිකම්|හිමිකම්|නීතිය|නීත්‍යානුකූල|කම්කරුවන්.{0,32}කාමර|කාමරයක.{0,32}කම්කරු|කාමරයක.{0,32}කම්කරුවන්/u;
+
+function unverifiedBlockHint(text) {
+  const value = normalized(text);
+  if (UNVERIFIED_BLOCK_HINTS.test(value)) return true;
+  // Passport logistics stay practical. Passport plus an employer or a
+  // withholding word does not.
+  const passportish = /ගමන් බලපත්|පාස්පෝට්|पासपोर्ट|หนังสือเดินทาง/.test(value);
+  const control = /යෝජක|තබා|අරගෙන|රදව|नियोक्ता|रख|นายจ้าง|ยึด/.test(value);
+  return passportish && control;
 }
 
 function topicResult(topic, section, authorityId, trafficking = false) {
@@ -47,7 +84,7 @@ function topicResult(topic, section, authorityId, trafficking = false) {
 }
 
 function collectLegalTopics(text, flags) {
-  const value = String(text || '');
+  const value = normalized(text);
   const found = [];
   const add = (result) => {
     if (!result || found.some((item) => item.topic === result.topic)) return;
@@ -172,29 +209,36 @@ function detectLegalTopic(text, flags) {
 }
 
 function weakEmploymentSignal(text) {
-  const value = String(text || '').trim();
+  const value = normalized(text).trim();
   if (!value || MENU_LABEL.test(value)) return false;
   return /לנכות|ניכוי|deduct|פיטור|dismiss|\bfired\b|זכויות|\brights\b|payslip|תלוש|פיקדון|pikadon/i.test(value);
 }
 
+function rightsSignal(text, topics) {
+  return topics.length > 0 || weakEmploymentSignal(text) || unverifiedBlockHint(text);
+}
+
 function classifyUserQuestion(text = '') {
-  const value = String(text || '');
+  const value = normalized(text);
   const practical = practicalFlags(value);
   const nativeReviewRequired = scriptNeedsNativeReview(value);
+  const unverifiedScript = hasUnverifiedLegalScript(value);
   const base = {
     practical,
     nativeReviewRequired,
+    unverifiedScript,
     topic: '',
     section: '',
     authorityId: '',
     trafficking: false,
   };
   if (!value.trim()) return { ...base, disposition: 'none' };
-  if (practical.greeting && !weakEmploymentSignal(value)) {
-    return { ...base, disposition: 'practical' };
-  }
   const topics = collectLegalTopics(value, practical);
+  const signal = rightsSignal(value, topics);
   const topic = topics[0] || null;
+  // A resolved topic stays on the existing legal path, including an approved
+  // Hebrew or English record when the reply language matches. Block hints
+  // that do not resolve a topic must not select a record.
   if (topic) {
     return {
       ...base,
@@ -203,8 +247,12 @@ function classifyUserQuestion(text = '') {
       disposition: 'legal',
     };
   }
-  if (anyPractical(practical)) return { ...base, disposition: 'practical' };
-  if (weakEmploymentSignal(value)) return { ...base, disposition: 'uncertain', topic: 'unspecified' };
+  if ((practical.greeting || anyPractical(practical)) && !signal) {
+    return { ...base, disposition: 'practical' };
+  }
+  if (signal || unverifiedScript) {
+    return { ...base, disposition: 'uncertain', topic: 'unspecified' };
+  }
   return { ...base, disposition: 'none' };
 }
 
@@ -216,6 +264,8 @@ function looksLikeLegalOrRightsQuestion(text = '') {
 module.exports = {
   PENDING_NATIVE_SPEAKER_REVIEW,
   classifyUserQuestion,
+  hasUnverifiedLegalScript,
   looksLikeLegalOrRightsQuestion,
   practicalFlags,
+  unverifiedBlockHint,
 };

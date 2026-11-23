@@ -151,6 +151,61 @@ function containsUnsupportedStatutoryClaim(text = '') {
   return UNSUPPORTED_STATUTORY_PATTERNS.some((pattern) => pattern.test(value));
 }
 
+// Digits in every script. Amounts alone are not a legal claim: a transfer
+// quote may name a sum. A claim needs a statute citation, an entitlement
+// phrase, or a sum tied to one of those.
+const ANY_DIGIT = String.raw`\p{Nd}`;
+const AMOUNT = String.raw`(?:${ANY_DIGIT}{1,3}(?:[,.\u00A0\u202F]${ANY_DIGIT}{3})+|${ANY_DIGIT}+(?:[.,]${ANY_DIGIT}+)?)`;
+const CURRENCY = String.raw`shekels?|sheqels?|nis|ils|₪|שקלים|שקל|ש״ח|ש"ח|บาท|baht|rupees?|रुप(?:ये|या)|शेकेल|ෂෙකල්|฿|₹`;
+const MONEY_AMOUNT = new RegExp(`(?:${AMOUNT})\\s*(?:${CURRENCY})|(?:${CURRENCY})\\s*(?:${AMOUNT})`, 'iu');
+const SECTION_CITATION = new RegExp([
+  String.raw`(?:^|[^\p{L}\p{M}])(?:section|sec\.?|article|clause|statute)\s*(?:no\.?|number)?\s*[:.]?\s*${ANY_DIGIT}{1,4}(?!${ANY_DIGIT})`,
+  String.raw`סעיף\s*${ANY_DIGIT}{1,4}(?!${ANY_DIGIT})`,
+  String.raw`(?:มาตรา|ตามมาตรา)\s*${ANY_DIGIT}{1,4}(?!${ANY_DIGIT})`,
+  String.raw`(?:धारा|अनुच्छेद)\s*${ANY_DIGIT}{1,4}(?!${ANY_DIGIT})`,
+  // Unverified machine-derived Sinhala hint. Block only. Never displayed.
+  String.raw`වගන්ති(?:ය)?\s*${ANY_DIGIT}{1,4}(?!${ANY_DIGIT})`,
+  String.raw`${ANY_DIGIT}{1,4}(?!${ANY_DIGIT})\s*වගන්ති`,
+  String.raw`§\s*${ANY_DIGIT}{1,4}(?!${ANY_DIGIT})`,
+].join('|'), 'iu');
+const ENTITLEMENT_PHRASE = new RegExp([
+  String.raw`you(?:\s+are|'re)\s+entitled`,
+  String.raw`\bentitled\s+to\b`,
+  String.raw`\bby\s+law\b`,
+  String.raw`\bunder\s+the\s+law\b`,
+  String.raw`\baccording\s+to\s+(?:the\s+)?law\b`,
+  String.raw`\bthe\s+law\s+(?:says|requires|entitles)\b`,
+  String.raw`\bit\s+is\s+(?:not\s+)?(?:il)?legal\b`,
+  'מגיע לך',
+  'מגיעים לך',
+  'על פי חוק',
+  'לפי החוק',
+  'לפי סעיף',
+  'זה חוקי',
+  'זה לא חוקי',
+  'ตามกฎหมาย',
+  'มีสิทธิได้รับ',
+  'มีสิทธิได้',
+  'ถูกกฎหมาย',
+  'कानून के अनुसार',
+  'हकदार',
+  // Unverified machine-derived Sinhala hints. Block only. Never displayed.
+  'නීතියට අනුව',
+  'හිමි වේ',
+  'ඔබට හිමි',
+].join('|'), 'iu');
+// "overtime" by itself is not enough: the hourly calculator says a basic-pay
+// figure "does not include overtime". A percentage or "overtime at 125" is
+// already covered by UNSUPPORTED_STATUTORY_PATTERNS.
+const AMOUNT_TIED_TO_RIGHTS = /minimum\s+wage|severance|statutory|compensation\s+pay|שכר\s+ה?מינימום|פיצויי|ค่าแรงขั้นต่ำ|ค่าชดเชย|न्यूनतम\s+वेतन|අවම\s+වැටුප|අවම\s+වේතන|වන්දි/iu;
+
+function containsUnapprovedLegalClaim(text = '') {
+  const value = String(text || '').normalize('NFC');
+  if (!value.trim()) return false;
+  if (SECTION_CITATION.test(value) || ENTITLEMENT_PHRASE.test(value)) return true;
+  return MONEY_AMOUNT.test(value) && (AMOUNT_TIED_TO_RIGHTS.test(value) || SECTION_CITATION.test(value) || ENTITLEMENT_PHRASE.test(value));
+}
+
 // Structured results from our own services. Free-text `message` is never trusted
 // on a legal segment, even if it mentions jobs, a question, or an arithmetic phrase.
 function trustedStructuredText(output) {
@@ -383,7 +438,7 @@ function guardLegalReply(text = '', options = {}) {
   const fallback = rightsFallbackFor(question, language);
   const legal = segmentIsLegal(question, options);
   if (!legal) {
-    if (containsUnsupportedStatutoryClaim(reply) || looksLikeUnverifiedLegalAnswer(reply)) return fallback;
+    if (containsUnsupportedStatutoryClaim(reply) || containsUnapprovedLegalClaim(reply) || looksLikeUnverifiedLegalAnswer(reply)) return fallback;
     return reply;
   }
 
@@ -426,7 +481,9 @@ function guardGeneratedLegalOutput(text = '', options = {}) {
     return rightsFallbackFor(question, options.language || 'en');
   }
   const reply = String(text || '');
-  if (containsUnsupportedStatutoryClaim(reply)) return rightsFallbackFor(question, options.language || 'en');
+  if (containsUnsupportedStatutoryClaim(reply) || containsUnapprovedLegalClaim(reply) || looksLikeUnverifiedLegalAnswer(reply)) {
+    return rightsFallbackFor(question, options.language || 'en');
+  }
   return reply;
 }
 
@@ -492,6 +549,7 @@ module.exports = {
   SEPARATE_SUBJECTS,
   UNSUPPORTED_STATUTORY_PATTERNS,
   claimTopics,
+  containsUnapprovedLegalClaim,
   containsUnsupportedStatutoryClaim,
   guardGeneratedLegalOutput,
   guardLegalReply,

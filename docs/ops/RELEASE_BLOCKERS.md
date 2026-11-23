@@ -77,6 +77,14 @@ A legal segment is decided on the way in. Free text is not kept because it also 
 
 Patterns for 125%, the ninth day, and named statutes remain only as a backup for a non-legal segment that still states one. The input detector is still a word list: a legal question that shares none of those words can be missed. Thai, Sinhala, and Hindi patterns in `legal-question-guard.js` are pending native-speaker review.
 
+## Sinhala legal questions were reaching the model
+
+Sinhala legal wording was mostly absent from `legal-topic-detector.js` (no minimum-wage, housing, dismissal, or severance patterns). `scriptNeedsNativeReview` was stored and then ignored, so an unrecognized Sinhala question was disposition `none`. With translation unavailable, the English patterns never saw the question, the model ran, and `guardGeneratedLegalOutput` only removed a short statute list (125%, "section 16", named laws). A reply such as "section 4 ... 2,000 shekels" was delivered.
+
+The fix has two layers. A message in a script other than Hebrew or Latin that is not confidently a practical question (job search, money transfer, exchange rate, greeting, document logistics, and the other practical flags), or that carries a rights signal, is disposition `uncertain` and uses the existing unverified-rights fallback. Sinhala keyword hints added for that signal are unverified machine-derived detection hints. They only block. They are not shown and they do not select a handbook record. Separately, every model reply is checked for a statute or section number, an entitlement phrase ("you are entitled", "by law", and the Hebrew, Thai, and Hindi equivalents), or a sum of money tied to one of those, including digits and currency in other scripts. A hit is replaced by the existing fallback for the reply language.
+
+Limits: a Sinhala practical question that also hides a legal point in words that are not in the hint list can still reach the model. The output check then catches statute numbers, entitlement phrasing, and money tied to those, and it misses a legal sentence that uses none of those shapes. The Sinhala fallback text was already in the repo and is still pending native-speaker review. No new Sinhala sentence was added for display. Hebrew and English approved topics are unchanged. Thai, Hindi, and Sinhala still have no approved rights record.
+
 ## What this does not unblock
 
 - No construction collective agreement, pension, site-safety, or permit answer. The handbook `construction_transfer` record does not close that gap.

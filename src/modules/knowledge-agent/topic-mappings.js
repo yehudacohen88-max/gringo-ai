@@ -4,6 +4,9 @@
 //
 // Terms in Thai, Sinhala and Hindi are pending native-speaker review.
 // Hebrew and English terms are the ones used for the pilot questions.
+// Sinhala block hints are not listed here. A term in this file can point a
+// question at a topic for retrieval. Unverified Sinhala detection hints live
+// in legal-topic-detector.js and are used only to block a free model answer.
 
 const PENDING_NATIVE_SPEAKER_REVIEW = Object.freeze(['th', 'si', 'hi']);
 
