@@ -151,9 +151,9 @@ function containsUnsupportedStatutoryClaim(text = '') {
   return UNSUPPORTED_STATUTORY_PATTERNS.some((pattern) => pattern.test(value));
 }
 
-// Digits in every script. Amounts alone are not a legal claim: a transfer
-// quote may name a sum. A claim needs a statute citation, an entitlement
-// phrase, or a sum tied to one of those.
+// Digits in every script. A transfer quote may name a sum. A bare "section 3
+// of this guide" is not a legal claim. A section number counts only together
+// with a law, a labour-rights subject, an entitlement phrase, or a sum.
 const ANY_DIGIT = String.raw`\p{Nd}`;
 const AMOUNT = String.raw`(?:${ANY_DIGIT}{1,3}(?:[,.\u00A0\u202F]${ANY_DIGIT}{3})+|${ANY_DIGIT}+(?:[.,]${ANY_DIGIT}+)?)`;
 const CURRENCY = String.raw`shekels?|sheqels?|nis|ils|₪|שקלים|שקל|ש״ח|ש"ח|บาท|baht|rupees?|रुप(?:ये|या)|शेकेल|ෂෙකල්|฿|₹`;
@@ -174,8 +174,11 @@ const ENTITLEMENT_PHRASE = new RegExp([
   String.raw`\bby\s+law\b`,
   String.raw`\bunder\s+the\s+law\b`,
   String.raw`\baccording\s+to\s+(?:the\s+)?law\b`,
+  String.raw`\b(?:labor|labour)\s+law\s+says\b`,
   String.raw`\bthe\s+law\s+(?:says|requires|entitles)\b`,
   String.raw`\bit\s+is\s+(?:not\s+)?(?:il)?legal\b`,
+  String.raw`\blegal\s+to\b`,
+  String.raw`\billegal\b`,
   'מגיע לך',
   'מגיעים לך',
   'על פי חוק',
@@ -187,6 +190,7 @@ const ENTITLEMENT_PHRASE = new RegExp([
   'มีสิทธิได้รับ',
   'มีสิทธิได้',
   'ถูกกฎหมาย',
+  'ผิดกฎหมาย',
   'कानून के अनुसार',
   'हकदार',
   // Unverified machine-derived Sinhala hints. Block only. Never displayed.
@@ -194,16 +198,141 @@ const ENTITLEMENT_PHRASE = new RegExp([
   'හිමි වේ',
   'ඔබට හිමි',
 ].join('|'), 'iu');
-// "overtime" by itself is not enough: the hourly calculator says a basic-pay
-// figure "does not include overtime". A percentage or "overtime at 125" is
-// already covered by UNSUPPORTED_STATUTORY_PATTERNS.
-const AMOUNT_TIED_TO_RIGHTS = /minimum\s+wage|severance|statutory|compensation\s+pay|שכר\s+ה?מינימום|פיצויי|ค่าแรงขั้นต่ำ|ค่าชดเชย|न्यूनतम\s+वेतन|අවම\s+වැටුප|අවම\s+වේතන|වන්දි/iu;
+// Obligation or permission. "legal advice" and "can ask" are not in this list.
+// Hebrew, Thai, and Hindi lines are the equivalents used only to block a reply.
+const OBLIGATION = new RegExp([
+  String.raw`\bmust\b`,
+  String.raw`\brequired\b`,
+  String.raw`\brequires\b`,
+  String.raw`\bhas\s+to\b`,
+  String.raw`\bhave\s+to\b`,
+  String.raw`\b(?:is|are)\s+obliged\b`,
+  String.raw`\bobliged\s+to\b`,
+  String.raw`\bnot\s+allowed\b`,
+  String.raw`\b(?:isn'?t|is\s+not)\s+allowed\b`,
+  String.raw`\bmay\s+not\b`,
+  String.raw`\bforbidden\b`,
+  String.raw`\bprohibited\b`,
+  String.raw`\billegal\b`,
+  'חייב',
+  'אסור',
+  'חובה',
+  'נדרש',
+  'מחויב',
+  'מותר',
+  'ต้อง',
+  'ห้าม',
+  'จำเป็น',
+  'चाहिए',
+  'अनिवार्य',
+  'मना है',
+  'गैरकानूनी',
+  // Unverified machine-derived Sinhala hints. Block only. Never displayed.
+  'යුතුයි',
+  'යුතු යි',
+  'බැහැ',
+].join('|'), 'iu');
+const LABOUR_SUBJECT = new RegExp([
+  String.raw`\bovertime\b`,
+  String.raw`\brest\b`,
+  String.raw`\b(?:wage|wages|salary|salaries|pay|paid|payment)\b`,
+  String.raw`\b(?:dismissal|dismissed|dismiss|fired|severance)\b`,
+  String.raw`\b(?:leave|vacation|sick)\b`,
+  String.raw`\binsurance\b`,
+  String.raw`\bpassport\b`,
+  String.raw`\bhousing\b`,
+  String.raw`\bdeposit\b`,
+  String.raw`\b(?:deduct|deduction|deductions)\b`,
+  String.raw`\b(?:injury|injured)\b`,
+  String.raw`\bvisa\b`,
+  String.raw`\bemployer\b`,
+  'שכר',
+  'משכורת',
+  'מנוחה',
+  'שעות נוספות',
+  'פיטור',
+  'פיצוי',
+  'חופשה',
+  'מחלה',
+  'ביטוח',
+  'דרכון',
+  'מגורים',
+  'דיור',
+  'פיקדון',
+  'ניכוי',
+  'פציעה',
+  'ויזה',
+  'אשרה',
+  'מעסיק',
+  'ค่าล่วงเวลา',
+  'ค่าจ้าง',
+  'เงินเดือน',
+  'นายจ้าง',
+  'หนังสือเดินทาง',
+  'ประกัน',
+  'ลาป่วย',
+  'ค่าชดเชย',
+  'หักเงิน',
+  'ชั่วโมงพัก',
+  'วีซ่า',
+  'नियोक्ता',
+  'पासपोर्ट',
+  'बीमा',
+  'छुट्टी',
+  'वेतन',
+  'ओवरटाइम',
+  'मुआवजा',
+  'कटौती',
+  'वीजा',
+  // Unverified machine-derived Sinhala hints. Block only. Never displayed.
+  'අතිකාල',
+  'වැටුප',
+  'නිවාඩු',
+  'රක්ෂණ',
+  'ගමන් බලපත්',
+  'පාස්පෝට්',
+  'යෝජක',
+  'වන්දි',
+].join('|'), 'iu');
+const LAW_CUE = new RegExp([
+  String.raw`\b(?:labor|labour)\s+laws?\b`,
+  String.raw`\blaws?\b`,
+  String.raw`\bregulations?\b`,
+  String.raw`\bstatute\b`,
+  String.raw`\bcourt\b`,
+  String.raw`\bministry\b`,
+  String.raw`\bhandbook\b`,
+  'חוק',
+  'תקנה',
+  'בית הדין',
+  'בית דין',
+  'กฎหมาย',
+  'กระทรวง',
+  'ศาล',
+  'कानून',
+  'अदालत',
+  'मंत्रालय',
+  // Unverified machine-derived Sinhala hint. Block only. Never displayed.
+  'නීතිය',
+].join('|'), 'iu');
+// A named wage rule plus a sum, without requiring the word "must". The hourly
+// calculator's "does not include overtime" sentence is not in this list.
+const AMOUNT_TIED_TO_RIGHTS = /minimum\s+wage|severance|statutory|compensation\s+pay|שכר\s+ה?מינימום|פיצויי|ค่าแรงขั้นต่ำ|ค่าชดเชย|न्यूनतम\s+वेतन|අවම\s+වැටුප|අවම\s+වේතන/iu;
 
 function containsUnapprovedLegalClaim(text = '') {
   const value = String(text || '').normalize('NFC');
   if (!value.trim()) return false;
-  if (SECTION_CITATION.test(value) || ENTITLEMENT_PHRASE.test(value)) return true;
-  return MONEY_AMOUNT.test(value) && (AMOUNT_TIED_TO_RIGHTS.test(value) || SECTION_CITATION.test(value) || ENTITLEMENT_PHRASE.test(value));
+  const entitlement = ENTITLEMENT_PHRASE.test(value);
+  const obligation = OBLIGATION.test(value);
+  const subject = LABOUR_SUBJECT.test(value);
+  const lawCue = LAW_CUE.test(value);
+  const section = SECTION_CITATION.test(value);
+  const money = MONEY_AMOUNT.test(value);
+  const tiedAmount = AMOUNT_TIED_TO_RIGHTS.test(value);
+  if (entitlement) return true;
+  if (obligation && (subject || lawCue)) return true;
+  if (section && (lawCue || entitlement || subject || money || tiedAmount)) return true;
+  return money && (tiedAmount || entitlement);
 }
 
 // Structured results from our own services. Free-text `message` is never trusted

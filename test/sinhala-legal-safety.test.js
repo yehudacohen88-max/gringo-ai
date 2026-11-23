@@ -223,11 +223,118 @@ test('detection bypass: a stubbed legal claim is filtered in every language', as
   }
 });
 
+const OBLIGATION_CLAIMS = [
+  'Labor law says you must get double pay for overtime.',
+  'Your employer must give you 36 hours of rest every week.',
+  'You are required to receive overtime pay.',
+  'The employer has to pay severance.',
+  'It is illegal to keep a worker passport.',
+  'You are not allowed to work without weekly rest.',
+  'The ministry rules say the employer is obliged to provide insurance.',
+  'Labor law requires paid sick leave.',
+  'You must get your deposit back.',
+  'Deductions from salary are not allowed.',
+  'The court says dismissal without notice is illegal.',
+  'Your employer has to arrange a visa.',
+  'Worker housing must meet the standard.',
+  'See section 4: the amount is 2,000 shekels.',
+  'Section 4 of the labor law covers overtime.',
+];
+
+const LOCAL_OBLIGATION = {
+  he: 'המעסיק חייב לתת 36 שעות מנוחה בכל שבוע.',
+  th: 'นายจ้างต้องให้ชั่วโมงพัก 36 ชั่วโมงต่อสัปดาห์',
+  hi: 'नियोक्ता को हर हफ्ते आराम देना अनिवार्य है।',
+  si: 'නීතියට අනුව අතිකාල සඳහා දෙගුණයක් ලැබිය යුතුයි.',
+};
+
+test('obligation claims with no section number are filtered in every language', async () => {
+  for (const claim of OBLIGATION_CLAIMS) {
+    assert.equal(containsUnapprovedLegalClaim(claim), true, claim);
+    for (const language of ['en', 'he', 'th', 'hi', 'si']) {
+      aiReply = `FAKE_CLAIM ${claim}`;
+      const result = await askTelegram(GREETINGS[language], language, `obl-${language}-${OBLIGATION_CLAIMS.indexOf(claim)}`);
+      assert.equal(result.calledModel, true, `${language} ${claim}`);
+      assert.equal(result.reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD[language]), true, `${language} ${claim}`);
+      assert.equal(result.reply.includes('FAKE_CLAIM'), false, `${language} ${claim}`);
+      assert.equal(result.reply.includes(claim), false, `${language} ${claim}`);
+    }
+  }
+  for (const [language, claim] of Object.entries(LOCAL_OBLIGATION)) {
+    assert.equal(containsUnapprovedLegalClaim(claim), true, claim);
+    aiReply = `FAKE_CLAIM ${claim}`;
+    const result = await askTelegram(GREETINGS[language], language, `obl-local-${language}`);
+    assert.equal(result.calledModel, true, language);
+    assert.equal(result.reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD[language]), true, language);
+    assert.equal(result.reply.includes('FAKE_CLAIM'), false, language);
+    assert.equal(result.reply.includes(claim), false, language);
+  }
+});
+
+test('a guide section about a bank account is not treated as a legal claim', async () => {
+  const guide = 'Section 3 of this guide explains how to open a bank account';
+  assert.equal(containsUnapprovedLegalClaim(guide), false);
+  aiReply = guide;
+  for (const language of ['en', 'he', 'th', 'hi', 'si']) {
+    const result = await askTelegram(GREETINGS[language], language, `guide-${language}`);
+    assert.equal(result.calledModel, true, language);
+    assert.equal(result.reply.includes(guide), true, language);
+    assert.equal(result.reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD[language]), false, language);
+  }
+});
+
+test('colloquial job, SIM, and bus questions in Sinhala, Thai, and Hindi get a normal reply', async () => {
+  aiReply = 'ORDINARY_REPLY The amount you asked about is 1000 shekels.';
+  const ordinary = [
+    ['si', 'මට රස්සාවක් හොයන්න ඕන'],
+    ['si', 'සිම් එකක් ගන්නේ කොහෙද'],
+    ['si', 'මොන බස් එකද තෙල් අවිව් යන්න'],
+    ['th', 'ซื้อซิมที่ไหน'],
+    ['th', 'รถบัสไปเทลอาวีฟคันไหน'],
+    ['hi', 'सिम कार्ड कहाँ मिलेगा'],
+  ];
+  for (const [index, [language, message]] of ordinary.entries()) {
+    const classified = classifyUserQuestion(message);
+    assert.equal(classified.disposition, 'practical', message);
+    const result = await askTelegram(message, language, `practical-${language}-${index}`);
+    assert.equal(result.calledModel, true, message);
+    assert.equal(result.reply.includes('ORDINARY_REPLY'), true, message);
+    assert.equal(result.reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD[language]), false, message);
+    assert.equal(result.reply.includes(CLARIFICATION[language]), false, message);
+  }
+});
+
+test('a colloquial Sinhala job question that also asks about wages stays on the fallback', async () => {
+  aiReply = 'Labor law says you must get double pay for overtime.';
+  const message = 'මට රස්සාවක් හොයන්න ඕන. අවම වැටුප කීයද?';
+  const classified = classifyUserQuestion(message);
+  assert.equal(classified.practical.job, true);
+  assert.equal(classified.disposition, 'uncertain');
+  const result = await askTelegram(message, 'si', 'si-colloquial-mixed');
+  assert.equal(result.calledModel, false);
+  assert.equal(result.reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD.si), true);
+  assert.equal(result.reply.includes('FAKE_CLAIM'), false);
+  assert.equal(result.reply.includes('double pay'), false);
+});
+
+test('a practical SIM question still filters a legal model reply', async () => {
+  const claim = 'Your employer must give you 36 hours of rest every week.';
+  aiReply = `FAKE_CLAIM ${claim}`;
+  const result = await askTelegram('සිම් එකක් ගන්නේ කොහෙද', 'si', 'si-sim-filtered');
+  assert.equal(classifyUserQuestion('සිම් එකක් ගන්නේ කොහෙද').disposition, 'practical');
+  assert.equal(result.calledModel, true);
+  assert.equal(result.reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD.si), true);
+  assert.equal(result.reply.includes('FAKE_CLAIM'), false);
+  assert.equal(result.reply.includes('36 hours'), false);
+});
+
 test('the claim filter ignores ordinary amounts and the existing fallback text', () => {
   assert.equal(containsUnapprovedLegalClaim('The amount you asked about is 1000 shekels.'), false);
   assert.equal(containsUnapprovedLegalClaim('Hello from the assistant.'), false);
   assert.equal(containsUnapprovedLegalClaim('AI should not invent a statute.'), false);
   assert.equal(containsUnapprovedLegalClaim('For 10 regular hours at 40 ILS per hour, basic gross pay is 400 ILS.'), false);
+  assert.equal(containsUnapprovedLegalClaim('For 100 regular hours at 40 ILS per hour, your basic gross pay for those regular hours is 4,000 ILS. This is not your final salary, net salary, or complete payslip amount, and it does not include overtime, rest-day or holiday work, allowances, deductions, tax, pension, insurance, accommodation, or foreign-worker-specific deductions.'), false);
+  assert.equal(containsUnapprovedLegalClaim('You can ask your employer for payment and keep records.'), false);
   for (const language of ['en', 'he', 'th', 'hi', 'si']) {
     assert.equal(containsUnapprovedLegalClaim(createRightsUnverifiedFallback(language)), false, language);
     assert.equal(containsUnapprovedLegalClaim(CLARIFICATION[language]), false, language);

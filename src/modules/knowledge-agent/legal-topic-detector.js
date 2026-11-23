@@ -12,7 +12,9 @@
 // carries any rights signal, is disposition "uncertain" so the caller uses
 // the existing unverified-rights fallback instead of a free model answer.
 // Sinhala strings added below are unverified machine-derived detection hints.
-// They are used only to BLOCK. They are never shown and never select a record.
+// Block hints are used only to BLOCK. Practical hints for Thai, Hindi, and
+// Sinhala only mark a message as an ordinary question. Neither is shown, and
+// neither selects a handbook record. A rights signal still blocks.
 
 const PENDING_NATIVE_SPEAKER_REVIEW = Object.freeze(['th', 'si', 'hi']);
 
@@ -24,7 +26,8 @@ function normalized(text) {
 
 function practicalFlags(text) {
   const value = normalized(text);
-  const job = /find me (a )?job|looking for (a )?(job|work)|job in |construction job|new construction job|מחפש עבודה|יש משרה|משרה חדשה|หางาน|งานก่อสร้างใหม่|नौकरी खोज|රැකියාවක් සොය|රැකියා සොය|වැඩක් සොය|වැඩ හොය/i.test(value);
+  // රස්සා / ජොබ් / වැඩක් හොය are unverified colloquial job-search hints.
+  const job = /find me (a )?job|looking for (a )?(job|work)|job in |construction job|new construction job|מחפש עבודה|יש משרה|משרה חדשה|หางาน|งานก่อสร้างใหม่|नौकरी खोज|नौकरी चाहिए|काम ढूंढ|काम ढूँढ|රැකියාවක් සොය|රැකියා සොය|රැකියාවක් ඕන|වැඩක් සොය|වැඩක් හොය|වැඩ හොය|වැඩක් ඕන|රස්සා|ජොබ්/i.test(value);
   const housingSearch = /looking for (a )?(room|apartment|housing)|place to live|מחפש (דירה|חדר)|หาห้อง|หาที่พัก/i.test(value)
     && !/deduct|ניכוי|לנכות|מוריד|หัก|workers in one room|עובדים בחדר/i.test(value);
   const money = /exchange rate|rate to send|send money|money transfer|transfer cost|cheapest way to send|send money home|להעביר|שולח את המשכורת|לשלוח את המשכורת|לשלוח כסף|כסף הביתה|ส่งเงิน|ส่งค่าจ้างกลับ|पैसे कैसे निकाल|कैसे निकाल|पैसे भेज|මුදල් යව|මුදල් යැව|විනිමය|හුවමාරු අනුපාත|අනුපාතය/i.test(value);
@@ -32,8 +35,12 @@ function practicalFlags(text) {
   // Sinhala renewal phrases are unverified routing hints. They only keep a
   // logistics question on the practical path. They are never displayed.
   const documentsLogistics = /embassy|שגרירות|สถานทูต|दूतावास|තානාපති|איפה מחדשים דרכון|מחדשים דרכון|renew my passport|passport renewal|lost my passport|איבדתי את הדרכון|පාස්පෝට්[^\n]{0,40}අලුත්|ගමන් බලපත්[^\n]{0,40}අලුත්/i.test(value);
-  const transport = /אוטובוס|\b(bus|train)\b|רכבת|תחבורה/i.test(value);
-  const shopping = /שוק|बाज़ार|market\b|חנות\b/i.test(value) && /פתוח|खुला|open\b/i.test(value);
+  // Thai, Hindi, and Sinhala bus/SIM/shop phrases below are unverified
+  // machine-derived routing hints. They only classify a question as practical.
+  const transport = /אוטובוס|\b(bus|train)\b|רכבת|תחבורה|รถเมล์|รถบัส|รถโดยสาร|รถประจำทาง|බස්|බසය|बस से|कौन सी बस|बस कहाँ|बस नंबर/i.test(value);
+  const phone = /ซิม|โทรศัพท์|มือถือ|\bsim\b|सिम|मोबाइल|फ़ोन|फोन|සිම්|දුරකථන|මොබයිල්/i.test(value);
+  const shopping = (/שוק|बाज़ार|market\b|חנות\b/i.test(value) && /פתוח|खुला|open\b/i.test(value))
+    || /ซื้อของ|ร้านค้า|ช้อปปิ้ง|කඩේ|මිලදී|සාප්පු|दुकान|खरीद/i.test(value);
   const greeting = /^(?:hi|hello|hey|shalom|שלום|היי|สวัสดี(?:ครับ|ค่ะ|คะ)?|नमस्ते|ආයුබෝවන්|හලෝ|හායි|مرحبا|привет)(?![\p{L}\p{M}\p{N}])/iu.test(value.trim());
   return {
     job,
@@ -42,6 +49,7 @@ function practicalFlags(text) {
     healthLocation,
     documentsLogistics,
     transport,
+    phone,
     shopping,
     greeting,
   };
