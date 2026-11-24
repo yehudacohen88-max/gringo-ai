@@ -30,7 +30,7 @@ const {
   CHOOSE_PRACTICAL,
   CHOOSE_RIGHTS,
   assessMixedSplit,
-  splitCoordinatingClauses,
+  splitMixedClauses,
 } = require('../src/modules/knowledge-agent/mixed-question-split');
 
 const DRAFTS = path.join(__dirname, '../knowledge/drafts');
@@ -148,8 +148,7 @@ function joined(practical, legal, coordinator) {
     : `${practical} ${coordinator} ${legal}`;
 }
 
-test('split rules use the existing coordinating split and one confirming flag', () => {
-  assert.equal(splitCoordinatingClauses, require('../src/modules/agents/supervisor/supervisor.service').splitCoordinatingClauses);
+test('split rules stay one legal clause and one confirmed practical clause', () => {
   const confident = assessMixedSplit('how do I get to the train station? and can my employer take my passport?');
   assert.equal(confident.kind, 'confident');
   assert.equal(confident.practical.clause, 'how do I get to the train station?');
@@ -161,9 +160,35 @@ test('split rules use the existing coordinating split and one confirming flag', 
   assert.equal(assessMixedSplit('hello and can my employer take my passport?').reason, 'no_practical_flag');
   assert.equal(assessMixedSplit('find me a job and my employer took my passport and also does not pay me').kind, 'clarify');
   assert.equal(assessMixedSplit("My employer keeps my passport and also doesn't pay my salary").kind, 'passthrough');
-  assert.equal(assessMixedSplit('I want to send money home but my employer has not paid me for two months').reason, 'unsplit');
+  assert.equal(assessMixedSplit('I want to send money home but my employer has not paid me for two months').kind, 'confident');
   assert.equal(assessMixedSplit('what is the minimum wage').kind, 'passthrough');
-  assert.equal(assessMixedSplit('how do I get to the train station? and where is the bus?').kind, 'passthrough');
+  assert.equal(assessMixedSplit('how do I get to the train station and where is the bus').kind, 'passthrough');
+  assert.equal(splitMixedClauses('אני מחפש עבודה והמעסיק לקח לי את הדרכון').length, 1);
+});
+
+test('each new separator divides only on that boundary', () => {
+  const cases = [
+    ['find me a job. My employer took my passport', 'find me a job', 'My employer took my passport'],
+    ['where is the hospital? My employer took my passport', 'where is the hospital', 'My employer took my passport'],
+    ['find me a job! My employer took my passport', 'find me a job', 'My employer took my passport'],
+    ['find me a job\nMy employer took my passport', 'find me a job', 'My employer took my passport'],
+    ['I want to send money home but my employer has not paid me', 'I want to send money home', 'my employer has not paid me'],
+    ['אני מחפש עבודה אבלהמעסיק לקח לי את הדרכון', 'אני מחפש עבודה', 'המעסיק לקח לי את הדרכון'],
+    ['אני מחפש עבודה וגמהמעסיק לקח לי את הדרכון', 'אני מחפש עבודה', 'המעסיק לקח לי את הדרכון'],
+    ['אני מחפש עבודה וגםהמעסיק לקח לי את הדרכון', 'אני מחפש עבודה', 'המעסיק לקח לי את הדרכון'],
+    ['โรงพยาบาลอยู่ที่ไหน และนายจ้างยึดพาสปอร์ต', 'โรงพยาบาลอยู่ที่ไหน', 'นายจ้างยึดพาสปอร์ต'],
+    ['ฉันอยากส่งเงินกลับบ้าน แต่นายจ้างไม่จ่ายเงินเดือน', 'ฉันอยากส่งเงินกลับบ้าน', 'นายจ้างไม่จ่ายเงินเดือน'],
+    ['मुझे नौकरी खोजनी है और नियोक्ता ने पासपोर्ट रख लिया', 'मुझे नौकरी खोजनी है', 'नियोक्ता ने पासपोर्ट रख लिया'],
+    ['मैं पैसे भेजना चाहता हूँ लेकिन नियोक्ता ने वेतन नहीं दिया', 'मैं पैसे भेजना चाहता हूँ', 'नियोक्ता ने वेतन नहीं दिया'],
+  ];
+  for (const [message, practical, legal] of cases) {
+    const split = assessMixedSplit(message);
+    assert.equal(split.kind, 'confident', message);
+    assert.equal(split.practical.clause, practical, message);
+    assert.equal(split.legal.clause, legal, message);
+    assert.equal(split.legal.disposition === 'legal' || split.legal.disposition === 'uncertain', true, message);
+    assert.ok(Object.entries(split.practical.practical).some(([key, value]) => key !== 'greeting' && value), message);
+  }
 });
 
 test('new he and en labels stay short and pending founder approval', () => {
@@ -224,7 +249,7 @@ test('a confident split sends only the practical clause to the model', async () 
       for (const call of fresh) {
         assert.equal(call.message.includes(legal), false, message);
         assert.equal(call.prompt.includes(legal), false, message);
-        assert.equal(call.message.includes(practical), true, message);
+        assert.equal(call.message.includes(split.practical.clause), true, message);
         assert.ok(call.prompt.length < buildUserPrompt({
           message,
           userLanguage: language,
@@ -416,13 +441,53 @@ test('the nine existing mixed scenarios never give the legal clause to the model
           assert.fail(`model ran for an unsplit mixed scenario: ${message}`);
         }
       }
-      assert.equal(reply.includes(MARKER), false, message);
       assert.equal(reply.includes(CLAIM), false, message);
+      if (split.kind === 'confident') {
+        assert.equal(reply.includes(split.legal.clause), false, message);
+      }
       assert.equal(
         reply.includes(legalDisclaimerText(language)) || reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD[language]),
         true,
         message,
       );
+    }
+  } finally {
+    gate.restore();
+  }
+});
+
+test('job and hospital answers stay beside the legal record in Hebrew and English', async () => {
+  const gate = install('en');
+  const cases = [
+    ['en', 'find me a job and my employer took my passport', 'passport'],
+    ['he', 'אני מחפש עבודה. המעסיק לקח לי את הדרכון', 'passport'],
+    ['en', 'where is the hospital and does my employer have to give me health insurance', 'medical_insurance'],
+    ['he', 'איפה בית החולים? המעסיק חייב לעשות לי ביטוח רפואי?', 'medical_insurance'],
+  ];
+  try {
+    for (const [language, message, topic] of cases) {
+      const split = assessMixedSplit(message);
+      assert.equal(split.kind, 'confident', message);
+      const before = gate.calls.length;
+      const alone = await ask(gate, split.practical.clause, language, `alone-${language}-${topic}`);
+      const mixed = await ask(gate, message, language, `mix-${language}-${topic}`);
+      const practicalText = String(alone.reply || '').trim();
+      const mixedReply = String(mixed.reply || '');
+      for (const call of gate.calls.slice(before)) {
+        assert.equal(String(call.message).includes(split.legal.clause), false, message);
+        assert.equal(String(call.prompt).includes(split.legal.clause), false, message);
+      }
+      assert.ok(practicalText.length > 0, message);
+      assert.equal(mixedReply.includes(practicalText), true, message);
+      assert.equal(Object.values(RIGHTS_UNVERIFIED_FALLBACK_LEAD).some((lead) => practicalText.startsWith(lead)), false, message);
+      const record = readDraft(topic, language);
+      const rendered = renderApprovedRecord(record.id, language);
+      const legalText = rendered.includes(lead(record))
+        ? rendered
+        : createRightsUnverifiedFallback(language);
+      assert.equal(mixedReply.includes(legalText), true, message);
+      assert.equal(mixedReply.includes(legalDisclaimerText(language)), true, message);
+      assert.ok(mixed.replyMarkup, message);
     }
   } finally {
     gate.restore();

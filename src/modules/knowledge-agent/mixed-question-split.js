@@ -2,17 +2,45 @@
 // The legal clause is never sent to a model. A split that is not confident
 // asks the user to choose, and does not call a model either.
 //
-// Confident: the existing coordinating-clause split returns exactly two
-// clauses, one legal or uncertain, and one practical whose code practical
-// flag (not a greeting) confirms it.
+// Confident: the clause split returns exactly two clauses, one legal or
+// uncertain, and one practical whose code practical flag (not a greeting)
+// confirms it.
 // Not confident: three or more clauses, two legal clauses alongside a
 // practical signal, no confirming practical flag, a clause that is neither,
 // or any other doubt. A message the splitter does not divide stays on the
 // existing path.
 
 const { PRACTICAL_FLAG_DOMAINS } = require('../ai-provider/dual-gate');
-const { splitCoordinatingClauses } = require('../agents/supervisor/supervisor.service');
 const { classifyUserQuestion } = require('./legal-topic-detector');
+
+// Sentence and conjunction breaks for a mixed question. This is not a legal
+// word list. Thai และ and แต่, and Hindi और and लेकिन, are machine-chosen
+// separators, pending native-speaker review. They are never shown to the user.
+// A bare Hebrew ו glued to the next word is not a separator: it is too ambiguous.
+const MIXED_CLAUSE_SEPARATOR = new RegExp([
+  String.raw`\r?\n+`,
+  // A period, question mark, or exclamation mark ends a clause. Leave it in
+  // place when the next word is itself a conjunction, so that conjunction
+  // stays the separator.
+  String.raw`[.?!]\s+(?!(?:and|also|plus|but)\b|אבל|וגם|וגמ(?!ם))`,
+  String.raw`\s+\b(?:and|also|plus|but)\b\s+`,
+  String.raw`\s+ו(?:אני|גם)?\s+`,
+  String.raw`\s+וגם(?=\S)`,
+  String.raw`\s+וגמ(?!ם)(?=\S)`,
+  String.raw`\s+אבל(?:\s+|(?=\S))`,
+  String.raw`\s*และ\s*`,
+  String.raw`\s*แต่\s*`,
+  String.raw`\s+और(?:\s+|(?=\S))`,
+  String.raw`\s+लेकिन(?:\s+|(?=\S))`,
+].join('|'), 'iu');
+
+function splitMixedClauses(message = '') {
+  return String(message || '')
+    .trim()
+    .split(MIXED_CLAUSE_SEPARATOR)
+    .map((clause) => clause.trim())
+    .filter(Boolean);
+}
 const { MIXED_SPLIT_LABELS } = require('./rights-menu.labels');
 const {
   createRightsReplyMarkup,
@@ -41,7 +69,7 @@ function isPracticalClause(clause) {
 }
 
 function assessMixedSplit(message = '') {
-  const clauses = splitCoordinatingClauses(message).map((clause) => ({
+  const clauses = splitMixedClauses(message).map((clause) => ({
     clause,
     ...classifyUserQuestion(clause),
   }));
@@ -147,5 +175,5 @@ module.exports = {
   joinSplitReply,
   legalAnswerForClause,
   mergeInlineKeyboards,
-  splitCoordinatingClauses,
+  splitMixedClauses,
 };

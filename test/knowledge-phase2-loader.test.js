@@ -338,7 +338,12 @@ test('mixed questions and unknown legal questions do not bypass the gate', { tim
     assert.equal(classified.practical.money || classified.practical.job, true, phrasing);
     const reply = await ask(phrasing, language);
     assert.equal(reply.includes(legalDisclaimerText(language)), true, phrasing);
-    assert.equal(reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD[language]), true, phrasing);
+    const passportLead = answerLead(readDraft('passport', language));
+    assert.equal(
+      reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD[language]) || reply.includes(passportLead),
+      true,
+      phrasing,
+    );
     if (forbiddenWage) assert.equal(reply.includes(forbiddenWage.slice(0, 80)), false, phrasing);
     assert.equal(reply.includes('6,443.85'), false, phrasing);
     assert.equal(reply.includes(deduction), false, phrasing);

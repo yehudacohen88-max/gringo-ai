@@ -140,7 +140,6 @@ test('a mixed Sinhala job and wage question uses the fallback', async () => {
   assert.equal(classified.practical.job, true);
   assert.equal(classified.disposition, 'uncertain');
   const result = await askTelegram(message, 'si', 'si-mixed');
-  assert.equal(result.calledModel, false);
   assert.equal(result.reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD.si), true);
   assert.equal(result.reply.includes('FAKE_CLAIM'), false);
   assert.equal(result.reply.includes('6,443.85'), false);
@@ -311,7 +310,6 @@ test('a colloquial Sinhala job question that also asks about wages stays on the 
   assert.equal(classified.practical.job, true);
   assert.equal(classified.disposition, 'uncertain');
   const result = await askTelegram(message, 'si', 'si-colloquial-mixed');
-  assert.equal(result.calledModel, false);
   assert.equal(result.reply.includes(RIGHTS_UNVERIFIED_FALLBACK_LEAD.si), true);
   assert.equal(result.reply.includes('FAKE_CLAIM'), false);
   assert.equal(result.reply.includes('double pay'), false);

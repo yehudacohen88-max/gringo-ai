@@ -1791,16 +1791,15 @@ async function processWebMessage(messageContext = {}) {
           ai: { attempted: false, used: false, error: 'split_practical_failed' },
         };
       }
-      // Catalog text was not checked by the dual gate. A legal whole question
-      // still drops unstructured catalog follow-ups. Gated model text stays.
-      let practicalReply = practicalResult.reply;
-      if (!(practicalResult.ai && practicalResult.ai.used)) {
-        practicalReply = guardLegalReply(practicalReply, {
-          question: originalQuestion,
-          language: userLanguage,
-          output: structuredOutputFromResponse(practicalResult),
-        });
-      }
+      // Guard the practical half against that clause only. A catalog or
+      // knowledge-base reply still has to pass the output filter. The original
+      // mixed message is not the question, or the filter would replace the
+      // practical answer with the rights fallback.
+      const practicalReply = guardLegalReply(practicalResult.reply, {
+        question: mixed.practical.clause,
+        language: userLanguage,
+        output: structuredOutputFromResponse(practicalResult),
+      });
       await attachSupervisorShadowIfEnabled({
         messageContext,
         userContext,

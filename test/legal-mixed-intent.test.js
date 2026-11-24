@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { classifyUserQuestion } = require('../src/modules/knowledge-agent/legal-topic-detector');
+const { assessMixedSplit } = require('../src/modules/knowledge-agent/mixed-question-split');
 const { guardLegalReply } = require('../src/modules/knowledge-agent/legal-question-guard');
 const { legalDisclaimerText } = require('../src/modules/knowledge-agent/legal-disclaimer');
 const { coreAgentService } = require('../src/modules/core-agent');
@@ -80,8 +81,8 @@ test('mixed web questions do not call free AI', async () => {
   crmAgentService.updateUserProfile = async () => saved;
   crmAgentService.saveConversation = async (event) => event;
   crmAgentService.extractAndUpdateMemory = async () => ({ signals: { interests: [] } });
-  aiProviderService.generateReply = async () => {
-    calls.push('ai');
+  aiProviderService.generateReply = async (context) => {
+    calls.push(String(context && context.message || ''));
     return { provider: 'mock', model: 'm', text: 'MOCK_AI_MIXED' };
   };
   for (const [language, phrasing] of MIXED) {
@@ -95,8 +96,17 @@ test('mixed web questions do not call free AI', async () => {
       channelUserId: 'mixed',
       explicitLanguage: language,
     });
-    assert.equal(calls.length, before, phrasing);
-    assert.equal(String(result.reply).includes('MOCK_AI_MIXED'), false, phrasing);
+    const fresh = calls.slice(before);
+    const split = assessMixedSplit(phrasing);
+    if (split.kind === 'confident') {
+      for (const message of fresh) {
+        assert.equal(message.includes(split.legal.clause), false, phrasing);
+        assert.equal(message === phrasing, false, phrasing);
+      }
+    } else {
+      assert.equal(fresh.length, 0, phrasing);
+      assert.equal(String(result.reply).includes('MOCK_AI_MIXED'), false, phrasing);
+    }
     assert.ok(String(result.reply).includes(legalDisclaimerText(language)), phrasing);
   }
 });
