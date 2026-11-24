@@ -272,7 +272,7 @@ test('OpenAI requests ask the provider not to store responses (store:false)', as
   let sent;
   mock.method(global, 'fetch', async (url, opts) => {
     sent = JSON.parse(opts.body);
-    return { ok: true, json: async () => ({ output_text: '{"domain":"unclear","rights":false,"sure":false,"reply":""}' }) };
+    return { ok: true, json: async () => ({ output_text: '{"domain":"unclear","rights":false,"sure":false,"medical_advice":false,"reply":""}' }) };
   });
   await provider.createResponse({ message: 'hi' });
   mock.restoreAll();

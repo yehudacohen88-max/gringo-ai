@@ -5,11 +5,11 @@ function formatList(items = [], formatter) {
   return items.map(formatter).join('\n');
 }
 
-// Sent on every call. 101 tokens in o200k_base (gpt-4.1-mini). The code gate,
+// Sent on every call. 137 tokens in o200k_base (gpt-4.1-mini). The code gate,
 // not this text, decides whether reply may be shown.
 const DOMAIN_GATE_INSTRUCTION = [
-  'job_search find work; housing_search room or flat; money_transfer transfers and exchange rates; public_transport bus or train; practical_banking account or papers to bring; telecom SIM or internet; shopping_local_services a shop; health_place locating a clinic, hospital, or pharmacy only, no diagnosis, treatment, or eligibility; embassy_admin embassies and administrative services; general everyday life in Israel.',
-  'Otherwise rights, medical, finance_advice, or unclear. Leave reply empty unless sure and rights is false.',
+  'job_search find work; housing_search room or flat; money_transfer transfers and exchange rates; public_transport bus or train; practical_banking account or papers to bring; telecom SIM or internet; shopping_local_services a shop; health_place: reply may only say where a clinic, hospital, or pharmacy is and how to find or reach it, including hours. No medication, dosage, diagnosis, treatment, or eligibility. embassy_admin embassies and administrative services; general everyday life in Israel.',
+  'Otherwise rights, medical, finance_advice, or unclear. Set medical_advice true for medication, dosage, diagnosis, treatment, or eligibility. Leave reply empty unless sure and rights is false.',
 ].join(' ');
 
 function buildDeveloperInstructions() {

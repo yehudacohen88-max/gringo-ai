@@ -67,9 +67,10 @@ function responseTextFormat() {
         domain: { type: 'string', enum: [...DOMAIN_ENUM] },
         rights: { type: 'boolean' },
         sure: { type: 'boolean' },
+        medical_advice: { type: 'boolean' },
         reply: { type: 'string' },
       },
-      required: ['domain', 'rights', 'sure', 'reply'],
+      required: ['domain', 'rights', 'sure', 'medical_advice', 'reply'],
     },
   };
 }
@@ -92,12 +93,13 @@ function parseModelReply(text, meta = {}) {
     return { ok: false, reason: 'schema' };
   }
   const keys = Object.keys(value);
-  if (keys.length !== 4 || ['domain', 'rights', 'sure', 'reply'].some((key) => !Object.prototype.hasOwnProperty.call(value, key))) {
+  const fields = ['domain', 'rights', 'sure', 'medical_advice', 'reply'];
+  if (keys.length !== fields.length || fields.some((key) => !Object.prototype.hasOwnProperty.call(value, key))) {
     return { ok: false, reason: 'schema' };
   }
   if (typeof value.domain !== 'string') return { ok: false, reason: 'schema' };
   if (!DOMAIN_ENUM.includes(value.domain)) return { ok: false, reason: 'unknown_enum' };
-  if (typeof value.rights !== 'boolean' || typeof value.sure !== 'boolean' || typeof value.reply !== 'string') {
+  if (typeof value.rights !== 'boolean' || typeof value.sure !== 'boolean' || typeof value.medical_advice !== 'boolean' || typeof value.reply !== 'string') {
     return { ok: false, reason: 'schema' };
   }
   return {
@@ -106,6 +108,7 @@ function parseModelReply(text, meta = {}) {
       domain: value.domain,
       rights: value.rights,
       sure: value.sure,
+      medical_advice: value.medical_advice,
       reply: value.reply,
     },
   };
@@ -135,13 +138,12 @@ function domainAllowed(domain, language, flags) {
 // menu: rights menu. clarification: existing CLARIFICATION. fallback: friendly fallback.
 function decideDualGate({ classification, language, disposition, practical } = {}) {
   const lang = languageKey(language);
-  const native = NATIVE_REVIEW_LANGUAGES.includes(lang);
   if (!classification || typeof classification !== 'object' || Array.isArray(classification)) {
     return { action: 'fallback', reason: 'schema' };
   }
   if (typeof classification.domain !== 'string') return { action: 'fallback', reason: 'schema' };
   if (!DOMAIN_ENUM.includes(classification.domain)) return { action: 'fallback', reason: 'unknown_enum' };
-  if (typeof classification.rights !== 'boolean' || typeof classification.sure !== 'boolean' || typeof classification.reply !== 'string') {
+  if (typeof classification.rights !== 'boolean' || typeof classification.sure !== 'boolean' || typeof classification.medical_advice !== 'boolean' || typeof classification.reply !== 'string') {
     return { action: 'fallback', reason: 'schema' };
   }
 
@@ -153,17 +155,20 @@ function decideDualGate({ classification, language, disposition, practical } = {
     else if (domain === 'rights') reason = 'domain_rights';
     return { action: 'menu', reason };
   }
+  if (classification.medical_advice === true) return { action: 'clarification', reason: 'medical_advice' };
+  if (domain === 'health_place' && classification.sure !== true) {
+    return { action: 'clarification', reason: 'health_place_unsure' };
+  }
   if (classification.sure !== true) return { action: 'clarification', reason: 'unsure' };
   if (domain === 'general') return { action: 'clarification', reason: 'general_closed' };
   if (domain === 'health_place' && !(practical && practical.healthLocation === true)) {
     return { action: 'clarification', reason: 'health_place_not_location' };
   }
   if (!domainAllowed(domain, lang, practical)) return { action: 'clarification', reason: 'domain_not_allowed' };
-  if (native && !agreedPracticalDomain(practical, domain)) {
+  // Every language, including Hebrew and English: exactly one practical flag
+  // must name the same domain. A greeting has no such flag.
+  if (!agreedPracticalDomain(practical, domain)) {
     return { action: 'clarification', reason: 'domain_disagreement' };
-  }
-  if (!native && disposition !== 'practical' && disposition !== 'none') {
-    return { action: 'clarification', reason: 'code_disposition' };
   }
   if (!classification.reply.trim()) return { action: 'clarification', reason: 'empty_reply' };
   return { action: 'allow', reason: 'agreed', reply: classification.reply };
