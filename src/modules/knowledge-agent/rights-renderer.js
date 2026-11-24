@@ -8,10 +8,12 @@ const { verbatimReviewedAnswers } = require('./legal-question-guard');
 const { handbookPdfUrl } = require('./handbook-links');
 const { STRINGS } = require('../core-agent/onboarding.i18n');
 const {
+  MIXED_SPLIT_LABELS,
   RIGHTS_MENU_TOPIC_ORDER,
   RIGHTS_TOPIC_LABELS,
 } = require('./rights-menu.labels');
 const {
+  CLARIFICATION,
   SOURCE_LINE,
   createRightsUnverifiedFallback,
   rightsFallbackLanguage,
@@ -134,6 +136,7 @@ function rightsShowTarget(recordId = '') {
 
 function rightsCallbackAllowed(parsed = {}) {
   if (!parsed || parsed.moduleName !== 'rights') return false;
+  if (parsed.action === 'choose') return parsed.recordId === 'practical' || parsed.recordId === 'menu';
   if (parsed.action === 'lang') return parsed.recordId === 'handbook' || parsed.recordId === 'en';
   if (parsed.action !== 'show') return false;
   const target = rightsShowTarget(parsed.recordId);
@@ -147,6 +150,20 @@ function rightsCallbackAllowed(parsed = {}) {
 function replyForRightsCallback(parsed = {}, userLanguage) {
   if (!rightsCallbackAllowed(parsed)) return null;
   const userLang = rightsFallbackLanguage(userLanguage);
+  // A mixed-split choice never sends the original message to a model.
+  // Worker rights opens the existing menu. Practical asks for a new message.
+  if (parsed.action === 'choose' && parsed.recordId === 'menu') {
+    return {
+      reply: createRightsUnverifiedFallback(userLang),
+      replyMarkup: createRightsReplyMarkup(userLang),
+    };
+  }
+  if (parsed.action === 'choose' && parsed.recordId === 'practical') {
+    if (userLang === 'he' || userLang === 'en') {
+      return { reply: MIXED_SPLIT_LABELS[userLang].resend, replyMarkup: { inline_keyboard: [] } };
+    }
+    return { reply: CLARIFICATION[userLang], replyMarkup: { inline_keyboard: [] } };
+  }
   if (parsed.action === 'lang' && parsed.recordId === 'en') {
     return {
       reply: createRightsUnverifiedFallback(userLang),

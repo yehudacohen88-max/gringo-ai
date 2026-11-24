@@ -43,7 +43,24 @@ const RIGHTS_TOPIC_LABELS = Object.freeze({
   }),
 });
 
+// Short he/en labels for a mixed practical+legal message that did not split
+// cleanly. Not legal answers. Not approved for publishing until the founder
+// reviews them. Thai, Hindi, and Sinhala are not added here.
+const MIXED_SPLIT_LABELS = Object.freeze({
+  en: Object.freeze({
+    practical: 'Practical question',
+    rights: 'Worker rights',
+    resend: 'Send only the practical question.',
+  }),
+  he: Object.freeze({
+    practical: 'שאלה מעשית',
+    rights: 'זכויות עובדים',
+    resend: 'שלחו רק את השאלה המעשית.',
+  }),
+});
+
 module.exports = {
+  MIXED_SPLIT_LABELS,
   PENDING_FOUNDER_APPROVAL,
   RIGHTS_MENU_TOPIC_ORDER,
   RIGHTS_TOPIC_LABELS,

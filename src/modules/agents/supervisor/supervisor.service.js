@@ -2313,5 +2313,6 @@ module.exports = {
   SUPERVISOR_DOMAINS,
   URGENT_KEYWORDS,
   WORKFLOW_KEYWORDS,
+  splitCoordinatingClauses,
   supervisorService,
 };
