@@ -1,5 +1,6 @@
 const { env } = require('../../config/env');
 const { AiProviderError } = require('./ai-provider.errors');
+const { parseModelReply, responseTextFormat } = require('./dual-gate');
 const { buildDeveloperInstructions, buildUserPrompt } = require('./gringo-prompt.service');
 
 function readResponseText(body) {
@@ -54,6 +55,9 @@ async function createResponse(context = {}) {
           },
         ],
         max_output_tokens: 350,
+        text: {
+          format: responseTextFormat(),
+        },
         // store:false only asks OpenAI not to keep this response for later retrieval.
         // It is NOT a no-retention guarantee: OpenAI may still keep API data for abuse
         // monitoring (default up to 30 days) unless the org has an approved ZDR setup.
@@ -72,15 +76,20 @@ async function createResponse(context = {}) {
     }
 
     const text = readResponseText(body);
-
-    if (!text) {
-      throw new AiProviderError('AI provider returned an empty response.');
+    const parsed = parseModelReply(text, {
+      status: body.status,
+      incomplete: Boolean(body.incomplete_details),
+    });
+    // Truncated, invalid, or off-schema JSON never leaves this function as text.
+    if (!parsed.ok) {
+      throw new AiProviderError('AI provider returned an unusable response.');
     }
 
     return {
       provider: 'openai',
       model: env.ai.model,
-      text,
+      text: parsed.value.reply,
+      classification: parsed.value,
       usage: body.usage || null,
     };
   } catch (error) {

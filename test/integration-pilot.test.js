@@ -270,11 +270,17 @@ test('OpenAI requests ask the provider not to store responses (store:false)', as
   const prevKey = env.ai.apiKey;
   env.ai.apiKey = 'test-not-a-secret';
   let sent;
-  mock.method(global, 'fetch', async (url, opts) => { sent = JSON.parse(opts.body); return { ok: true, json: async () => ({ output_text: 'ok' }) }; });
+  mock.method(global, 'fetch', async (url, opts) => {
+    sent = JSON.parse(opts.body);
+    return { ok: true, json: async () => ({ output_text: '{"domain":"unclear","rights":false,"sure":false,"reply":""}' }) };
+  });
   await provider.createResponse({ message: 'hi' });
   mock.restoreAll();
   env.ai.apiKey = prevKey;
   assert.equal(sent.store, false);
+  assert.equal(sent.max_output_tokens, 350);
+  assert.equal(sent.text.format.type, 'json_schema');
+  assert.equal(sent.text.format.strict, true);
   const { createOpenAiTranslationProvider } = require('../src/modules/translation/providers/openai-translation.provider');
   let tSent;
   const translator = createOpenAiTranslationProvider({ apiKey: 'test-not-a-secret', model: 'm', fetchImpl: async (url, opts) => { tSent = JSON.parse(opts.body); return { ok: true, json: async () => ({ output_text: 'สวัสดี' }) }; } });
