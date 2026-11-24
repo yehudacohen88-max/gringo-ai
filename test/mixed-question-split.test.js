@@ -191,6 +191,19 @@ test('each new separator divides only on that boundary', () => {
   }
 });
 
+test('abbreviations, digit periods, and letters inside Thai or Hindi words stay whole', () => {
+  assert.deepEqual(splitMixedClauses('See Dr. Smith about the bus'), ['See Dr. Smith about the bus']);
+  assert.deepEqual(splitMixedClauses('Mrs. Cohen is at the station'), ['Mrs. Cohen is at the station']);
+  assert.deepEqual(splitMixedClauses('Take bus No. 480 to the hospital'), ['Take bus No. 480 to the hospital']);
+  assert.deepEqual(splitMixedClauses('The fare is 4. 50 shekels'), ['The fare is 4. 50 shekels']);
+  assert.deepEqual(splitMixedClauses('ตั้งแต่ฉันมาทำงาน'), ['ตั้งแต่ฉันมาทำงาน']);
+  assert.deepEqual(splitMixedClauses('औरत ने बस पूछी'), ['औरत ने बस पूछी']);
+  const still = assessMixedSplit('find me a job. My employer took my passport');
+  assert.equal(still.kind, 'confident');
+  assert.equal(still.practical.clause, 'find me a job');
+  assert.equal(still.legal.clause, 'My employer took my passport');
+});
+
 test('new he and en labels stay short and pending founder approval', () => {
   const source = fs.readFileSync(path.join(__dirname, '../src/modules/knowledge-agent/rights-menu.labels.js'), 'utf8');
   assert.equal(PENDING_FOUNDER_APPROVAL, 'PENDING_FOUNDER_APPROVAL');

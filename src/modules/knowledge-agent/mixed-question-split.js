@@ -17,21 +17,26 @@ const { classifyUserQuestion } = require('./legal-topic-detector');
 // word list. Thai และ and แต่, and Hindi और and लेकिन, are machine-chosen
 // separators, pending native-speaker review. They are never shown to the user.
 // A bare Hebrew ו glued to the next word is not a separator: it is too ambiguous.
+// A period after a common abbreviation, or between digits, is not a sentence end.
+const ABBREVIATION_BEFORE_PERIOD = String.raw`Mrs|Miss|Mr|Ms|Dr|St|No|Nos|Prof|Jr|Sr|vs|etc|Ave|Rd|Blvd|Mt|Lt|Gen|Rev|Hon|Inc|Ltd|Co|Fig|Vol|pp|Dept|Apt|Est|e\.g|i\.e|a\.m|p\.m`;
 const MIXED_CLAUSE_SEPARATOR = new RegExp([
   String.raw`\r?\n+`,
   // A period, question mark, or exclamation mark ends a clause. Leave it in
   // place when the next word is itself a conjunction, so that conjunction
-  // stays the separator.
-  String.raw`[.?!]\s+(?!(?:and|also|plus|but)\b|אבל|וגם|וגמ(?!ם))`,
+  // stays the separator. Do not break "Dr. Smith" or "4. 50".
+  String.raw`(?<!\b(?:${ABBREVIATION_BEFORE_PERIOD}))(?!(?<=\d)\.(?=\s+\d))[.?!]\s+(?!(?:and|also|plus|but)\b|אבל|וגם|וגמ(?!ם))`,
   String.raw`\s+\b(?:and|also|plus|but)\b\s+`,
   String.raw`\s+ו(?:אני|גם)?\s+`,
   String.raw`\s+וגם(?=\S)`,
   String.raw`\s+וגמ(?!ם)(?=\S)`,
   String.raw`\s+אבל(?:\s+|(?=\S))`,
-  String.raw`\s*และ\s*`,
-  String.raw`\s*แต่\s*`,
-  String.raw`\s+और(?:\s+|(?=\S))`,
-  String.raw`\s+लेकिन(?:\s+|(?=\S))`,
+  // Thai conjunctions only as their own token: a space or the string edge
+  // before them. "ตั้งแต่" contains แต่ and must stay one word.
+  String.raw`(?:^|\s)และ`,
+  String.raw`(?:^|\s)แต่`,
+  // Hindi conjunctions only as whole words. "औरत" must stay one word.
+  String.raw`(?:^|\s)और(?:\s+|$)`,
+  String.raw`(?:^|\s)लेकिन(?:\s+|$)`,
 ].join('|'), 'iu');
 
 function splitMixedClauses(message = '') {
