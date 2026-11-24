@@ -564,20 +564,27 @@ function formatSourceBlock(record, language) {
 function verbatimReviewedAnswers(records = [], topics = [], options = {}) {
   const approved = (Array.isArray(records) ? records : []).filter((record) => passesLegalVerification(record, options));
   const needed = topics.length ? topics : ['rights'];
-  const question = String(options.question || '');
+  // directRecordId copies one gate-approved record without a question match.
+  // An empty question must not widen what the normal path will show.
+  const directRecordId = storedText(options.directRecordId);
+  const question = directRecordId ? '' : String(options.question || '');
   const language = options.language || 'en';
-  const { topics: questionTopicIds } = questionTopics(question);
+  const questionTopicIds = directRecordId ? [] : questionTopics(question).topics;
   const grounded = [];
   const lines = [];
   for (const record of approved) {
     if (isSourceGroundedRecord(record)) {
-      if (!sourceGroundedRecordMayAnswer(record, question, language)) continue;
+      if (directRecordId) {
+        if (storedText(record.id) !== directRecordId) continue;
+        if (recordLanguageCode(record) !== disclaimerLanguage(language)) continue;
+      } else if (!sourceGroundedRecordMayAnswer(record, question, language)) continue;
       const body = presentAnswerBody(record.answer, language);
       const source = formatSourceBlock(record, language);
       if (!body || sourceEntries(record).every((entry) => !entry.url)) continue;
       grounded.push({ topic: String(record.topic || '').trim(), body, source });
       continue;
     }
+    if (directRecordId) continue;
     const covered = new Set(recordTopics(record));
     if (!needed.some((topic) => topicCovered(topic, covered))) continue;
     const answer = String(record.answer || '').trim();
@@ -749,4 +756,5 @@ module.exports = {
   recordsCoverClaim,
   replyContainsRightsFallback,
   swapRightsFallbackToLanguage,
+  verbatimReviewedAnswers,
 };
