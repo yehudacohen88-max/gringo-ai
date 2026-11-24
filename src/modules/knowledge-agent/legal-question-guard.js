@@ -151,6 +151,252 @@ function containsUnsupportedStatutoryClaim(text = '') {
   return UNSUPPORTED_STATUTORY_PATTERNS.some((pattern) => pattern.test(value));
 }
 
+// Digits in every script. A transfer quote may name a sum. A bare "section 3
+// of this guide" is not a legal claim. A section number counts only together
+// with a law, a labour-rights subject, an entitlement phrase, or a sum.
+const ANY_DIGIT = String.raw`\p{Nd}`;
+const AMOUNT = String.raw`(?:${ANY_DIGIT}{1,3}(?:[,.\u00A0\u202F]${ANY_DIGIT}{3})+|${ANY_DIGIT}+(?:[.,]${ANY_DIGIT}+)?)`;
+const CURRENCY = String.raw`shekels?|sheqels?|nis|ils|₪|שקלים|שקל|ש״ח|ש"ח|บาท|baht|rupees?|रुप(?:ये|या)|शेकेल|ෂෙකල්|฿|₹`;
+const MONEY_AMOUNT = new RegExp(`(?:${AMOUNT})\\s*(?:${CURRENCY})|(?:${CURRENCY})\\s*(?:${AMOUNT})`, 'iu');
+const SECTION_CITATION = new RegExp([
+  String.raw`(?:^|[^\p{L}\p{M}])(?:section|sec\.?|article|clause|statute)\s*(?:no\.?|number)?\s*[:.]?\s*${ANY_DIGIT}{1,4}(?!${ANY_DIGIT})`,
+  String.raw`סעיף\s*${ANY_DIGIT}{1,4}(?!${ANY_DIGIT})`,
+  String.raw`(?:มาตรา|ตามมาตรา)\s*${ANY_DIGIT}{1,4}(?!${ANY_DIGIT})`,
+  String.raw`(?:धारा|अनुच्छेद)\s*${ANY_DIGIT}{1,4}(?!${ANY_DIGIT})`,
+  // Unverified machine-derived Sinhala hint. Block only. Never displayed.
+  String.raw`වගන්ති(?:ය)?\s*${ANY_DIGIT}{1,4}(?!${ANY_DIGIT})`,
+  String.raw`${ANY_DIGIT}{1,4}(?!${ANY_DIGIT})\s*වගන්ති`,
+  String.raw`§\s*${ANY_DIGIT}{1,4}(?!${ANY_DIGIT})`,
+].join('|'), 'iu');
+const ENTITLEMENT_PHRASE = new RegExp([
+  String.raw`you(?:\s+are|'re)\s+entitled`,
+  String.raw`\bentitled\s+to\b`,
+  String.raw`\bby\s+law\b`,
+  String.raw`\bunder\s+the\s+law\b`,
+  String.raw`\baccording\s+to\s+(?:the\s+)?law\b`,
+  String.raw`\b(?:labor|labour)\s+law\s+says\b`,
+  String.raw`\bthe\s+law\s+(?:says|requires|entitles)\b`,
+  String.raw`\bit\s+is\s+(?:not\s+)?(?:il)?legal\b`,
+  String.raw`\blegal\s+to\b`,
+  String.raw`\billegal\b`,
+  // "a right to" / "the right to", not "the right bus".
+  String.raw`\bright\s+to\b`,
+  'זכות ל',
+  'זכאי',
+  'זכאית',
+  'יש לך זכות',
+  'มีสิทธิ',
+  'का अधिकार',
+  'अधिकार है',
+  'מגיע לך',
+  'מגיעים לך',
+  'על פי חוק',
+  'לפי החוק',
+  'לפי סעיף',
+  'זה חוקי',
+  'זה לא חוקי',
+  'ตามกฎหมาย',
+  'มีสิทธิได้รับ',
+  'มีสิทธิได้',
+  'ถูกกฎหมาย',
+  'ผิดกฎหมาย',
+  'कानून के अनुसार',
+  'हकदार',
+  // Unverified machine-derived Sinhala hints. Block only. Never displayed.
+  'නීතියට අනුව',
+  'හිමි වේ',
+  'ඔබට හිමි',
+  'අයිතිය තිබේ',
+  'අයිතියක් තිබේ',
+  'හිමිකම තිබේ',
+].join('|'), 'iu');
+// Obligation or permission. "legal advice" and "can ask" are not in this list.
+// Hebrew, Thai, and Hindi lines are the equivalents used only to block a reply.
+const OBLIGATION = new RegExp([
+  String.raw`\bmust\b`,
+  String.raw`\brequired\b`,
+  String.raw`\brequires\b`,
+  String.raw`\bhas\s+to\b`,
+  String.raw`\bhave\s+to\b`,
+  String.raw`\b(?:is|are)\s+obliged\b`,
+  String.raw`\bobliged\s+to\b`,
+  String.raw`\bnot\s+allowed\b`,
+  String.raw`\b(?:isn'?t|is\s+not)\s+allowed\b`,
+  String.raw`\bmay\s+not\b`,
+  String.raw`\bforbidden\b`,
+  String.raw`\bprohibited\b`,
+  String.raw`\billegal\b`,
+  'חייב',
+  'אסור',
+  'חובה',
+  'נדרש',
+  'מחויב',
+  'מותר',
+  'ต้อง',
+  'ห้าม',
+  'จำเป็น',
+  'चाहिए',
+  'अनिवार्य',
+  'मना है',
+  'गैरकानूनी',
+  // Unverified machine-derived Sinhala hints. Block only. Never displayed.
+  'යුතුයි',
+  'යුතු යි',
+  'බැහැ',
+].join('|'), 'iu');
+const LABOUR_SUBJECT = new RegExp([
+  String.raw`\bovertime\b`,
+  String.raw`\brest\b`,
+  String.raw`\b(?:wage|wages|salary|salaries|pay|paid|payment)\b`,
+  String.raw`\b(?:dismissal|dismissed|dismiss|fired|severance)\b`,
+  String.raw`\b(?:leave|vacation|sick)\b`,
+  String.raw`\binsurance\b`,
+  String.raw`\bpassport\b`,
+  String.raw`\bhousing\b`,
+  String.raw`\bdeposit\b`,
+  String.raw`\b(?:deduct|deduction|deductions)\b`,
+  String.raw`\b(?:injury|injured)\b`,
+  String.raw`\bvisa\b`,
+  String.raw`\bemployer\b`,
+  'שכר',
+  'משכורת',
+  'מנוחה',
+  'שעות נוספות',
+  'פיטור',
+  'פיצוי',
+  'חופשה',
+  'מחלה',
+  'ביטוח',
+  'דרכון',
+  'מגורים',
+  'דיור',
+  'פיקדון',
+  'ניכוי',
+  'פציעה',
+  'ויזה',
+  'אשרה',
+  'מעסיק',
+  'ค่าล่วงเวลา',
+  'ค่าจ้าง',
+  'เงินเดือน',
+  'นายจ้าง',
+  'หนังสือเดินทาง',
+  'ประกัน',
+  'ลาป่วย',
+  'ค่าชดเชย',
+  'หักเงิน',
+  'ชั่วโมงพัก',
+  'วีซ่า',
+  'नियोक्ता',
+  'पासपोर्ट',
+  'बीमा',
+  'छुट्टी',
+  'वेतन',
+  'ओवरटाइम',
+  'मुआवजा',
+  'कटौती',
+  'वीजा',
+  // Unverified machine-derived Sinhala hints. Block only. Never displayed.
+  'අතිකාල',
+  'වැටුප',
+  'නිවාඩු',
+  'රක්ෂණ',
+  'ගමන් බලපත්',
+  'පාස්පෝට්',
+  'යෝජක',
+  'වන්දි',
+].join('|'), 'iu');
+const LAW_CUE = new RegExp([
+  String.raw`\b(?:labor|labour)\s+laws?\b`,
+  String.raw`\blaws?\b`,
+  String.raw`\bregulations?\b`,
+  String.raw`\bstatute\b`,
+  String.raw`\bcourt\b`,
+  String.raw`\bministry\b`,
+  String.raw`\bhandbook\b`,
+  'חוק',
+  'תקנה',
+  'בית הדין',
+  'בית דין',
+  'กฎหมาย',
+  'กระทรวง',
+  'ศาล',
+  'कानून',
+  'अदालत',
+  'मंत्रालय',
+  // Unverified machine-derived Sinhala hint. Block only. Never displayed.
+  'නීතිය',
+].join('|'), 'iu');
+// A named wage rule plus a sum, without requiring the word "must". The hourly
+// calculator's "does not include overtime" sentence is not in this list.
+const AMOUNT_TIED_TO_RIGHTS = /minimum\s+wage|severance|statutory|compensation\s+pay|שכר\s+ה?מינימום|פיצויי|ค่าแรงขั้นต่ำ|ค่าชดเชย|न्यूनतम\s+वेतन|අවම\s+වැටුප|අවම\s+වේතන/iu;
+const DAY_OFF = /\bday\s+off\b|\bdays\s+off\b/iu;
+// Cannot / may not / not allowed, next to firing, dismissal, a deduction, or
+// holding a passport. "cannot find the bus" is not in this list.
+const EMPLOYER_PROHIBITION = new RegExp([
+  String.raw`\b(?:cannot|can't|can\s+not|may\s+not|must\s+not|not\s+allowed(?:\s+to)?)\b[\s\S]{0,48}\b(?:fire|fires|dismiss|deduct|withhold)\b`,
+  String.raw`\b(?:cannot|can't|can\s+not|may\s+not|must\s+not|not\s+allowed(?:\s+to)?)\b[\s\S]{0,48}\b(?:keep|hold|take)\b[\s\S]{0,24}\bpassport\b`,
+  'אסור למעסיק',
+  'לא יכול לפטר',
+  'אי אפשר לפטר',
+  'ไม่สามารถไล่',
+  'ห้ามนายจ้าง',
+  'नहीं निकाल सकता',
+  'नहीं निकाल सकती',
+  'नहीं रख सकता',
+  // Unverified machine-derived Sinhala hints. Block only. Never displayed.
+  'පහ කළ නොහැක',
+  'නෙරපන්න බැහැ',
+].join('|'), 'iu');
+const PASSPORT_WORD = /passport|דרכון|พาสปอร์ต|หนังสือเดินทาง|पासपोर्ट|පාස්පෝට්|ගමන් බලපත්/iu;
+const PASSPORT_HOLDER = /\b(?:employer|boss|agency|manpower)\b|מעסיק|קבלן|นายจ้าง|บริษัทจัดหา|मालिक|नियोक्ता|एजेंसी|යෝජක|නියෝජිත/iu;
+const PASSPORT_CONTROL = /\b(?:keep|keeps|kept|withhold|withheld|confiscat\w*|took|taken|holding|holds)\b|\b(?:will not|won't|refus(?:e|es|ing) to)\s+return\b|לקח|מחזיק|ייקח|החזיק|לא מחזיר|לא החזיר|ยึด|ไม่คืน|रख लिया|रोक लिया|वापस नहीं|තබා|අරගෙන|නොදෙ/iu;
+
+function employerPassportControl(value) {
+  return PASSPORT_WORD.test(value) && PASSPORT_HOLDER.test(value) && PASSPORT_CONTROL.test(value);
+}
+
+// Bringing a passport to a bank, post office, or SIM shop is an errand.
+// An employer or agency holding that passport is not.
+function passportErrand(value) {
+  if (employerPassportControl(value)) return false;
+  const place = /\b(?:bank|post office)\b|\bsim\b|בנק|דואר|ธนาคาร|ไปรษณีย์|बैंक|डाक|सिम|බැංකු|තැපැල්|සිම්/iu;
+  const bring = /\b(?:bring|take|show|present|need|open)\b|להביא|นำ|เอา|ले जा|लेकर|ගෙන|අරින්න/iu;
+  return PASSPORT_WORD.test(value) && place.test(value) && bring.test(value);
+}
+
+function labourSubject(value, ignorePassport) {
+  const source = ignorePassport ? value.replace(PASSPORT_WORD, ' ') : value;
+  return LABOUR_SUBJECT.test(source) || DAY_OFF.test(source);
+}
+
+function lawMandate(value) {
+  if (/กำหนดให้/.test(value) && (/กฎหมาย|นายจ้าง|กระทรวง/.test(value) || /\blaw\b/i.test(value))) return true;
+  if (/के तहत/.test(value) && /होगा|करना होगा|होना होगा/.test(value)) return true;
+  if (/\blaw\s+requires\b/i.test(value)) return true;
+  return false;
+}
+
+function containsUnapprovedLegalClaim(text = '') {
+  const value = String(text || '').normalize('NFC');
+  if (!value.trim()) return false;
+  if (employerPassportControl(value) || EMPLOYER_PROHIBITION.test(value)) return true;
+  const errand = passportErrand(value);
+  const entitlement = ENTITLEMENT_PHRASE.test(value);
+  const obligation = OBLIGATION.test(value);
+  const subject = labourSubject(value, errand);
+  const lawCue = LAW_CUE.test(value);
+  const mandate = lawMandate(value);
+  const section = SECTION_CITATION.test(value);
+  const money = MONEY_AMOUNT.test(value);
+  const tiedAmount = AMOUNT_TIED_TO_RIGHTS.test(value);
+  if (entitlement) return true;
+  if (mandate && (lawCue || subject)) return true;
+  if (obligation && (subject || lawCue)) return true;
+  if (section && (lawCue || entitlement || subject || money || tiedAmount)) return true;
+  return money && (tiedAmount || entitlement);
+}
+
 // Structured results from our own services. Free-text `message` is never trusted
 // on a legal segment, even if it mentions jobs, a question, or an arithmetic phrase.
 function trustedStructuredText(output) {
@@ -383,7 +629,7 @@ function guardLegalReply(text = '', options = {}) {
   const fallback = rightsFallbackFor(question, language);
   const legal = segmentIsLegal(question, options);
   if (!legal) {
-    if (containsUnsupportedStatutoryClaim(reply) || looksLikeUnverifiedLegalAnswer(reply)) return fallback;
+    if (containsUnsupportedStatutoryClaim(reply) || containsUnapprovedLegalClaim(reply) || looksLikeUnverifiedLegalAnswer(reply)) return fallback;
     return reply;
   }
 
@@ -426,7 +672,9 @@ function guardGeneratedLegalOutput(text = '', options = {}) {
     return rightsFallbackFor(question, options.language || 'en');
   }
   const reply = String(text || '');
-  if (containsUnsupportedStatutoryClaim(reply)) return rightsFallbackFor(question, options.language || 'en');
+  if (containsUnsupportedStatutoryClaim(reply) || containsUnapprovedLegalClaim(reply) || looksLikeUnverifiedLegalAnswer(reply)) {
+    return rightsFallbackFor(question, options.language || 'en');
+  }
   return reply;
 }
 
@@ -492,6 +740,7 @@ module.exports = {
   SEPARATE_SUBJECTS,
   UNSUPPORTED_STATUTORY_PATTERNS,
   claimTopics,
+  containsUnapprovedLegalClaim,
   containsUnsupportedStatutoryClaim,
   guardGeneratedLegalOutput,
   guardLegalReply,

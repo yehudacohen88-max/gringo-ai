@@ -15,7 +15,7 @@ Checked on branch `cursor/source-grounded-rights-c633`. No file was added under 
 
 | Path | What it can show | Approval required |
 | --- | --- | --- |
-| `guardLegalReply` / `guardGeneratedLegalOutput` | A record answer copied with its source URL, or the handbook fallback plus disclaimer | Yes. `verifiedRecords` are filtered by `passesLegalVerification`. Model text is dropped. |
+| `guardLegalReply` / `guardGeneratedLegalOutput` | A record answer copied with its source URL, or the handbook fallback plus disclaimer. On a non-legal segment, a model reply is replaced by that fallback when it states an entitlement, pairs an obligation ("must", "has to", "not allowed", "illegal", and Hebrew, Thai, and Hindi equivalents) with a labour-rights subject or a law/regulation/court/ministry cue, cites a section number together with one of those cues or a sum, or ties a sum to a named wage rule. A guide line such as "section 3 … bank account" is kept. A transfer amount with no legal cue is kept. | Yes. `verifiedRecords` are filtered by `passesLegalVerification`. Model text is dropped on a legal segment, and an unapproved legal claim is dropped on every other segment. |
 | `searchKnowledgeBase` / `answerQuestion` | Withholds legal items that fail the gate. Category-only legal hits are withheld, not answered | Yes |
 | Core agent web chat (`processWebMessage`) | Legal segments call the guard and do not call free AI. Mixed practical results are kept only as structured job, housing, transfer, or rate rows | Yes for any legal sentence |
 | Supervisor `composeResponse` / `composeEnglishResponse` | Each domain result is passed through `guardLegalReply` | Yes |
@@ -31,3 +31,11 @@ Checked on branch `cursor/source-grounded-rights-c633`. No file was added under 
 `test/legal-approval-metadata.test.js` flips `legalClaimsVerified`, `source.verified`, `verifiedAt`, `contentStatus`, `reviewedBy`, and the URL, and checks that the answer is not shown. A matching approval entry is the case that does show the answer. Wrong content hash does not.
 
 `test/employment-agent-execution.test.js` checks that a salary-timing record with full legacy metadata and no approval file is not quoted (no "ninth day", no statute name).
+
+## Sinhala script gap
+
+Sinhala questions about passport, wages, insurance, housing, dismissal, and worker rights were not a legal segment unless they happened to contain one of a few fragments (`විදේශ ගමන්`, `සෞඛ්‍ය රක්ෂණ`, `අයිතිවාසිකම්`, and similar). The model was then called, and the old output list did not cover "section 4" or "2,000 shekels".
+
+`classifyUserQuestion` now treats a non-Hebrew, non-Latin script as unverified. If that message is not confidently practical, or it contains a rights signal, the disposition is `uncertain` and the existing fallback is used. A detected Hebrew, English, Thai, or Hindi topic still follows the old path, so an approved record in the reply language can still be shown. New Sinhala hints are machine-derived, marked in code, and used only to block. They do not add a string the user sees and they do not select a record.
+
+The output check also treats "a right to", זכות/זכאי, มีสิทธิ, अधिकार, and the existing Sinhala අයිතිය තිබේ line as entitlement wording, and it treats "cannot fire / dismiss / deduct" and an employer holding a passport as claims. A passport carried to a bank, post office, or SIM shop is not that claim. These patterns still miss paraphrases.
