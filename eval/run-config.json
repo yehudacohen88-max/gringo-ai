@@ -1,0 +1,37 @@
+{
+  "model": "gpt-4.1-mini",
+  "encoding": "o200k_base",
+  "pricingPerM": {
+    "input": 0.4,
+    "output": 1.6
+  },
+  "pricingCheckedOn": "2026-11-24",
+  "maxOutputTokens": 350,
+  "cumulativeBudgetUsd": 1.35,
+  "stage1": {
+    "maxCalls": 20,
+    "stageBudgetUsd": 0.05
+  },
+  "tokenizer": {
+    "package": "js-tiktoken",
+    "packageVersion": "1.0.21",
+    "encoding": "o200k_base",
+    "safetyMargin": 0.15,
+    "perMessageOverheadTokens": 8,
+    "requestFramingOverheadTokens": 24
+  },
+  "retries": "disabled",
+  "concurrency": 1,
+  "openaiProjectBudgetIsNotAStopMechanism": true,
+  "openaiProjectBudgetNote": "The OpenAI project or account budget is not a stop mechanism. Only the local stage cap, the cumulative $1.35 cap, and the max-calls cap may stop a run.",
+  "repoBranch": "cursor/safety-mvp-pr3-mixed-split-5df6",
+  "repoBranchHeadSha": "29c19c8270824a2a066cd0e40e0ff818fb975b21",
+  "repoBranchHeadShaShort": "29c19c8",
+  "flags": [
+    "--staged",
+    "--max-calls=20",
+    "--stage-budget=0.05"
+  ],
+  "dryRunCommand": "node eval/run-isolated.js --staged --max-calls=20 --stage-budget=0.05 --dry-run",
+  "liveRunCommand": "node eval/run-isolated.js --staged --max-calls=20 --stage-budget=0.05"
+}
