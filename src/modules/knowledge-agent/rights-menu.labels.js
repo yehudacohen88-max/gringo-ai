@@ -21,7 +21,7 @@ const RIGHTS_MENU_TOPIC_ORDER = Object.freeze([
 const RIGHTS_TOPIC_LABELS = Object.freeze({
   en: Object.freeze({
     passport: 'Passport',
-    construction_transfer: 'Change employer',
+    construction_transfer: 'Changing employer in construction',
     minimum_wage: 'Minimum wage',
     housing: 'Housing',
     medical_insurance: 'Health insurance',
@@ -32,7 +32,7 @@ const RIGHTS_TOPIC_LABELS = Object.freeze({
   }),
   he: Object.freeze({
     passport: 'דרכון',
-    construction_transfer: 'החלפת מעסיק',
+    construction_transfer: 'מעבר מעסיק בענף הבנייה',
     minimum_wage: 'שכר מינימום',
     housing: 'מגורים',
     medical_insurance: 'ביטוח רפואי',
