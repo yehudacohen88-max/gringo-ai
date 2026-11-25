@@ -8,6 +8,7 @@ on:
     branches:
       - main
       - cursor/rights-menu-approved-record-44ba
+      - cursor/safety-mvp-pr2-dual-gate-07ec
 
 permissions:
   contents: read

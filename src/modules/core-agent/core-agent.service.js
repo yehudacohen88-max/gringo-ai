@@ -34,6 +34,13 @@ const {
 } = require('../knowledge-agent/legal-question-guard');
 const { classifyUserQuestion } = require('../knowledge-agent/legal-topic-detector');
 const { createRightsReplyMarkup } = require('../knowledge-agent/rights-renderer');
+const {
+  assessMixedSplit,
+  clarificationForMixedSplit,
+  joinSplitReply,
+  legalAnswerForClause,
+  mergeInlineKeyboards,
+} = require('../knowledge-agent/mixed-question-split');
 const { languageDetectionService } = require('../language');
 const {
   appendLanguageConflictNotice,
@@ -1549,6 +1556,23 @@ async function getPersonalizedStartup(userContext = {}) {
   };
 }
 
+function structuredOutputFromResponse(response = {}) {
+  if (response.structuredOutput) return response.structuredOutput;
+  if (response.category === 'Jobs' && Array.isArray(response.jobs)) {
+    return { capability: 'jobs.search', jobs: response.jobs };
+  }
+  if (response.category === 'Housing' && response.housing && Array.isArray(response.housing.listings)) {
+    return { capability: 'housing.support', listings: response.housing.listings };
+  }
+  if (response.category === 'Money' && response.money && Array.isArray(response.money.results)) {
+    return { capability: 'finance.transfer', reportedQuotes: response.money.results, message: response.reply };
+  }
+  if (response.category === 'Money' && response.money && response.money.rate) {
+    return { capability: 'finance.rate', rate: response.money.rate };
+  }
+  return undefined;
+}
+
 async function processWebMessage(messageContext = {}) {
   const originalQuestion = String(messageContext.message || '').trim();
   let question = originalQuestion;
@@ -1626,7 +1650,7 @@ async function processWebMessage(messageContext = {}) {
   const deliverResponse = async (response) => {
     const domainCategories = new Set(['Jobs', 'Housing', 'Money', 'Documents', 'Services']);
     const asked = `${originalQuestion}\n${question}`;
-    if (domainCategories.has(response.category) || containsUnsupportedStatutoryClaim(response.reply || '')) {
+    if (!response.preserveSplitReply && (domainCategories.has(response.category) || containsUnsupportedStatutoryClaim(response.reply || ''))) {
       const guarded = guardLegalReply(response.reply, {
         question: asked,
         language: userLanguage,
@@ -1658,6 +1682,7 @@ async function processWebMessage(messageContext = {}) {
       // Lifecycle maintenance should never block a user response.
     }
     const finalized = { ...response };
+    delete finalized.preserveSplitReply;
     delete finalized.replyLanguage;
     delete finalized.verifiedRecords;
     if (response.skipOutgoingTranslation || responseAlreadyMatchesUserLanguage(response, userLanguage)) {
@@ -1741,6 +1766,65 @@ async function processWebMessage(messageContext = {}) {
           memoryUpdated: false,
           error: '',
         },
+      });
+    }
+  }
+
+  // A mixed practical+legal message is split before translation, so the legal
+  // clause is never sent to a model. The practical clause then follows the
+  // normal path on its own, including the dual gate when that path calls the
+  // model. Anything that is not a confident pair asks a clarifying question.
+  if (!messageContext.splitDepth) {
+    const mixed = assessMixedSplit(originalQuestion);
+    if (mixed.kind === 'clarify') {
+      return deliverResponse(clarificationForMixedSplit(userLanguage));
+    }
+    if (mixed.kind === 'confident') {
+      let practicalResult;
+      try {
+        const practicalContext = { ...messageContext, message: mixed.practical.clause, splitDepth: 1 };
+        delete practicalContext.supervisorShadow;
+        practicalResult = await processWebMessage(practicalContext);
+      } catch (error) {
+        practicalResult = {
+          reply: '',
+          ai: { attempted: false, used: false, error: 'split_practical_failed' },
+        };
+      }
+      // Guard the practical half against that clause only. A catalog or
+      // knowledge-base reply still has to pass the output filter. The original
+      // mixed message is not the question, or the filter would replace the
+      // practical answer with the rights fallback.
+      const practicalReply = guardLegalReply(practicalResult.reply, {
+        question: mixed.practical.clause,
+        language: userLanguage,
+        output: structuredOutputFromResponse(practicalResult),
+      });
+      await attachSupervisorShadowIfEnabled({
+        messageContext,
+        userContext,
+        originalQuestion,
+        question: originalQuestion,
+        conversationId,
+        languageResolution,
+        savedLanguage,
+        memorySnapshot,
+        workingMemory,
+        conversationContext,
+        profile: onboardingStatus.profile,
+      });
+      const legal = legalAnswerForClause(mixed.legal.clause, userLanguage);
+      const replyMarkup = mergeInlineKeyboards(practicalResult.replyMarkup, legal.replyMarkup);
+      return deliverResponse({
+        reply: joinSplitReply(mixed, practicalReply, legal.reply),
+        ...(replyMarkup ? { replyMarkup } : {}),
+        category: practicalResult.category || 'Knowledge',
+        status: practicalResult.status || 'MIXED_SPLIT',
+        preserveSplitReply: true,
+        skipOutgoingTranslation: true,
+        replyLanguage: userLanguage,
+        ai: practicalResult.ai || { attempted: false, used: false, error: '' },
+        crm: practicalResult.crm,
       });
     }
   }
