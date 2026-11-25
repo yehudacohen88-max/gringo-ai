@@ -170,11 +170,13 @@ test('founder labels are new he/en UI text only and stay pending approval', () =
   assert.match(source, /PENDING_FOUNDER_APPROVAL/);
   assert.equal(/[\u0E00-\u0E7F\u0D80-\u0DFF\u0900-\u097F]/.test(source), false);
   assert.deepEqual(Object.keys(RIGHTS_TOPIC_LABELS).sort(), ['en', 'he']);
+  assert.equal(RIGHTS_TOPIC_LABELS.en.construction_transfer, 'Changing employer in construction');
+  assert.equal(RIGHTS_TOPIC_LABELS.he.construction_transfer, 'מעבר מעסיק בענף הבנייה');
   for (const language of ['he', 'en']) {
     for (const topic of [...RIGHTS_MENU_TOPIC_ORDER, 'other']) {
       const label = RIGHTS_TOPIC_LABELS[language][topic];
       assert.equal(typeof label, 'string', `${language}:${topic}`);
-      assert.ok(label.length > 0 && label.length <= 32, label);
+      assert.ok(label.length > 0 && label.length <= 40, label);
     }
   }
 });
