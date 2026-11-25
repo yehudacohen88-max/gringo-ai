@@ -8,6 +8,7 @@ const {
 } = require('../../config/agents');
 const { aiProviderService } = require('../ai-provider');
 const { decideDualGate } = require('../ai-provider/dual-gate');
+const { formatPracticalClarification } = require('../ai-provider/practical-clarification');
 const { supervisorService } = require('../agents');
 const { crmAgentService } = require('../crm-agent');
 const communityService = require('../community/community.service');
@@ -2630,11 +2631,24 @@ async function processWebMessage(messageContext = {}) {
           ai.used = false;
           ai.closed = decision.reason;
         } else if (decision.action === 'clarification') {
-          reply = CLARIFICATION[replyLanguageKey(userLanguage)];
-          withholdLegalTranslation = true;
-          finalStatus = 'AI_CLOSED';
-          ai.used = false;
-          ai.closed = decision.reason;
+          const practicalClarification = decision.clarificationKind === 'practical' && decision.domain
+            ? formatPracticalClarification(decision.domain, userLanguage)
+            : null;
+          if (practicalClarification) {
+            reply = practicalClarification.reply;
+            withholdLegalTranslation = true;
+            finalStatus = 'PRACTICAL_CLARIFICATION';
+            ai.used = false;
+            ai.closed = decision.reason;
+            ai.practicalDomain = decision.domain;
+            ai.nativeReviewRequired = practicalClarification.nativeReviewRequired;
+          } else {
+            reply = CLARIFICATION[replyLanguageKey(userLanguage)];
+            withholdLegalTranslation = true;
+            finalStatus = 'AI_CLOSED';
+            ai.used = false;
+            ai.closed = decision.reason;
+          }
         } else {
           reply = createFriendlyFallback(userLanguage);
           ai.used = false;

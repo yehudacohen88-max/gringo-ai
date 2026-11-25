@@ -47,8 +47,8 @@ function practicalFlags(text) {
   // unverified machine-derived routing hints. They only classify a question
   // as practical.
   const transport = /אוטובוס|\b(bus|train)\b|רכבת|תחבורה|รถเมล์|รถบัส|รถโดยสาร|รถประจำทาง|รถไฟ|สถานีรถไฟ|ตั๋วรถไฟ|බස්|බසය|बस से|कौन सी बस|बस कहाँ|बस नंबर/i.test(value);
-  const phone = /ซิม|โทรศัพท์|มือถือ|\bsim\b|सिम|मोबाइल|फ़ोन|फोन|සිම්|දුරකථන|මොබයිල්/i.test(value);
-  const shopping = (/שוק|बाज़ार|market\b|חנות\b/i.test(value) && /פתוח|खुला|open\b/i.test(value))
+  const phone = /ซิม|โทรศัพท์|มือถือ|\bsim\b|(?:^|[\s"\x27(])סים(?![\p{L}\p{M}])|सिम|मोबाइल|फ़ोन|फोन|සිම්|දුරකථන|මොබයිල්/iu.test(value);
+  const shopping = (/שוק|बाज़ार|market\b|(?:^|\s)חנות(?![\p{L}\p{M}])/iu.test(value) && /פתוח|खुला|open\b/i.test(value))
     || /ซื้อของ|ร้านค้า|ช้อปปิ้ง|කඩේ|මිලදී|සාප්පු|दुकान|खरीद/i.test(value);
   const greeting = /^(?:hi|hello|hey|shalom|שלום|היי|สวัสดี(?:ครับ|ค่ะ|คะ)?|नमस्ते|ආයුබෝවන්|හලෝ|හායි|مرحبا|привет)(?![\p{L}\p{M}\p{N}])/iu.test(value.trim());
   return {
@@ -84,7 +84,7 @@ function hasUnverifiedLegalScript(text) {
 // Never displayed. Never used to choose or quote a handbook record.
 // Sinhala covers minimum wage, medical insurance, severance, dismissal,
 // worker rights, workers sharing a room, and "the law".
-const UNVERIFIED_BLOCK_HINTS = /අවම වැටුප|අවම වේතන|වෛද්‍ය රක්ෂණ|සෞඛ්‍ය රක්ෂණ|වන්දි|පන්සන්|රැකියාවෙන් ඉවත්|වැඩෙන් ඉවත්|පහ කළ|පහකළ|අයිතිවාසිකම්|හිමිකම්|නීතිය|නීත්‍යානුකූල|කම්කරුවන්.{0,32}කාමර|කාමරයක.{0,32}කම්කරු|කාමරයක.{0,32}කම්කරුවන්/u;
+const UNVERIFIED_BLOCK_HINTS = /ตามกฎหมาย|กฎหมายกำหนด|ตามมาตรา|අවම වැටුප|අවම වේතන|වෛද්‍ය රක්ෂණ|සෞඛ්‍ය රක්ෂණ|වන්දි|පන්සන්|රැකියාවෙන් ඉවත්|වැඩෙන් ඉවත්|පහ කළ|පහකළ|අයිතිවාසිකම්|හිමිකම්|නීතිය|නීත්‍යානුකූල|කම්කරුවන්.{0,32}කාමර|කාමරයක.{0,32}කම්කරු|කාමරයක.{0,32}කම්කරුවන්/u;
 
 function unverifiedBlockHint(text) {
   const value = normalized(text);
@@ -197,7 +197,7 @@ function collectLegalTopics(text, flags) {
   // "Do I get paid?" is a wage question on its own. Next to sick leave or
   // another subject it is part of that subject, not a second unpaid-wage claim.
   const weakPay = /still get paid|how much should i (get paid|be paid)|do i get paid|מגיע לי שכר/i.test(value);
-  if ((strongUnpaid || (weakPay && found.length === 0)) && !flags.transport) {
+  if (strongUnpaid || (weakPay && found.length === 0 && !flags.transport)) {
     add(topicResult('wages', '9', 'piba'));
   }
 

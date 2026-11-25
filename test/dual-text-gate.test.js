@@ -126,7 +126,10 @@ test('the domain instruction names the narrow health_place and general meanings'
   assert.match(DOMAIN_GATE_INSTRUCTION, /medical_advice true/);
   assert.match(DOMAIN_GATE_INSTRUCTION, /general everyday life in Israel/);
   assert.match(DOMAIN_GATE_INSTRUCTION, /money_transfer transfers and exchange rates/);
-  assert.match(DOMAIN_GATE_INSTRUCTION, /Leave reply empty unless sure and rights is false/);
+  assert.match(DOMAIN_GATE_INSTRUCTION, /topic_sure/);
+  assert.match(DOMAIN_GATE_INSTRUCTION, /info_sure/);
+  assert.match(DOMAIN_GATE_INSTRUCTION, /needs_practical_clarification/);
+  assert.match(DOMAIN_GATE_INSTRUCTION, /Leave reply empty unless topic_sure, info_sure, not needs_practical_clarification, and not rights/);
   for (const domain of DOMAINS) assert.match(DOMAIN_GATE_INSTRUCTION, new RegExp(domain));
 });
 
@@ -135,10 +138,12 @@ test('strict json schema lists the fourteen domains and no extra fields', () => 
   assert.equal(format.type, 'json_schema');
   assert.equal(format.strict, true);
   assert.equal(format.schema.additionalProperties, false);
-  assert.deepEqual(format.schema.required, ['domain', 'rights', 'sure', 'medical_advice', 'reply']);
+  assert.deepEqual(format.schema.required, ['domain', 'rights', 'topic_sure', 'info_sure', 'needs_practical_clarification', 'medical_advice', 'reply']);
   assert.deepEqual(format.schema.properties.domain.enum, DOMAINS);
   assert.equal(format.schema.properties.rights.type, 'boolean');
-  assert.equal(format.schema.properties.sure.type, 'boolean');
+  assert.equal(format.schema.properties.topic_sure.type, 'boolean');
+  assert.equal(format.schema.properties.info_sure.type, 'boolean');
+  assert.equal(format.schema.properties.needs_practical_clarification.type, 'boolean');
   assert.equal(format.schema.properties.medical_advice.type, 'boolean');
   assert.equal(format.schema.properties.reply.type, 'string');
 });
@@ -311,23 +316,23 @@ test('a clinic location may use health_place, and a treatment sentence the filte
 });
 
 test('invalid JSON, truncated JSON, extra fields, and an unknown enum do not parse', () => {
-  const marker = `{"domain":"job_search","rights":false,"sure":true,"medical_advice":false,"reply":"${MARKER}"}`;
+  const marker = `{"domain":"job_search","rights":false,"topic_sure":true,"info_sure":true,"needs_practical_clarification":false,"medical_advice":false,"reply":"${MARKER}"}`;
   assert.equal(parseModelReply('not-json').reason, 'invalid_json');
   assert.equal(parseModelReply('').reason, 'invalid_json');
-  assert.equal(parseModelReply(`{"domain":"job_search","rights":false,"sure":true,"medical_advice":false,"reply":"${MARKER}"`).reason, 'truncated');
+  assert.equal(parseModelReply(`{"domain":"job_search","rights":false,"topic_sure":true,"info_sure":true,"needs_practical_clarification":false,"medical_advice":false,"reply":"${MARKER}"`).reason, 'truncated');
   assert.equal(parseModelReply(marker, { status: 'incomplete' }).reason, 'truncated');
   assert.equal(parseModelReply(marker, { incomplete: true }).reason, 'truncated');
   assert.equal(parseModelReply(`${marker.slice(0, -1)},"extra":true}`).reason, 'schema');
-  assert.equal(parseModelReply(`{"domain":"cooking","rights":false,"sure":true,"medical_advice":false,"reply":"${MARKER}"}`).reason, 'unknown_enum');
-  assert.equal(parseModelReply(`{"domain":"job_search","rights":"false","sure":true,"medical_advice":false,"reply":"${MARKER}"}`).reason, 'schema');
-  assert.equal(parseModelReply(`{"domain":"job_search","rights":false,"sure":true,"reply":"${MARKER}"}`).reason, 'schema');
+  assert.equal(parseModelReply(`{"domain":"cooking","rights":false,"topic_sure":true,"info_sure":true,"needs_practical_clarification":false,"medical_advice":false,"reply":"${MARKER}"}`).reason, 'unknown_enum');
+  assert.equal(parseModelReply(`{"domain":"job_search","rights":"false","topic_sure":true,"info_sure":true,"needs_practical_clarification":false,"medical_advice":false,"reply":"${MARKER}"}`).reason, 'schema');
+  assert.equal(parseModelReply(`{"domain":"job_search","rights":false,"topic_sure":true,"reply":"${MARKER}"}`).reason, 'schema');
   assert.equal(parseModelReply('[]').reason, 'schema');
   for (const sample of [
     'not-json',
     `{"reply":"${MARKER}"`,
     marker,
     `${marker.slice(0, -1)},"extra":1}`,
-    `{"domain":"cooking","rights":false,"sure":true,"medical_advice":false,"reply":"${MARKER}"}`,
+    `{"domain":"cooking","rights":false,"topic_sure":true,"info_sure":true,"needs_practical_clarification":false,"medical_advice":false,"reply":"${MARKER}"}`,
   ]) {
     const parsed = parseModelReply(sample, sample === marker ? { status: 'incomplete' } : {});
     assert.equal(parsed.ok, false);
@@ -874,7 +879,7 @@ test('a direct provider call keeps max_output_tokens at 350 and drops a bad payl
       sent = JSON.parse(opts.body);
       return {
         ok: true,
-        json: async () => ({ output_text: '{"domain":"public_transport","rights":false,"sure":true,"medical_advice":false,"reply":"Bus 480."}' }),
+        json: async () => ({ output_text: '{"domain":"public_transport","rights":false,"topic_sure":true,"info_sure":true,"needs_practical_clarification":false,"medical_advice":false,"reply":"Bus 480."}' }),
       };
     };
     const ok = await openAiProvider.createResponse({ message: 'hello', userLanguage: 'en' });
