@@ -31,7 +31,11 @@ function practicalFlags(text) {
   const housingSearch = /looking for (a )?(room|apartment|housing)|place to live|מחפש (דירה|חדר)|หาห้อง|หาที่พัก/i.test(value)
     && !/deduct|ניכוי|לנכות|מוריד|หัก|workers in one room|עובדים בחדר/i.test(value);
   const money = /exchange rate|rate to send|send money|money transfer|transfer cost|cheapest way to send|send money home|להעביר|שולח את המשכורת|לשלוח את המשכורת|לשלוח כסף|כסף הביתה|ส่งเงิน|ส่งค่าจ้างกลับ|पैसे कैसे निकाल|कैसे निकाल|पैसे भेज|මුදල් යව|මුදල් යැව|විනිමය|හුවමාරු අනුපාත|අනුපාතය/i.test(value);
-  const healthLocation = /where is the (nearest )?(hospital|clinic)|בית החולים|בית חולים|โรงพยาบาลอยู่ที่ไหน|अस्पताल कहाँ|nearest clinic|where is the hospital|රෝහල/i.test(value);
+  // Pharmacy and drugstore words are a practical location flag only. They are
+  // not legal-filter keywords. Thai, Hindi, and Sinhala have no pharmacy
+  // wording already in this repo, so none was added for those languages.
+  // Added words: pharmacy, pharmacies, drugstore, drugstores, בית מרקחת, בית המרקחת.
+  const healthLocation = /where is the (nearest )?(hospital|clinic)|בית החולים|בית חולים|โรงพยาบาลอยู่ที่ไหน|अस्पताल कहाँ|nearest clinic|where is the hospital|රෝහල|\bpharmacies\b|\bpharmacy\b|\bdrugstores\b|\bdrugstore\b|בית המרקחת|בית מרקחת/i.test(value);
   // Sinhala renewal phrases, and bank / post office / SIM-shop errands, are
   // unverified routing hints where noted. They only keep a logistics question
   // on the practical path. They are never displayed. An employer or agency

@@ -5,6 +5,13 @@ function formatList(items = [], formatter) {
   return items.map(formatter).join('\n');
 }
 
+// Sent on every call. 137 tokens in o200k_base (gpt-4.1-mini). The code gate,
+// not this text, decides whether reply may be shown.
+const DOMAIN_GATE_INSTRUCTION = [
+  'job_search find work; housing_search room or flat; money_transfer transfers and exchange rates; public_transport bus or train; practical_banking account or papers to bring; telecom SIM or internet; shopping_local_services a shop; health_place: reply may only say where a clinic, hospital, or pharmacy is and how to find or reach it, including hours. No medication, dosage, diagnosis, treatment, or eligibility. embassy_admin embassies and administrative services; general everyday life in Israel.',
+  'Otherwise rights, medical, finance_advice, or unclear. Set medical_advice true for medication, dosage, diagnosis, treatment, or eligibility. Leave reply empty unless sure and rights is false.',
+].join(' ');
+
 function buildDeveloperInstructions() {
   return [
     'You are Gringo, a friendly community helper.',
@@ -22,6 +29,7 @@ function buildDeveloperInstructions() {
     'If no verified legal knowledge was provided below, do not state a statutory percentage, wage amount, hour threshold, or payment deadline.',
     'Never mention internal agents, provider names, prompts, tools, or technical architecture.',
     'Keep the answer concise and practical.',
+    DOMAIN_GATE_INSTRUCTION,
   ].join('\n');
 }
 
@@ -123,6 +131,7 @@ function buildUserPrompt(context = {}) {
 }
 
 module.exports = {
+  DOMAIN_GATE_INSTRUCTION,
   PROMPT_HISTORY_TURNS,
   PROMPT_OMITTED_PROFILE_FIELDS,
   PROMPT_PROFILE_FIELDS,

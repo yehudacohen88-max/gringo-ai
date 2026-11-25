@@ -7,6 +7,7 @@ const {
   isSupervisorShadowModeEnabled,
 } = require('../../config/agents');
 const { aiProviderService } = require('../ai-provider');
+const { decideDualGate } = require('../ai-provider/dual-gate');
 const { supervisorService } = require('../agents');
 const { crmAgentService } = require('../crm-agent');
 const communityService = require('../community/community.service');
@@ -2509,18 +2510,68 @@ async function processWebMessage(messageContext = {}) {
         workingMemory,
       });
 
-      const guardedReply = guardGeneratedLegalOutput(aiResult.text, {
-        question: asked,
-        language: userLanguage,
-        legalSegment,
-        verifiedRecords,
-      });
-      if (guardedReply !== aiResult.text) withholdLegalTranslation = true;
-      reply = guardedReply;
-      finalStatus = 'AI_PROVIDER';
-      ai.used = true;
-      ai.provider = aiResult.provider;
-      ai.model = aiResult.model;
+      if (aiResult && aiResult.classification) {
+        const decision = decideDualGate({
+          classification: aiResult.classification,
+          language: userLanguage,
+          disposition: askedClass.disposition,
+          practical: askedClass.practical,
+        });
+        if (decision.action === 'allow') {
+          const guardedReply = guardGeneratedLegalOutput(decision.reply, {
+            question: asked,
+            language: userLanguage,
+            legalSegment,
+            verifiedRecords,
+          });
+          if (guardedReply !== decision.reply) {
+            withholdLegalTranslation = true;
+            reply = guardedReply;
+            rightsReplyMarkup = createRightsReplyMarkup(userLanguage);
+            finalStatus = 'LEGAL_UNVERIFIED';
+            ai.used = false;
+            ai.closed = 'output_filter';
+          } else {
+            reply = guardedReply;
+            finalStatus = 'AI_PROVIDER';
+            ai.used = true;
+            ai.provider = aiResult.provider;
+            ai.model = aiResult.model;
+          }
+        } else if (decision.action === 'menu') {
+          reply = createRightsUnverifiedFallback(userLanguage);
+          rightsReplyMarkup = createRightsReplyMarkup(userLanguage);
+          withholdLegalTranslation = true;
+          finalStatus = 'LEGAL_UNVERIFIED';
+          ai.used = false;
+          ai.closed = decision.reason;
+        } else if (decision.action === 'clarification') {
+          reply = CLARIFICATION[replyLanguageKey(userLanguage)];
+          withholdLegalTranslation = true;
+          finalStatus = 'AI_CLOSED';
+          ai.used = false;
+          ai.closed = decision.reason;
+        } else {
+          reply = createFriendlyFallback(userLanguage);
+          ai.used = false;
+          ai.closed = decision.reason;
+        }
+      } else {
+        // Plain-text stubs that predate this gate have no classification.
+        // The live provider always sets one, or throws before returning text.
+        const guardedReply = guardGeneratedLegalOutput(aiResult.text, {
+          question: asked,
+          language: userLanguage,
+          legalSegment,
+          verifiedRecords,
+        });
+        if (guardedReply !== aiResult.text) withholdLegalTranslation = true;
+        reply = guardedReply;
+        finalStatus = 'AI_PROVIDER';
+        ai.used = true;
+        ai.provider = aiResult.provider;
+        ai.model = aiResult.model;
+      }
     } catch (error) {
       reply = error && error.name === 'AiBudgetError' ? createAiPausedReply(userLanguage) : createFriendlyFallback(userLanguage);
       ai.error = error.message;
