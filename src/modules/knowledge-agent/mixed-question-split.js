@@ -126,10 +126,23 @@ function legalAnswerForClause(clause, language) {
 }
 
 function joinSplitReply(split, practicalReply, legalReply) {
-  const practicalText = String(practicalReply || '').trim();
-  const legalText = String(legalReply || '').trim();
+  const practicalText = String(practicalReply || "").trim();
+  const legalText = String(legalReply || "").trim();
+  const legalParagraphs = new Set(
+    legalText.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean),
+  );
+  // Keep approved/fallback legal text verbatim; drop from the practical half
+  // any paragraph already repeated verbatim inside the legal half (e.g.
+  // CLARIFICATION or disclaimer), and deduplicate across blocks.
+  const dedupedPractical = practicalText
+    ? practicalText
+      .split(/\n{2,}/)
+      .map((p) => p.trim())
+      .filter((p) => p && !legalParagraphs.has(p))
+      .join("\n\n")
+    : "";
   const ordered = split.clauses.map((clause) => (
-    clause === split.practical ? practicalText : legalText
+    clause === split.practical ? dedupedPractical : legalText
   ));
   const parts = [];
   for (const part of ordered) {
@@ -137,9 +150,8 @@ function joinSplitReply(split, practicalReply, legalReply) {
     if (parts.some((kept) => kept.includes(part))) continue;
     parts.push(part);
   }
-  return parts.join('\n\n');
+  return parts.join("\n\n");
 }
-
 function mergeInlineKeyboards(primary, extra) {
   const rows = [];
   if (primary && Array.isArray(primary.inline_keyboard)) rows.push(...primary.inline_keyboard);

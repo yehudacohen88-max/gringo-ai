@@ -46,6 +46,16 @@ const PRACTICAL_FLAG_DOMAINS = Object.freeze({
 
 const NATIVE_REVIEW_LANGUAGES = Object.freeze(['th', 'hi', 'si']);
 
+const SCHEMA_FIELDS = Object.freeze([
+  'domain',
+  'rights',
+  'topic_sure',
+  'info_sure',
+  'needs_practical_clarification',
+  'medical_advice',
+  'reply',
+]);
+
 function languageKey(language) {
   const code = String(language || '').toLowerCase();
   if (code.startsWith('he') || code.startsWith('iw')) return 'he';
@@ -66,11 +76,13 @@ function responseTextFormat() {
       properties: {
         domain: { type: 'string', enum: [...DOMAIN_ENUM] },
         rights: { type: 'boolean' },
-        sure: { type: 'boolean' },
+        topic_sure: { type: 'boolean' },
+        info_sure: { type: 'boolean' },
+        needs_practical_clarification: { type: 'boolean' },
         medical_advice: { type: 'boolean' },
         reply: { type: 'string' },
       },
-      required: ['domain', 'rights', 'sure', 'medical_advice', 'reply'],
+      required: [...SCHEMA_FIELDS],
     },
   };
 }
@@ -93,13 +105,19 @@ function parseModelReply(text, meta = {}) {
     return { ok: false, reason: 'schema' };
   }
   const keys = Object.keys(value);
-  const fields = ['domain', 'rights', 'sure', 'medical_advice', 'reply'];
-  if (keys.length !== fields.length || fields.some((key) => !Object.prototype.hasOwnProperty.call(value, key))) {
+  if (keys.length !== SCHEMA_FIELDS.length || SCHEMA_FIELDS.some((key) => !Object.prototype.hasOwnProperty.call(value, key))) {
     return { ok: false, reason: 'schema' };
   }
   if (typeof value.domain !== 'string') return { ok: false, reason: 'schema' };
   if (!DOMAIN_ENUM.includes(value.domain)) return { ok: false, reason: 'unknown_enum' };
-  if (typeof value.rights !== 'boolean' || typeof value.sure !== 'boolean' || typeof value.medical_advice !== 'boolean' || typeof value.reply !== 'string') {
+  if (
+    typeof value.rights !== 'boolean'
+    || typeof value.topic_sure !== 'boolean'
+    || typeof value.info_sure !== 'boolean'
+    || typeof value.needs_practical_clarification !== 'boolean'
+    || typeof value.medical_advice !== 'boolean'
+    || typeof value.reply !== 'string'
+  ) {
     return { ok: false, reason: 'schema' };
   }
   return {
@@ -107,11 +125,55 @@ function parseModelReply(text, meta = {}) {
     value: {
       domain: value.domain,
       rights: value.rights,
-      sure: value.sure,
+      topic_sure: value.topic_sure,
+      info_sure: value.info_sure,
+      needs_practical_clarification: value.needs_practical_clarification,
       medical_advice: value.medical_advice,
       reply: value.reply,
     },
   };
+}
+
+function normalizeClassification(classification) {
+  if (!classification || typeof classification !== 'object' || Array.isArray(classification)) {
+    return { ok: false, reason: 'schema' };
+  }
+  if (typeof classification.domain !== 'string') return { ok: false, reason: 'schema' };
+  if (!DOMAIN_ENUM.includes(classification.domain)) return { ok: false, reason: 'unknown_enum' };
+  if (typeof classification.rights !== 'boolean' || typeof classification.medical_advice !== 'boolean' || typeof classification.reply !== 'string') {
+    return { ok: false, reason: 'schema' };
+  }
+
+  const hasSeparated = Object.prototype.hasOwnProperty.call(classification, 'topic_sure')
+    || Object.prototype.hasOwnProperty.call(classification, 'info_sure')
+    || Object.prototype.hasOwnProperty.call(classification, 'needs_practical_clarification');
+
+  if (hasSeparated) {
+    if (
+      typeof classification.topic_sure !== 'boolean'
+      || typeof classification.info_sure !== 'boolean'
+      || typeof classification.needs_practical_clarification !== 'boolean'
+    ) {
+      return { ok: false, reason: 'schema' };
+    }
+    return {
+      ok: true,
+      mode: 'separated',
+      topicSure: classification.topic_sure,
+      infoSure: classification.info_sure,
+      needsPracticalClarification: classification.needs_practical_clarification,
+    };
+  }
+
+  if (typeof classification.sure === 'boolean') {
+    return {
+      ok: true,
+      mode: 'legacy',
+      sure: classification.sure,
+    };
+  }
+
+  return { ok: false, reason: 'schema' };
 }
 
 function agreedPracticalDomain(flags, domain) {
@@ -135,16 +197,15 @@ function domainAllowed(domain, language, flags) {
 }
 
 // Returns an action. reply is set only for action 'allow'.
-// menu: rights menu. clarification: existing CLARIFICATION. fallback: friendly fallback.
+// menu: rights menu.
+// clarification: clarificationKind 'topic_or_safety' (existing CLARIFICATION)
+// or 'practical' (structured practical clarification template for domain).
+// fallback: friendly fallback.
 function decideDualGate({ classification, language, disposition, practical } = {}) {
   const lang = languageKey(language);
-  if (!classification || typeof classification !== 'object' || Array.isArray(classification)) {
-    return { action: 'fallback', reason: 'schema' };
-  }
-  if (typeof classification.domain !== 'string') return { action: 'fallback', reason: 'schema' };
-  if (!DOMAIN_ENUM.includes(classification.domain)) return { action: 'fallback', reason: 'unknown_enum' };
-  if (typeof classification.rights !== 'boolean' || typeof classification.sure !== 'boolean' || typeof classification.medical_advice !== 'boolean' || typeof classification.reply !== 'string') {
-    return { action: 'fallback', reason: 'schema' };
+  const norm = normalizeClassification(classification);
+  if (!norm.ok) {
+    return { action: 'fallback', reason: norm.reason };
   }
 
   const domain = classification.domain;
@@ -155,22 +216,58 @@ function decideDualGate({ classification, language, disposition, practical } = {
     else if (domain === 'rights') reason = 'domain_rights';
     return { action: 'menu', reason };
   }
-  if (classification.medical_advice === true) return { action: 'clarification', reason: 'medical_advice' };
-  if (domain === 'health_place' && classification.sure !== true) {
-    return { action: 'clarification', reason: 'health_place_unsure' };
+  if (classification.medical_advice === true) {
+    return { action: 'clarification', clarificationKind: 'topic_or_safety', reason: 'medical_advice' };
   }
-  if (classification.sure !== true) return { action: 'clarification', reason: 'unsure' };
-  if (domain === 'general') return { action: 'clarification', reason: 'general_closed' };
+  if (domain === 'general') {
+    return { action: 'clarification', clarificationKind: 'topic_or_safety', reason: 'general_closed' };
+  }
   if (domain === 'health_place' && !(practical && practical.healthLocation === true)) {
-    return { action: 'clarification', reason: 'health_place_not_location' };
+    return { action: 'clarification', clarificationKind: 'topic_or_safety', reason: 'health_place_not_location' };
   }
-  if (!domainAllowed(domain, lang, practical)) return { action: 'clarification', reason: 'domain_not_allowed' };
+  if (!domainAllowed(domain, lang, practical)) {
+    return { action: 'clarification', clarificationKind: 'topic_or_safety', reason: 'domain_not_allowed' };
+  }
+
   // Every language, including Hebrew and English: exactly one practical flag
   // must name the same domain. A greeting has no such flag.
   if (!agreedPracticalDomain(practical, domain)) {
-    return { action: 'clarification', reason: 'domain_disagreement' };
+    if (norm.mode === 'separated' && norm.topicSure !== true) {
+      return { action: 'clarification', clarificationKind: 'topic_or_safety', reason: 'topic_unsure' };
+    }
+    if (norm.mode === 'legacy' && norm.sure !== true) {
+      return { action: 'clarification', clarificationKind: 'topic_or_safety', reason: 'unsure' };
+    }
+    return { action: 'clarification', clarificationKind: 'topic_or_safety', reason: 'domain_disagreement' };
   }
-  if (!classification.reply.trim()) return { action: 'clarification', reason: 'empty_reply' };
+
+  if (norm.mode === 'separated') {
+    if (norm.topicSure !== true) {
+      return { action: 'clarification', clarificationKind: 'topic_or_safety', reason: 'topic_unsure' };
+    }
+    if (norm.needsPracticalClarification === true || norm.infoSure !== true) {
+      return {
+        action: 'clarification',
+        clarificationKind: 'practical',
+        domain,
+        reason: norm.needsPracticalClarification ? 'needs_practical_clarification' : 'insufficient_info',
+      };
+    }
+  } else if (norm.sure !== true) {
+    // Legacy classification where code practical flag and model domain already
+    // agreed on a non-legal practical domain, with rights=false and
+    // medical_advice=false: uncertainty is practical/factual, not worker rights.
+    return {
+      action: 'clarification',
+      clarificationKind: 'practical',
+      domain,
+      reason: 'insufficient_info',
+    };
+  }
+
+  if (!classification.reply.trim()) {
+    return { action: 'clarification', clarificationKind: 'practical', domain, reason: 'empty_reply' };
+  }
   return { action: 'allow', reason: 'agreed', reply: classification.reply };
 }
 
@@ -182,6 +279,7 @@ module.exports = {
   NATIVE_REVIEW_LANGUAGES,
   PRACTICAL_DOMAINS,
   PRACTICAL_FLAG_DOMAINS,
+  SCHEMA_FIELDS,
   agreedPracticalDomain,
   decideDualGate,
   domainAllowed,
