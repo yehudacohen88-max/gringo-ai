@@ -32,6 +32,7 @@ const {
   swapRightsFallbackToLanguage,
 } = require('../knowledge-agent/legal-question-guard');
 const { classifyUserQuestion } = require('../knowledge-agent/legal-topic-detector');
+const { createRightsReplyMarkup } = require('../knowledge-agent/rights-renderer');
 const { languageDetectionService } = require('../language');
 const {
   appendLanguageConflictNotice,
@@ -2480,6 +2481,8 @@ async function processWebMessage(messageContext = {}) {
     || (isLegalCategory(knowledgeResult.category) && askedClass.disposition !== 'practical');
   // A legal segment is never given to the model to compose. The only legal
   // text is a gate-approved record's own answer, copied with its source.
+  // The reply text stays on that path. The menu is buttons only.
+  let rightsReplyMarkup;
   let withholdLegalTranslation = legalSegment;
   if (legalSegment) {
     reply = guardGeneratedLegalOutput('', {
@@ -2489,6 +2492,7 @@ async function processWebMessage(messageContext = {}) {
       verifiedRecords,
     });
     finalStatus = reply.includes(createRightsUnverifiedFallback(userLanguage)) ? 'LEGAL_UNVERIFIED' : 'LEGAL_VERIFIED';
+    rightsReplyMarkup = createRightsReplyMarkup(userLanguage);
   } else if (shouldUseAiProvider(question, knowledgeResult)) {
     ai.attempted = true;
 
@@ -2554,6 +2558,7 @@ async function processWebMessage(messageContext = {}) {
 
   return deliverResponse({
     reply,
+    ...(rightsReplyMarkup ? { replyMarkup: rightsReplyMarkup } : {}),
     ...(withholdLegalTranslation ? { skipOutgoingTranslation: true, replyLanguage: userLanguage } : {}),
     category: knowledgeResult.category,
     status: finalStatus,

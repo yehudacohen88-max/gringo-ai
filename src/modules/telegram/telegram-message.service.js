@@ -59,10 +59,13 @@ function inlineKeyboard(rows = []) {
     .map((row) => row.filter(Boolean))
     .filter((row) => row.length)
     .map((row) =>
-      row.map((button) => ({
-        text: button.text,
-        callback_data: button.data.slice(0, 64),
-      }))
+      row.map((button) => {
+        if (button.url) return { text: button.text, url: button.url };
+        return {
+          text: button.text,
+          callback_data: button.data.slice(0, 64),
+        };
+      })
     );
   return inline_keyboard.length ? { inline_keyboard } : undefined;
 }
@@ -71,8 +74,18 @@ function button(text, action, module, recordId) {
   return { text, data: [action, module, recordId].map(cleanText).join(':') };
 }
 
+function urlButton(text, url) {
+  return { text, url };
+}
+
 function parseCallbackData(data = '') {
-  const [action, moduleName, recordId] = cleanText(data).split(':');
+  const parts = cleanText(data).split(':');
+  // Rights callbacks carry show:<topic> or lang:<handbook|en>. The English
+  // menu opened by lang:en uses show:rights:en:<topic>, so the topic is kept.
+  if (parts[1] === 'rights') {
+    return { action: parts[0], moduleName: parts[1], recordId: parts.slice(2).join(':') };
+  }
+  const [action, moduleName, recordId] = parts;
   return { action, moduleName, recordId };
 }
 
@@ -518,6 +531,7 @@ async function processTextMessage(message = {}) {
   const reply = result.reply || 'Gringo received your message.';
   return {
     reply,
+    ...(result.replyMarkup ? { replyMarkup: result.replyMarkup } : {}),
     user,
     category: result.category,
     status: result.status,
@@ -747,6 +761,32 @@ async function processCallback(callback = {}, options = {}) {
   }
 
   const parsed = parseCallbackData(callback.callbackData);
+  if (parsed.moduleName === 'rights') {
+    const { replyForRightsCallback, rightsCallbackAllowed } = require('../knowledge-agent/rights-renderer');
+    if (!rightsCallbackAllowed(parsed)) {
+      await answerCallback(callback, 'Action not available.');
+      return { rejected: true };
+    }
+    try {
+      const user = await findOrCreateTelegramUser(callback);
+      const profile = {
+        ...(await currentProfile(user.userId)),
+        userId: user.userId,
+        channelLanguage: callback.languageCode,
+      };
+      const language = languageFromProfile(profile, callback.languageCode);
+      const rendered = replyForRightsCallback(parsed, language);
+      await answerCallback(callback, 'Done.');
+      await editCallbackMessage(callback, rendered.reply, rendered.replyMarkup);
+      await saveCallbackHistory(callback, user.userId, rendered.reply, 'TELEGRAM_CALLBACK_RIGHTS');
+      return { reply: rendered.reply, replyMarkup: rendered.replyMarkup, user, status: 'TELEGRAM_CALLBACK_DONE' };
+    } catch (error) {
+      safeTelegramWarning('Telegram callback failed safely.');
+      await answerCallback(callback, 'Sorry, this action could not be completed.');
+      return { error: true };
+    }
+  }
+
   const allowedModules = ['jobs', 'housing', 'documents', 'notifications', 'tasks', 'community', 'services', 'link'];
   const allowedActions = ['view', 'found', 'stop', 'read', 'dismiss', 'later', 'later1', 'later3', 'complete', 'open', 'more', 'save', 'renew', 'confirm', 'cancel'];
   if (!allowedModules.includes(parsed.moduleName) || !allowedActions.includes(parsed.action)) {
@@ -778,10 +818,14 @@ async function recordDeliveryStatus(message, userId, reply, status, deliveryStat
 }
 
 module.exports = {
+  button,
   createHelpReply,
   createStartIntro,
   findOrCreateTelegramUser,
+  inlineKeyboard,
+  parseCallbackData,
   processCallback,
   processTelegramMessage,
   recordDeliveryStatus,
+  urlButton,
 };
